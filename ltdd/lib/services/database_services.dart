@@ -1,3 +1,4 @@
+// Chỉnh sửa file: lib/services/database_services.dart (thay đổi deleteTempBooking để optional add back seats)
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Nếu cần UID từ Auth
 import '../models/booking.dart'; // Import tất cả models
@@ -5,6 +6,7 @@ import '../models/movie.dart';
 import '../models/showtime.dart';
 import '../models/booking.dart';
 import '../models/payment.dart';
+import '../models/theater.dart';
 import '../models/voucher.dart';
 import '../models/tempbooking.dart';
 import '../models/user.dart';
@@ -80,23 +82,19 @@ class DatabaseService {
     return movies;
   }
 
-  Future<void> updateMovie(String movieId, {double? newRating, String? newDescription}) async {
-    Map<String, dynamic> updates = {};
-    if (newRating != null) updates['rating'] = newRating;
-    if (newDescription != null) updates['description'] = newDescription;
-    await _db.child('movies').child(movieId).update(updates);
-  }
-
-  Future<void> deleteMovie(String movieId) async {
-    await _db.child('movies').child(movieId).remove();
-    // Optional: Xóa liên kết khác nếu cần, như showtimes liên quan
-  }
-
-//SHOWTIME
+  //SHOWTIME
   Future<String> saveShowtime(ShowtimeModel showtime) async {
     final ref = _db.child('showtimes').push();
     await ref.set(showtime.toMap());
     return ref.key!;
+  }
+
+  Future<ShowtimeModel?> getShowtime(String showtimeId) async {
+    DataSnapshot snapshot = await _db.child('showtimes').child(showtimeId).get();
+    if (snapshot.exists) {
+      return ShowtimeModel.fromMap(snapshot.value as Map<dynamic, dynamic>, showtimeId);
+    }
+    return null;
   }
 
   Future<List<ShowtimeModel>> getShowtimesByMovie(String movieId) async {
@@ -112,61 +110,24 @@ class DatabaseService {
     return showtimes;
   }
 
-  Future<void> reserveSeats(String showtimeId, List<String> seatsToReserve) async {
-    final ref = _db.child('showtimes').child(showtimeId).child('availableSeats');
-    await ref.runTransaction((currentData) {
-      if (currentData == null) return Transaction.abort();
-      List<dynamic> available = List.from(currentData as List<dynamic>);
-      available.removeWhere((seat) => seatsToReserve.contains(seat));
-      return Transaction.success(available);
-    });
+  Future<void> updateShowtimeSeats(String showtimeId, List<String> newAvailableSeats) async {
+    await _db.child('showtimes').child(showtimeId).update({'availableSeats': newAvailableSeats});
   }
 
-  Future<void> updateShowtime(String showtimeId, {double? newPrice, int? newStartTime}) async {
-    Map<String, dynamic> updates = {};
-    if (newPrice != null) updates['price'] = newPrice;
-    if (newStartTime != null) updates['startTime'] = newStartTime;
-    await _db.child('showtimes').child(showtimeId).update(updates);
-  }
-
-  Future<void> deleteShowtime(String showtimeId) async {
-    await _db.child('showtimes').child(showtimeId).remove();
-  }
-
-  //BookingModel và TempBookingModel
+  //TEMP BOOKING
   Future<String> saveTempBooking(TempBookingModel temp) async {
     final ref = _db.child('temp_bookings').push();
     await ref.set(temp.toMap());
-    // Đồng thời reserve seats trong Showtime
-    await reserveSeats(temp.showtimeId, temp.seats);
-    return ref.key!;
-  }
+    String tempId = ref.key!;
 
-  Future<String> convertTempToBooking(String tempId, double totalPrice, String? voucherId) async {
-    TempBookingModel? temp = await getTempBooking(tempId);
-    if (temp == null || temp.status != 'active') return '';
+    // Remove seats from showtime availableSeats
+    ShowtimeModel? showtime = await getShowtime(temp.showtimeId);
+    if (showtime != null) {
+      List<String> updatedSeats = List.from(showtime.availableSeats)..removeWhere((seat) => temp.seats.contains(seat));
+      await updateShowtimeSeats(temp.showtimeId, updatedSeats);
+    }
 
-    // Tính finalPrice dựa trên voucher (logic ở đây hoặc trong BLoC)
-    double finalPrice = totalPrice; // Áp voucher nếu có
-
-    BookingModel booking = BookingModel(
-      id: '', // Sẽ generate
-      userId: temp.userId,
-      showtimeId: temp.showtimeId,
-      seats: temp.seats,
-      totalPrice: totalPrice,
-      finalPrice: finalPrice,
-      voucherId: voucherId,
-      status: 'confirmed',
-    );
-
-    final bookingRef = _db.child('bookings').push();
-    await bookingRef.set(booking.toMap());
-
-    // Cập nhật status temp và xóa nếu cần
-    await _db.child('temp_bookings').child(tempId).update({'status': 'converted'});
-
-    return bookingRef.key!;
+    return tempId;
   }
 
   Future<TempBookingModel?> getTempBooking(String tempId) async {
@@ -177,24 +138,48 @@ class DatabaseService {
     return null;
   }
 
-  Future<void> updateBookingStatus(String bookingId, String newStatus) async {
-    await _db.child('bookings').child(bookingId).update({'status': newStatus});
+  Future<void> deleteTempBooking(String tempId, {bool addBackSeats = true}) async {
+    TempBookingModel? temp = await getTempBooking(tempId);
+    if (temp != null && temp.status == 'active' && addBackSeats) {
+      // Add seats back to showtime availableSeats only if addBackSeats is true
+      ShowtimeModel? showtime = await getShowtime(temp.showtimeId);
+      if (showtime != null) {
+        List<String> updatedSeats = List.from(showtime.availableSeats)..addAll(temp.seats);
+        updatedSeats = updatedSeats.toSet().toList(); // Remove duplicates
+        await updateShowtimeSeats(temp.showtimeId, updatedSeats);
+      }
+    }
+    await _db.child('temp_bookings').child(tempId).remove();
   }
 
-  Future<void> deleteBooking(String bookingId) async {
-    await _db.child('bookings').child(bookingId).remove();
+  //BOOKING
+  Future<String> saveBooking(BookingModel booking) async {
+    final ref = _db.child('bookings').push();
+    await ref.set(booking.toMap());
+    return ref.key!;
   }
 
+  Future<List<BookingModel>> getBookingsByUser(String userId) async {
+    Query query = _db.child('bookings').orderByChild('userId').equalTo(userId);
+    DataSnapshot snapshot = await query.get();
+    List<BookingModel> bookings = [];
+    if (snapshot.exists) {
+      Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        bookings.add(BookingModel.fromMap(value, key));
+      });
+    }
+    return bookings;
+  }
 
-
-  //PaymentModel và VoucherModel
-
+  //PAYMENT
   Future<String> savePayment(PaymentModel payment) async {
     final ref = _db.child('payments').push();
     await ref.set(payment.toMap());
     return ref.key!;
   }
 
+  //VOUCHER
   Future<VoucherModel?> getVoucher(String voucherId) async {
     DataSnapshot snapshot = await _db.child('vouchers').child(voucherId).get();
     if (snapshot.exists) {
@@ -203,37 +188,30 @@ class DatabaseService {
     return null;
   }
 
-  Future<void> updatePaymentStatus(String paymentId, String newStatus, String? transactionId) async {
-    Map<String, dynamic> updates = {'status': newStatus};
-    if (transactionId != null) updates['transactionId'] = transactionId;
-    await _db.child('payments').child(paymentId).update(updates);
+  //THEATER (unchanged)
+  Future<String> saveTheater(TheaterModel theater) async {
+    final ref = _db.child('theaters').push(); // Generate ID
+    await ref.set(theater.toMap());
+    return ref.key!;
   }
 
-  Future<void> deletePayment(String paymentId) async {
-    await _db.child('payments').child(paymentId).remove();
+  Future<TheaterModel?> getTheater(String theaterId) async {
+    DataSnapshot snapshot = await _db.child('theaters').child(theaterId).get();
+    if (snapshot.exists) {
+      return TheaterModel.fromMap(snapshot.value as Map<dynamic, dynamic>, theaterId);
+    }
+    return null;
   }
 
-  Future<void> updateVoucher(String voucherId, {bool? isActive, int? newExpiryDate}) async {
-    Map<String, dynamic> updates = {};
-    if (isActive != null) updates['isActive'] = isActive;
-    if (newExpiryDate != null) updates['expiryDate'] = newExpiryDate;
-    await _db.child('vouchers').child(voucherId).update(updates);
-  }
-
-  Future<void> deleteVoucher(String voucherId) async {
-    await _db.child('vouchers').child(voucherId).remove();
-  }
-
-  Future<void> updateTempBooking(String tempId, {int? newExpiryTime, String? newStatus}) async {
-    Map<String, dynamic> updates = {};
-    if (newExpiryTime != null) updates['expiryTime'] = newExpiryTime;
-    if (newStatus != null) updates['status'] = newStatus;
-    await _db.child('temp_bookings').child(tempId).update(updates);
-  }
-
-  Future<void> deleteTempBooking(String tempId) async {
-    await _db.child('temp_bookings').child(tempId).remove();
-    // Optional: Release seats trong Showtime nếu status là 'active'
+  Future<List<TheaterModel>> getAllTheaters() async {
+    DataSnapshot snapshot = await _db.child('theaters').get();
+    List<TheaterModel> theaters = [];
+    if (snapshot.exists) {
+      Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        theaters.add(TheaterModel.fromMap(value, key));
+      });
+    }
+    return theaters;
   }
 }
-
