@@ -1,4 +1,4 @@
-// Chỉnh sửa file: lib/screens/movie_detail_screen.dart
+// Updated: lib/screens/movie_detail_screen.dart
 import 'package:flutter/material.dart';
 
 import '../models/movie.dart';
@@ -29,25 +29,77 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_movie == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_movie == null) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.blue)));
     return Scaffold(
-      appBar: AppBar(title: Text(_movie!.title)),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Image.network(_movie!.posterUrl, height: 200, width: double.infinity, fit: BoxFit.cover),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(_movie!.description),
+      appBar: AppBar(
+        title: Text(_movie!.title),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade700, Colors.blue.shade500],
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ShowtimesScreen(movieId: widget.movieId)),
+          ),
+        ),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.blue.shade100,
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Image.network(_movie!.posterUrl, height: 300, width: double.infinity, fit: BoxFit.cover),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  _movie!.description,
+                  style: TextStyle(color: Colors.black87, fontSize: 16),
+                ),
               ),
-              child: const Text('Đặt Vé'),
-            ),
-          ],
+              ElevatedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ShowtimesScreen(movieId: widget.movieId)),
+                ),
+                style: ButtonStyle(
+                  padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 32, vertical: 16)),
+                  shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+                  backgroundColor: MaterialStateProperty.all(Colors.transparent),
+                  shadowColor: MaterialStateProperty.all(Colors.blue.shade300),
+                  elevation: MaterialStateProperty.all(8),
+                  foregroundColor: MaterialStateProperty.resolveWith((states) {
+                    if (states.contains(MaterialState.hovered)) {
+                      return Colors.blue.shade900; // In đậm khi hover
+                    }
+                    return Colors.blue.shade700;
+                  }),
+                ),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade600, Colors.blue.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Đặt Vé',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

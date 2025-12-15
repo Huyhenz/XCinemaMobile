@@ -1,4 +1,4 @@
-// Chỉnh sửa file: lib/screens/payment_screen.dart (thêm logic không add back seats khi deleteTemp sau success)
+// Updated: lib/screens/payment_screen.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -49,39 +49,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() {}); // Optional, if need to update UI
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_tempBookingId == null) return const Center(child: CircularProgressIndicator());
-
-    return WillPopScope(
-      onWillPop: () async {
-        await _handleCancel();
-        return true;
-      },
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Payment')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Total Amount: ${widget.totalPrice} VND'),
-              if (_isProcessing) const CircularProgressIndicator(),
-              ElevatedButton(
-                onPressed: _isProcessing ? null : _handlePayment,
-                child: const Text('Pay Now'),
-              ),
-              ElevatedButton(
-                onPressed: _isProcessing ? null : _handleCancel,
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-// Chỉnh sửa file: lib/screens/payment_screen.dart (sửa _handlePayment để gọi deleteTempBooking với addBackSeats = false)
   Future<void> _handlePayment() async {
     setState(() => _isProcessing = true);
     // Simulate payment process (integrate real payment gateway here, e.g., VNPay)
@@ -134,5 +101,117 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking Cancelled')));
     Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_tempBookingId == null) return const Center(child: CircularProgressIndicator(color: Colors.blue));
+
+    return WillPopScope(
+      onWillPop: () async {
+        await _handleCancel();
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Thanh Toán'),
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade700, Colors.blue.shade500],
+              ),
+            ),
+          ),
+        ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.blue.shade100,
+                Colors.white,
+              ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Tổng Số Tiền: ${widget.totalPrice} VND',
+                  style: TextStyle(fontSize: 24, color: Colors.black87, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 32),
+                if (_isProcessing) const CircularProgressIndicator(color: Colors.blue),
+                ElevatedButton(
+                  onPressed: _isProcessing ? null : _handlePayment,
+                  style: ButtonStyle(
+                    padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 48, vertical: 16)),
+                    shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+                    backgroundColor: MaterialStateProperty.all(Colors.transparent),
+                    shadowColor: MaterialStateProperty.all(Colors.blue.shade300),
+                    elevation: MaterialStateProperty.all(8),
+                    foregroundColor: MaterialStateProperty.resolveWith((states) {
+                      if (states.contains(MaterialState.hovered)) {
+                        return Colors.blue.shade900; // In đậm khi hover
+                      }
+                      return Colors.blue.shade700;
+                    }),
+                  ),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.green.shade600, Colors.green.shade400],
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Container(
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Thanh Toán Ngay',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _isProcessing ? null : _handleCancel,
+                  style: ButtonStyle(
+                    padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 48, vertical: 16)),
+                    shape: MaterialStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+                    backgroundColor: MaterialStateProperty.all(Colors.transparent),
+                    shadowColor: MaterialStateProperty.all(Colors.blue.shade300),
+                    elevation: MaterialStateProperty.all(8),
+                    foregroundColor: MaterialStateProperty.resolveWith((states) {
+                      if (states.contains(MaterialState.hovered)) {
+                        return Colors.blue.shade900; // In đậm khi hover
+                      }
+                      return Colors.blue.shade700;
+                    }),
+                  ),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.red.shade600, Colors.red.shade400],
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Container(
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Hủy',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

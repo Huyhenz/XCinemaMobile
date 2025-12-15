@@ -1,4 +1,4 @@
-// Chỉnh sửa file: lib/services/database_services.dart (thay đổi deleteTempBooking để optional add back seats)
+// File: lib/services/database_services.dart (giữ nguyên Realtime Database cho tất cả)
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Nếu cần UID từ Auth
 import '../models/booking.dart'; // Import tất cả models
@@ -141,7 +141,7 @@ class DatabaseService {
   Future<void> deleteTempBooking(String tempId, {bool addBackSeats = true}) async {
     TempBookingModel? temp = await getTempBooking(tempId);
     if (temp != null && temp.status == 'active' && addBackSeats) {
-      // Add seats back to showtime availableSeats only if addBackSeats is true
+      // Add seats back to showtime availableSeats
       ShowtimeModel? showtime = await getShowtime(temp.showtimeId);
       if (showtime != null) {
         List<String> updatedSeats = List.from(showtime.availableSeats)..addAll(temp.seats);
@@ -188,7 +188,7 @@ class DatabaseService {
     return null;
   }
 
-  //THEATER (unchanged)
+  //THEATER
   Future<String> saveTheater(TheaterModel theater) async {
     final ref = _db.child('theaters').push(); // Generate ID
     await ref.set(theater.toMap());

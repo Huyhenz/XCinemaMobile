@@ -45,6 +45,9 @@ dependencies:
   cloud_functions: ^6.0.4
   flutter_bloc: ^9.1.1
   image_picker: ^1.2.1
+  google_sign_in: ^6.2.1
+  flutter_facebook_auth: ^7.0.1
+  github_sign_in_plus: ^0.0.2
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +70,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+dependency_overrides:
+  http: ^1.2.2  # Ep use version compatible with Firebase, but may break github_sign_in
 
   # To add assets to your application, add an assets section, like this:
   # assets:
