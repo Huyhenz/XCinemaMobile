@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart'; // Thêm dependency: image_picker: ^1.0.0 vào pubspec.yaml
 import 'dart:io';
-
+import 'admin_cleanup_screen.dart';
 import '../blocs/admin/admin_bloc.dart';
 import '../blocs/admin/admin_event.dart';
 import '../blocs/admin/admin_state.dart';
@@ -37,6 +37,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Dashboard'),
+          actions: [
+            // ✅ THÊM NÚT NÀY
+            IconButton(
+              icon: const Icon(Icons.cleaning_services),
+              tooltip: 'Database Cleanup',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminCleanupScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
           bottom: TabBar(
             controller: _tabController,
             tabs: const [
@@ -45,15 +60,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               Tab(text: 'Manage Theaters'),
             ],
           ),
-        ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _CreateMovieTab(),
-            _CreateShowtimeTab(),
-            _CreateTheaterTab(),
-          ],
-        ),
+        )
       ),
     );
   }

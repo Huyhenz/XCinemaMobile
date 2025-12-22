@@ -1,266 +1,332 @@
-// Updated: lib/screens/home_screen.dart - Cinema Classic Theme
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../blocs/movies/movies_bloc.dart';
 import '../blocs/movies/movies_event.dart';
 import '../blocs/movies/movies_state.dart';
 import '../models/movie.dart';
 import 'movie_detail_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => MovieBloc()..add(LoadMovies()),
       child: Scaffold(
-        backgroundColor: Color(0xFF1a1a1a),
-        appBar: AppBar(
-          backgroundColor: Color(0xFF1a1a1a),
-          elevation: 0,
-          centerTitle: true,
-          title: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.movie_filter, color: Color(0xFFD4AF37), size: 28),
-                  SizedBox(width: 10),
-                  Text(
-                    'Cinema',
-                    style: TextStyle(
-                      color: Color(0xFFD4AF37),
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                      fontFamily: 'serif',
-                    ),
+        backgroundColor: const Color(0xFF0F0F0F),
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              _buildHeader(),
+              _buildSearchBar(),
+              _buildTabBar(),
+              _buildMovieGrid(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              Text(
-                'Ticket',
+              child: const Text(
+                'CINEMA',
                 style: TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 4,
-                ),
-              ),
-            ],
-          ),
-          bottom: PreferredSize(
-            preferredSize: Size.fromHeight(40),
-            child: Container(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Buy Your Ticket Now',
-                style: TextStyle(
-                  color: Color(0xFFB8941E),
-                  fontSize: 12,
-                  letterSpacing: 1.5,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 3,
+                  color: Colors.white,
                 ),
               ),
             ),
-          ),
-        ),
-        body: Stack(
-          children: [
-            // Film reel borders
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: _buildFilmStrip(),
-            ),
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: _buildFilmStrip(),
-            ),
-            // Main content
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 50.0),
-              child: BlocBuilder<MovieBloc, MovieState>(
-                builder: (context, state) {
-                  if (state.movies.isEmpty) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFFD4AF37),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    itemCount: state.movies.length,
-                    itemBuilder: (context, index) {
-                      MovieModel movie = state.movies[index];
-                      return GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MovieDetailScreen(movieId: movie.id),
-                          ),
-                        ),
-                        child: Container(
-                          margin: EdgeInsets.only(bottom: 30),
-                          child: Column(
-                            children: [
-                              // Movie Poster with ornate frame
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Color(0xFFD4AF37),
-                                    width: 3,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Color(0xFFD4AF37).withOpacity(0.3),
-                                      blurRadius: 20,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                child: Stack(
-                                  children: [
-                                    ClipRect(
-                                      child: Image.network(
-                                        movie.posterUrl,
-                                        height: 400,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                    // Gradient overlay at bottom
-                                    Positioned(
-                                      bottom: 0,
-                                      left: 0,
-                                      right: 0,
-                                      child: Container(
-                                        height: 100,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            colors: [
-                                              Colors.transparent,
-                                              Colors.black.withOpacity(0.8),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(height: 15),
-                              // Movie Title
-                              Text(
-                                movie.title,
-                                style: TextStyle(
-                                  color: Color(0xFFD4AF37),
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
-                                  fontFamily: 'serif',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 8),
-                              // Genre and Rating
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    movie.genre,
-                                    style: TextStyle(
-                                      color: Color(0xFFB8941E),
-                                      fontSize: 14,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                  SizedBox(width: 20),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.star,
-                                        color: Color(0xFFD4AF37),
-                                        size: 16,
-                                      ),
-                                      SizedBox(width: 5),
-                                      Text(
-                                        '${movie.rating}',
-                                        style: TextStyle(
-                                          color: Color(0xFFD4AF37),
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 15),
-                              // Decorative dots
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List.generate(
-                                  5,
-                                      (i) => Container(
-                                    margin: EdgeInsets.symmetric(horizontal: 4),
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: i < 3 ? Color(0xFFD4AF37) : Color(0xFF3a3a3a),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF2A2A2A)),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        // Bottom Navigation with film theme
-        bottomNavigationBar: Container(
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
+        child: Container(
           decoration: BoxDecoration(
-            color: Color(0xFF1a1a1a),
-            border: Border(
-              top: BorderSide(color: Color(0xFFD4AF37), width: 2),
+            color: const Color(0xFF2A2A2A),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: TextField(
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Tìm kiếm phim...',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFFE50914)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             ),
           ),
-          child: BottomNavigationBar(
-            backgroundColor: Colors.transparent,
-            selectedItemColor: Color(0xFFD4AF37),
-            unselectedItemColor: Color(0xFF666666),
-            elevation: 0,
-            type: BottomNavigationBarType.fixed,
-            items: [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: TabBar(
+          controller: _tabController,
+          indicator: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE50914), Color(0xFFB20710)],
+            ),
+            borderRadius: BorderRadius.circular(25),
+          ),
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.grey,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          tabs: const [
+            Tab(text: 'Đang Chiếu'),
+            Tab(text: 'Sắp Chiếu'),
+            Tab(text: 'Phổ Biến'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMovieGrid() {
+    return BlocBuilder<MovieBloc, MovieState>(
+      builder: (context, state) {
+        if (state.movies.isEmpty) {
+          return SliverToBoxAdapter(
+            child: _buildLoadingGrid(),
+          );
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 100), // Bottom padding cho navbar
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.65,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                return AnimationConfiguration.staggeredGrid(
+                  position: index,
+                  duration: const Duration(milliseconds: 375),
+                  columnCount: 2,
+                  child: ScaleAnimation(
+                    child: FadeInAnimation(
+                      child: _buildMovieCard(state.movies[index]),
+                    ),
+                  ),
+                );
+              },
+              childCount: state.movies.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMovieCard(MovieModel movie) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MovieDetailScreen(movieId: movie.id),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: movie.posterUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Colors.grey[800]!,
+                  highlightColor: Colors.grey[700]!,
+                  child: Container(color: Colors.grey[800]),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.grey[800],
+                  child: const Icon(Icons.movie, size: 50, color: Colors.grey),
+                ),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.movie),
-                label: 'Movies',
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.9),
+                    ],
+                  ),
+                ),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.confirmation_number),
-                label: 'Tickets',
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE50914),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        movie.rating.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profile',
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        movie.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        movie.genre,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, color: Colors.grey, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${movie.duration} phút',
+                            style: const TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -269,20 +335,31 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFilmStrip() {
-    return Container(
-      width: 40,
-      color: Color(0xFFD4AF37),
-      child: ListView.builder(
-        itemCount: 100,
-        itemBuilder: (context, index) => Container(
-          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          height: 15,
-          decoration: BoxDecoration(
-            color: Color(0xFF1a1a1a),
-            borderRadius: BorderRadius.circular(2),
-          ),
+  Widget _buildLoadingGrid() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.65,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
         ),
+        itemCount: 6,
+        itemBuilder: (context, index) {
+          return Shimmer.fromColors(
+            baseColor: Colors.grey[800]!,
+            highlightColor: Colors.grey[700]!,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

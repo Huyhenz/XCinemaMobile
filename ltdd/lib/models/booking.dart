@@ -24,16 +24,71 @@ class BookingModel {
   });
 
   factory BookingModel.fromMap(Map<dynamic, dynamic> data, String key) {
+    // Safely convert seats - handle both List and other types
+    List<String> seatsList = [];
+    try {
+      if (data['seats'] is List) {
+        seatsList = List<String>.from(data['seats']!.map((s) => s.toString()));
+      } else if (data['seats'] != null) {
+        // If seats is not a List, try to convert
+        print('⚠️ Warning: seats is not a List in booking $key');
+      }
+    } catch (e) {
+      print('⚠️ Error parsing seats in booking $key: $e');
+    }
+
+    // Safely convert totalPrice
+    double totalPriceValue = 0.0;
+    try {
+      if (data['totalPrice'] != null) {
+        if (data['totalPrice'] is num) {
+          totalPriceValue = data['totalPrice'].toDouble();
+        } else if (data['totalPrice'] is String) {
+          totalPriceValue = double.tryParse(data['totalPrice']) ?? 0.0;
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error parsing totalPrice in booking $key: $e');
+    }
+
+    // Safely convert finalPrice
+    double? finalPriceValue;
+    try {
+      if (data['finalPrice'] != null) {
+        if (data['finalPrice'] is num) {
+          finalPriceValue = data['finalPrice'].toDouble();
+        } else if (data['finalPrice'] is String) {
+          finalPriceValue = double.tryParse(data['finalPrice']);
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error parsing finalPrice in booking $key: $e');
+    }
+
+    // Safely convert bookedAt
+    int? bookedAtValue;
+    try {
+      if (data['bookedAt'] != null) {
+        if (data['bookedAt'] is num) {
+          bookedAtValue = data['bookedAt'].toInt();
+        } else if (data['bookedAt'] is String) {
+          bookedAtValue = int.tryParse(data['bookedAt']);
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error parsing bookedAt in booking $key: $e');
+    }
+
     return BookingModel(
       id: key,
-      userId: data['userId'] ?? '',
-      showtimeId: data['showtimeId'] ?? '',
-      seats: List<String>.from(data['seats'] ?? []),
-      totalPrice: data['totalPrice']?.toDouble() ?? 0.0,
-      finalPrice: data['finalPrice']?.toDouble(),
-      voucherId: data['voucherId'],
-      bookedAt: data['bookedAt'],
-      status: data['status'] ?? 'pending',
+      userId: data['userId']?.toString() ?? '',
+      showtimeId: data['showtimeId']?.toString() ?? '',
+      seats: seatsList,
+      totalPrice: totalPriceValue,
+      finalPrice: finalPriceValue,
+      voucherId: data['voucherId']?.toString(),
+      bookedAt: bookedAtValue,
+      status: data['status']?.toString() ?? 'pending',
     );
   }
 
