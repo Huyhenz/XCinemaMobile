@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
+
+// Không cần import EmailVerificationScreen nữa vì AuthChecker tự lo
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -51,58 +54,104 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     setState(() => _isLoading = true);
 
     try {
-      UserCredential cred;
       if (_isRegister) {
-        cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        // --- ĐĂNG KÝ ---
+        // 1. Chỉ tạo Auth, KHÔNG LƯU DB
+        UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-        UserModel user = UserModel(
-          id: cred.user!.uid,
-          name: 'New User',
-          email: _emailController.text.trim(),
-          role: 'user',
-        );
-        await DatabaseService().saveUser(user);
-        _showSnackBar('Đăng ký thành công!');
+
+        if (cred.user != null) {
+          // 2. Gửi email xác thực
+          await cred.user!.sendEmailVerification();
+
+          // 3. KHÔNG SignOut -> AuthChecker ở main.dart sẽ tự chuyển sang màn hình Verify
+          _showSnackBar('Đăng ký thành công. Vui lòng kiểm tra email.');
+        }
       } else {
-        cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        // --- ĐĂNG NHẬP ---
+        UserCredential cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
-        _showSnackBar('Đăng nhập thành công!');
+
+        if (cred.user != null) {
+          // Reload để đảm bảo trạng thái emailVerified mới nhất
+          await cred.user!.reload();
+          final user = FirebaseAuth.instance.currentUser; // Lấy lại instance mới nhất
+
+          if (user != null && user.emailVerified) {
+            // --- TRƯỜNG HỢP 1: ĐÃ XÁC THỰC EMAIL ---
+            
+            // Kiểm tra xem đã có trong DB chưa (Lần đầu verify xong sẽ chưa có)
+            UserModel? existingUser = await DatabaseService().getUser(user.uid);
+            
+            if (existingUser == null) {
+              // ==> ĐÂY LÀ LÚC LƯU VÀO DB <==
+              UserModel newUser = UserModel(
+                id: user.uid,
+                name: 'New User', // Hoặc tách field tên ra form đăng ký
+                email: _emailController.text.trim(),
+                role: 'user',
+              );
+              await DatabaseService().saveUser(newUser);
+              print('✅ Đã khởi tạo user trong DB sau khi verify');
+            }
+            
+            // AuthChecker sẽ tự chuyển vào MainWrapper
+          } else {
+            // --- TRƯỜNG HỢP 2: CHƯA XÁC THỰC ---
+            
+            // Kiểm tra quá hạn 5 phút
+            final creationTime = user!.metadata.creationTime;
+            if (creationTime != null) {
+              final difference = DateTime.now().difference(creationTime).inMinutes;
+              
+              if (difference >= 5) {
+                 // QUÁ 5 PHÚT -> XÓA AUTH
+                 await user.delete();
+                 // SignOut để AuthChecker quay lại màn hình Login (thay vì màn Verify)
+                 await FirebaseAuth.instance.signOut();
+                 _showSnackBar('Link xác thực đã hết hạn (quá 5 phút). Tài khoản đã bị hủy. Vui lòng đăng ký lại.', isError: true);
+                 return;
+              }
+            }
+            
+            // Nếu chưa quá 5 phút -> AuthChecker sẽ tự hiển thị màn hình Verify
+            // Không cần làm gì thêm
+          }
+        }
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'Có lỗi xảy ra';
-      if (e.code == 'user-not-found') {
-        message = 'Email không tồn tại';
-      } else if (e.code == 'wrong-password') {
-        message = 'Mật khẩu không đúng';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'Email đã được sử dụng';
-      } else if (e.code == 'weak-password') {
-        message = 'Mật khẩu quá yếu';
-      }
+      String message = 'Có lỗi xảy ra: ${e.code}';
+      if (e.code == 'user-not-found') message = 'Email không tồn tại';
+      else if (e.code == 'wrong-password') message = 'Mật khẩu không đúng';
+      else if (e.code == 'email-already-in-use') message = 'Email đã được sử dụng';
+      else if (e.code == 'weak-password') message = 'Mật khẩu quá yếu';
+      
       _showSnackBar(message, isError: true);
+      
+      // Nếu lỗi login, đảm bảo signout để tránh kẹt trạng thái
+      if (!_isRegister) {
+        await FirebaseAuth.instance.signOut(); 
+      }
     } catch (e) {
       _showSnackBar('Lỗi: $e', isError: true);
+      await FirebaseAuth.instance.signOut();
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
-      // ✅ Đăng xuất Google trước khi đăng nhập để bắt chọn tài khoản mới
       final GoogleSignIn googleSignIn = GoogleSignIn();
       await googleSignIn.signOut();
-
-      // ✅ Bắt buộc hiển thị popup chọn tài khoản Google
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
-        // User đã hủy đăng nhập
         setState(() => _isLoading = false);
         return;
       }
@@ -115,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
       UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
 
+      // Google mặc định là đã verify, nên lưu luôn
       if (userCredential.additionalUserInfo?.isNewUser ?? false) {
         UserModel user = UserModel(
           id: userCredential.user!.uid,
@@ -124,7 +174,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         );
         await DatabaseService().saveUser(user);
       }
-      _showSnackBar('Đăng nhập thành công!');
     } catch (e) {
       _showSnackBar('Lỗi đăng nhập Google: $e', isError: true);
     } finally {

@@ -4,17 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ltdd/widgets/main_wrapper.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
+import 'screens/email_verification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // ✅ Đăng xuất mỗi khi khởi động app
-  await FirebaseAuth.instance.signOut();
 
   runApp(const MyApp());
 }
@@ -46,21 +43,20 @@ class MyApp extends StatelessWidget {
           unselectedItemColor: Colors.grey,
         ),
       ),
-      home: const AuthChecker(), // ✅ Sử dụng AuthChecker để kiểm tra trạng thái đăng nhập
+      home: const AuthChecker(),
     );
   }
 }
 
-// ✅ AuthChecker sẽ tự động chuyển hướng dựa trên trạng thái đăng nhập
 class AuthChecker extends StatelessWidget {
   const AuthChecker({super.key});
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+      // Sử dụng userChanges để lắng nghe cả các thay đổi như reload user (verification)
+      stream: FirebaseAuth.instance.userChanges(),
       builder: (context, snapshot) {
-        // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Color(0xFF0F0F0F),
@@ -72,12 +68,17 @@ class AuthChecker extends StatelessWidget {
           );
         }
 
-        // ✅ User đã đăng nhập -> Vào MainWrapper (Home Screen)
         if (snapshot.hasData) {
+          User? user = snapshot.data;
+          
+          // Kiểm tra nếu chưa verify email thì hiển thị màn hình chờ verify
+          if (user != null && !user.emailVerified) {
+             return EmailVerificationScreen(email: user.email ?? '');
+          }
+          
           return const MainWrapper();
         }
 
-        // ✅ Chưa đăng nhập -> Login Screen
         return const LoginScreen();
       },
     );
