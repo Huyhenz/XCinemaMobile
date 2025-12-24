@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
+import '../utils/validators.dart';
 
 class UserInfoScreen extends StatefulWidget {
   const UserInfoScreen({super.key});
@@ -15,6 +16,7 @@ class UserInfoScreen extends StatefulWidget {
 class _UserInfoScreenState extends State<UserInfoScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  DateTime? _selectedDateOfBirth;
   UserModel? _user;
   bool _isLoading = true;
   bool _isEditing = false;
@@ -40,6 +42,9 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
       if (_user != null) {
         _nameController.text = _user!.name;
         _phoneController.text = _user!.phone ?? '';
+        if (_user!.dateOfBirth != null) {
+          _selectedDateOfBirth = DateTime.fromMillisecondsSinceEpoch(_user!.dateOfBirth!);
+        }
       }
     } catch (e) {
       _showSnackBar('Lỗi tải thông tin: $e', isError: true);
@@ -49,19 +54,45 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
   }
 
   Future<void> _updateUserInfo() async {
-    if (_nameController.text.isEmpty) {
-      _showSnackBar('Vui lòng nhập tên', isError: true);
+    // Validate name
+    String? nameError = Validators.validateName(_nameController.text);
+    if (nameError != null) {
+      _showSnackBar(nameError, isError: true);
       return;
+    }
+
+    // Validate phone if provided
+    if (_phoneController.text.trim().isNotEmpty) {
+      String? phoneError = Validators.validatePhone(_phoneController.text);
+      if (phoneError != null) {
+        _showSnackBar(phoneError, isError: true);
+        return;
+      }
+    }
+
+    // Validate date of birth if provided
+    if (_selectedDateOfBirth != null) {
+      String? dateError = Validators.validateDateOfBirth(_selectedDateOfBirth);
+      if (dateError != null) {
+        _showSnackBar(dateError, isError: true);
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
     try {
       String userId = FirebaseAuth.instance.currentUser!.uid;
 
-      // Update name
+      // Format phone number
+      String? phoneValue = _phoneController.text.trim().isEmpty 
+          ? null 
+          : _phoneController.text.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+
+      // Update user info
       await DatabaseService().updateUser(userId, {
         'name': _nameController.text.trim(),
-        'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        'phone': phoneValue,
+        'dateOfBirth': _selectedDateOfBirth?.millisecondsSinceEpoch,
       });
 
       _showSnackBar('Cập nhật thành công!');
@@ -184,6 +215,8 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 20),
+          _buildDateOfBirthField(),
+          const SizedBox(height: 20),
           _buildReadOnlyInfo(
             'Vai Trò',
             _user?.role == 'admin' ? 'Quản Trị Viên' : 'Thành Viên',
@@ -247,6 +280,78 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
     );
   }
 
+  Widget _buildDateOfBirthField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Ngày Tháng Năm Sinh',
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: _isEditing ? const Color(0xFF2A2A2A) : const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _isEditing ? const Color(0xFF3A3A3A) : const Color(0xFF2A2A2A),
+            ),
+          ),
+          child: InkWell(
+            onTap: _isEditing
+                ? () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 25)),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.dark(
+                              primary: Color(0xFFE50914),
+                              onPrimary: Colors.white,
+                              surface: Color(0xFF1A1A1A),
+                              onSurface: Colors.white,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _selectedDateOfBirth = picked;
+                      });
+                    }
+                  }
+                : null,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                prefixIcon: const Icon(Icons.calendar_today_outlined, color: Color(0xFFE50914)),
+              ),
+              child: Text(
+                _selectedDateOfBirth == null
+                    ? 'Chưa có thông tin'
+                    : DateFormat('dd/MM/yyyy').format(_selectedDateOfBirth!),
+                style: TextStyle(
+                  color: _selectedDateOfBirth == null ? Colors.grey[600] : Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildReadOnlyInfo(String label, String value, IconData icon) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,8 +393,17 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
         Expanded(
           child: ElevatedButton(
             onPressed: () {
-              setState(() => _isEditing = false);
-              _loadUserInfo();
+              setState(() {
+                _isEditing = false;
+                // Reset to original values
+                if (_user != null) {
+                  _nameController.text = _user!.name;
+                  _phoneController.text = _user!.phone ?? '';
+                  _selectedDateOfBirth = _user!.dateOfBirth != null
+                      ? DateTime.fromMillisecondsSinceEpoch(_user!.dateOfBirth!)
+                      : null;
+                }
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2A2A2A),

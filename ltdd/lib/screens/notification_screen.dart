@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/notification.dart';
 import '../services/database_services.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/loading_widgets.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -106,9 +108,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(
-        child: CircularProgressIndicator(color: Color(0xFFE50914)),
-      )
+          ? const AppLoadingIndicator(message: 'Đang tải thông báo...')
           : _notifications.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
@@ -127,25 +127,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications_none,
-            size: 80,
-            color: Colors.grey[700],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Chưa có thông báo',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
+    return const EmptyState(
+      icon: Icons.notifications_none,
+      title: 'Chưa có thông báo',
+      subtitle: 'Các thông báo mới sẽ hiển thị ở đây',
     );
   }
 

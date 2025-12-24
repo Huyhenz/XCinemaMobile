@@ -10,6 +10,9 @@ import '../blocs/profile/profile_event.dart';
 import '../blocs/profile/profile_state.dart';
 import '../services/database_services.dart';
 import '../utils/booking_helper.dart';
+import '../widgets/confirmation_dialog.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/loading_widgets.dart';
 import 'user_info_screen.dart';
 import 'notification_screen.dart';
 
@@ -27,16 +30,20 @@ class ProfileScreen extends StatelessWidget {
         body: BlocBuilder<ProfileBloc, ProfileState>(
           builder: (context, state) {
             if (state.isLoading && state.user == null) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFFE50914)),
-              );
+              return const AppLoadingIndicator(message: 'Đang tải thông tin...');
             }
 
             if (state.error != null) {
-              return Center(
-                child: Text(
-                  'Lỗi: ${state.error}',
-                  style: const TextStyle(color: Colors.white),
+              return EmptyState(
+                icon: Icons.error_outline,
+                title: 'Có lỗi xảy ra',
+                subtitle: state.error,
+                action: ElevatedButton(
+                  onPressed: () {
+                    final userId = FirebaseAuth.instance.currentUser!.uid;
+                    context.read<ProfileBloc>().add(RefreshProfile(userId));
+                  },
+                  child: const Text('Thử lại'),
                 ),
               );
             }
@@ -430,32 +437,10 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           if (state.bookings.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
-              ),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.receipt_long_outlined,
-                      size: 60,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Chưa có lịch sử đặt vé',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const EmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: 'Chưa có lịch sử đặt vé',
+              subtitle: 'Các vé bạn đặt sẽ hiển thị ở đây',
             )
           else
             ...state.bookings.map((detail) => _buildBookingCard(detail, context)),
@@ -736,38 +721,18 @@ class ProfileScreen extends StatelessWidget {
 
   // ✅ Confirm Dialog trước khi xóa
   void _confirmDeleteBooking(BuildContext context, String bookingId, String movieTitle) {
-    showDialog(
+    ConfirmationDialog.show(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Xác Nhận Hủy Vé',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Bạn có chắc muốn hủy vé xem phim "$movieTitle"?\n\nGhế sẽ được mở lại cho người khác đặt.',
-          style: TextStyle(color: Colors.grey[400]),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Không', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext); // Đóng dialog
-              Navigator.pop(context); // Đóng bottom sheet
-              await _deleteBooking(context, bookingId, movieTitle);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE50914),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Xác Nhận Hủy'),
-          ),
-        ],
-      ),
+      title: 'Xác Nhận Hủy Vé',
+      message: 'Bạn có chắc muốn hủy vé xem phim "$movieTitle"?\n\nGhế sẽ được mở lại cho người khác đặt.',
+      confirmText: 'Xác Nhận Hủy',
+      cancelText: 'Không',
+      isDestructive: true,
+      icon: Icons.warning_amber_rounded,
+      onConfirm: () async {
+        Navigator.pop(context); // Đóng bottom sheet nếu đang mở
+        await _deleteBooking(context, bookingId, movieTitle);
+      },
     );
   }
 
@@ -778,9 +743,7 @@ class ProfileScreen extends StatelessWidget {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(color: Color(0xFFE50914)),
-        ),
+        builder: (context) => const AppLoadingIndicator(message: 'Đang xử lý...'),
       );
 
       final userId = FirebaseAuth.instance.currentUser!.uid;

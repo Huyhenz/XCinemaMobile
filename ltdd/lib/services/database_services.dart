@@ -293,11 +293,11 @@ class DatabaseService {
   // ✅ FALLBACK: Load all showtimes and filter manually when query fails
   Future<List<ShowtimeModel>> _getShowtimesByMovieFallback(String movieId) async {
     List<ShowtimeModel> showtimes = [];
-
+    
     try {
       print('🔄 Loading all showtimes and filtering for movieId: $movieId');
       DataSnapshot snapshot = await _db.child('showtimes').get();
-
+      
       if (!snapshot.exists || snapshot.value == null) {
         print('ℹ️ No showtimes found in database');
         return showtimes;
@@ -330,7 +330,7 @@ class DatabaseService {
           }
 
           Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
-
+          
           // Filter by movieId
           final itemMovieId = itemMap['movieId']?.toString() ?? '';
           if (itemMovieId == movieId) {
@@ -461,12 +461,12 @@ class DatabaseService {
               print('⚠️ Skipping null booking: $key');
               return;
             }
-
+            
             if (itemValue is String) {
               print('⚠️ Skipping invalid booking (String): $key');
               return;
             }
-
+            
             if (itemValue is! Map) {
               print('⚠️ Skipping invalid booking type: $key (${itemValue.runtimeType})');
               return;
@@ -507,11 +507,11 @@ class DatabaseService {
   // ✅ FALLBACK: Load all bookings and filter manually when query fails
   Future<List<BookingModel>> _getBookingsByUserFallback(String userId) async {
     List<BookingModel> bookings = [];
-
+    
     try {
       print('🔄 Loading all bookings and filtering for userId: $userId');
       DataSnapshot snapshot = await _db.child('bookings').get();
-
+      
       if (!snapshot.exists || snapshot.value == null) {
         print('ℹ️ No bookings found in database');
         return bookings;
@@ -543,7 +543,7 @@ class DatabaseService {
           }
 
           Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
-
+          
           // Filter by userId
           final itemUserId = itemMap['userId']?.toString() ?? '';
           if (itemUserId == userId) {
@@ -719,12 +719,12 @@ class DatabaseService {
               print('⚠️ Skipping null notification: $key');
               return;
             }
-
+            
             if (itemValue is String) {
               print('⚠️ Skipping invalid notification (String): $key');
               return;
             }
-
+            
             if (itemValue is! Map) {
               print('⚠️ Skipping invalid notification type: $key (${itemValue.runtimeType})');
               return;
@@ -818,7 +818,7 @@ class DatabaseService {
 
         if (snapshot.exists && snapshot.value != null) {
           final value = snapshot.value;
-
+          
           // Check if value is String (invalid data)
           if (value is String) {
             print('⚠️ Sync query returned String instead of Map, skipping');
@@ -831,7 +831,7 @@ class DatabaseService {
                 if (itemValue == null || itemValue is String) {
                   return;
                 }
-
+                
                 if (itemValue is Map) {
                   Map<dynamic, dynamic> booking = Map<dynamic, dynamic>.from(itemValue);
                   final status = booking['status']?.toString() ?? '';
@@ -893,6 +893,58 @@ class DatabaseService {
     }
   }
 
+  // Get booking count by movieId (for popular movies)
+  Future<Map<String, int>> getBookingCountsByMovie() async {
+    Map<String, int> movieBookingCounts = {};
+    
+    try {
+      // Load all bookings
+      DataSnapshot bookingsSnapshot = await _db.child('bookings').get();
+      if (!bookingsSnapshot.exists || bookingsSnapshot.value == null) {
+        return movieBookingCounts;
+      }
+
+      // Load all showtimes to create map showtimeId -> movieId
+      DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
+      Map<String, String> showtimeToMovie = {};
+      
+      if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
+        final showtimesData = _convertMap(showtimesSnapshot.value);
+        showtimesData.forEach((key, value) {
+          if (value is Map) {
+            final showtimeMap = Map<dynamic, dynamic>.from(value);
+            final movieId = showtimeMap['movieId']?.toString();
+            if (movieId != null) {
+              showtimeToMovie[key.toString()] = movieId;
+            }
+          }
+        });
+      }
+
+      // Count bookings by movieId
+      final bookingsData = _convertMap(bookingsSnapshot.value);
+      bookingsData.forEach((key, value) {
+        if (value is Map) {
+          final bookingMap = Map<dynamic, dynamic>.from(value);
+          final showtimeId = bookingMap['showtimeId']?.toString();
+          final status = bookingMap['status']?.toString();
+          
+          // Only count confirmed bookings
+          if (showtimeId != null && status == 'confirmed') {
+            final movieId = showtimeToMovie[showtimeId];
+            if (movieId != null) {
+              movieBookingCounts[movieId] = (movieBookingCounts[movieId] ?? 0) + 1;
+            }
+          }
+        }
+      });
+    } catch (e) {
+      print('Error getting booking counts by movie: $e');
+    }
+    
+    return movieBookingCounts;
+  }
+
   Stream<ShowtimeModel?> listenToShowtime(String showtimeId) {
     return _db.child('showtimes').child(showtimeId).onValue.map((event) {
       if (event.snapshot.exists && event.snapshot.value != null) {
@@ -920,13 +972,13 @@ class DatabaseService {
       try {
         if (event.snapshot.exists && event.snapshot.value != null) {
           final value = event.snapshot.value;
-
+          
           // Check if value is String (invalid data)
           if (value is String) {
             print('⚠️ Bookings stream returned String instead of Map, skipping');
             return bookings;
           }
-
+          
           if (value is Map) {
             Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
             data.forEach((key, itemValue) {
@@ -936,12 +988,12 @@ class DatabaseService {
                   print('⚠️ Skipping null booking: $key');
                   return;
                 }
-
+                
                 if (itemValue is String) {
                   print('⚠️ Skipping invalid booking (String): $key');
                   return;
                 }
-
+                
                 if (itemValue is Map) {
                   Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
                   bookings.add(BookingModel.fromMap(itemMap, key.toString()));

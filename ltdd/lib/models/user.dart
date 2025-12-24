@@ -6,6 +6,7 @@ class UserModel {
   final String email;
   final String role; // 'user' hoặc 'admin'
   final String? phone;
+  final int? dateOfBirth; // Timestamp (milliseconds) - ngày tháng năm sinh
   final int? createdAt; // Timestamp (milliseconds)
   final String? fcmToken; // Cho Firebase Messaging (push notifications)
 
@@ -15,6 +16,7 @@ class UserModel {
     required this.email,
     required this.role,
     this.phone,
+    this.dateOfBirth,
     this.createdAt,
     this.fcmToken,
   });
@@ -26,6 +28,7 @@ class UserModel {
       email: data['email'] ?? '',
       role: data['role'] ?? 'user',
       phone: data['phone'],
+      dateOfBirth: data['dateOfBirth'],
       createdAt: data['createdAt'],
       fcmToken: data['fcmToken'],
     );
@@ -37,6 +40,7 @@ class UserModel {
       'email': email,
       'role': role,
       'phone': phone,
+      'dateOfBirth': dateOfBirth,
       'createdAt': ServerValue.timestamp,
       'fcmToken': fcmToken,
     };

@@ -1,12 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../blocs/movies/movies_bloc.dart';
 import '../blocs/movies/movies_event.dart';
 import '../blocs/movies/movies_state.dart';
 import '../models/movie.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/loading_widgets.dart';
 import 'movie_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,34 +20,69 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+    // Set initial category
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onTabChanged();
+    });
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && mounted) {
+      String category = '';
+      switch (_tabController.index) {
+        case 0:
+          category = 'nowShowing';
+          break;
+        case 1:
+          category = 'comingSoon';
+          break;
+        case 2:
+          category = 'popular';
+          break;
+      }
+      context.read<MovieBloc>().add(FilterMoviesByCategory(category));
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() {}); // Update UI to show/hide clear button
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        context.read<MovieBloc>().add(SearchMovies(value));
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => MovieBloc()..add(LoadMovies()),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
-        body: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              _buildHeader(),
-              _buildSearchBar(),
-              _buildTabBar(),
-              _buildMovieGrid(),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            _buildHeader(),
+            _buildSearchBar(),
+            _buildTabBar(),
+            _buildMovieGrid(),
+          ],
         ),
       ),
     );
@@ -123,11 +160,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
           child: TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
             style: const TextStyle(color: Colors.white),
+            textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              hintText: 'Tìm kiếm phim...',
-              hintStyle: TextStyle(color: Colors.grey[500]),
+              hintText: 'Tìm kiếm theo tên phim hoặc thể loại...',
+              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
               prefixIcon: const Icon(Icons.search, color: Color(0xFFE50914)),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey),
+                      tooltip: 'Xóa tìm kiếm',
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                        });
+                        context.read<MovieBloc>().add(SearchMovies(''));
+                      },
+                    )
+                  : null,
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             ),
@@ -171,12 +223,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildMovieGrid() {
     return BlocBuilder<MovieBloc, MovieState>(
       builder: (context, state) {
-        if (state.movies.isEmpty) {
+        // Loading state
+        if (state.isLoading && state.allMovies.isEmpty) {
           return SliverToBoxAdapter(
-            child: _buildLoadingGrid(),
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: const ShimmerMovieGrid(itemCount: 6),
+            ),
           );
         }
 
+        // Empty state
+        if (state.movies.isEmpty) {
+          return SliverFillRemaining(
+            child: EmptyState(
+              icon: state.searchQuery != null ? Icons.search_off : Icons.movie_outlined,
+              title: state.searchQuery != null 
+                  ? 'Không tìm thấy phim' 
+                  : 'Chưa có phim',
+              subtitle: state.searchQuery != null
+                  ? 'Thử tìm kiếm với từ khóa khác'
+                  : 'Hãy quay lại sau',
+            ),
+          );
+        }
+
+        // Movie grid
         return SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 100), // Bottom padding cho navbar
           sliver: SliverGrid(
@@ -236,10 +308,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               CachedNetworkImage(
                 imageUrl: movie.posterUrl,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => Shimmer.fromColors(
-                  baseColor: Colors.grey[800]!,
-                  highlightColor: Colors.grey[700]!,
-                  child: Container(color: Colors.grey[800]),
+                placeholder: (context, url) => ShimmerLoadingCard(
+                  height: double.infinity,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 errorWidget: (context, url, error) => Container(
                   color: Colors.grey[800],
@@ -335,32 +406,4 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildLoadingGrid() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.65,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-        ),
-        itemCount: 6,
-        itemBuilder: (context, index) {
-          return Shimmer.fromColors(
-            baseColor: Colors.grey[800]!,
-            highlightColor: Colors.grey[700]!,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 }

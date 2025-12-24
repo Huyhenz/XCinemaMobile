@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
@@ -32,11 +33,40 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           UserModel? existingUser = await DatabaseService().getUser(updatedUser.uid);
             
           if (existingUser == null) {
+            // Lấy thông tin đăng ký tạm thời nếu có
+            String name = 'New User';
+            String? phone;
+            int? dateOfBirth;
+            
+            try {
+              final tempSnapshot = await FirebaseDatabase.instance
+                  .ref('temp_registrations')
+                  .child(updatedUser.uid)
+                  .get();
+              
+              if (tempSnapshot.exists && tempSnapshot.value != null) {
+                final tempData = Map<dynamic, dynamic>.from(tempSnapshot.value as Map);
+                name = tempData['name'] ?? 'New User';
+                phone = tempData['phone'];
+                dateOfBirth = tempData['dateOfBirth'];
+                
+                // Xóa dữ liệu tạm thời sau khi lấy
+                await FirebaseDatabase.instance
+                    .ref('temp_registrations')
+                    .child(updatedUser.uid)
+                    .remove();
+              }
+            } catch (e) {
+              print('Lỗi khi lấy thông tin đăng ký tạm thời: $e');
+            }
+            
             UserModel newUser = UserModel(
               id: updatedUser.uid,
-              name: 'New User', // Hoặc lấy tên từ display name nếu có
+              name: name,
               email: widget.email, // Dùng email từ widget cho chắc chắn
               role: 'user',
+              phone: phone,
+              dateOfBirth: dateOfBirth,
             );
             await DatabaseService().saveUser(newUser);
             print('✅ Đã khởi tạo user trong DB từ màn hình Verify');

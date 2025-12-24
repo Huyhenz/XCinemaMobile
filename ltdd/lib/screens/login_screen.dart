@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
+import '../utils/validators.dart';
 
 // Không cần import EmailVerificationScreen nữa vì AuthChecker tự lo
 
@@ -17,6 +20,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  DateTime? _selectedDateOfBirth;
   bool _isRegister = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -42,13 +48,47 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _animationController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _authAction() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showSnackBar('Vui lòng điền đầy đủ thông tin', isError: true);
+    // Validate email
+    String? emailError = Validators.validateEmail(_emailController.text);
+    if (emailError != null) {
+      _showSnackBar(emailError, isError: true);
       return;
+    }
+
+    // Validate password
+    String? passwordError = Validators.validatePassword(_passwordController.text);
+    if (passwordError != null) {
+      _showSnackBar(passwordError, isError: true);
+      return;
+    }
+
+    if (_isRegister) {
+      // Validate name
+      String? nameError = Validators.validateName(_nameController.text);
+      if (nameError != null) {
+        _showSnackBar(nameError, isError: true);
+        return;
+      }
+
+      // Validate phone
+      String? phoneError = Validators.validatePhone(_phoneController.text);
+      if (phoneError != null) {
+        _showSnackBar(phoneError, isError: true);
+        return;
+      }
+
+      // Validate date of birth
+      String? dateError = Validators.validateDateOfBirth(_selectedDateOfBirth);
+      if (dateError != null) {
+        _showSnackBar(dateError, isError: true);
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
@@ -63,10 +103,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         );
 
         if (cred.user != null) {
-          // 2. Gửi email xác thực
+          // 2. Lưu thông tin đăng ký tạm thời vào Firebase Database
+          // Format phone number (remove spaces)
+          String cleanPhone = _phoneController.text.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+          
+          final tempData = {
+            'name': _nameController.text.trim(),
+            'phone': cleanPhone,
+            'dateOfBirth': _selectedDateOfBirth!.millisecondsSinceEpoch,
+            'email': _emailController.text.trim(),
+          };
+          await FirebaseDatabase.instance
+              .ref('temp_registrations')
+              .child(cred.user!.uid)
+              .set(tempData);
+
+          // 3. Gửi email xác thực
           await cred.user!.sendEmailVerification();
 
-          // 3. KHÔNG SignOut -> AuthChecker ở main.dart sẽ tự chuyển sang màn hình Verify
+          // 4. KHÔNG SignOut -> AuthChecker ở main.dart sẽ tự chuyển sang màn hình Verify
           _showSnackBar('Đăng ký thành công. Vui lòng kiểm tra email.');
         }
       } else {
@@ -89,11 +144,40 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             
             if (existingUser == null) {
               // ==> ĐÂY LÀ LÚC LƯU VÀO DB <==
+              // Lấy thông tin đăng ký tạm thời nếu có
+              String name = 'New User';
+              String? phone;
+              int? dateOfBirth;
+              
+              try {
+                final tempSnapshot = await FirebaseDatabase.instance
+                    .ref('temp_registrations')
+                    .child(user.uid)
+                    .get();
+                
+                if (tempSnapshot.exists && tempSnapshot.value != null) {
+                  final tempData = Map<dynamic, dynamic>.from(tempSnapshot.value as Map);
+                  name = tempData['name'] ?? 'New User';
+                  phone = tempData['phone'];
+                  dateOfBirth = tempData['dateOfBirth'];
+                  
+                  // Xóa dữ liệu tạm thời sau khi lấy
+                  await FirebaseDatabase.instance
+                      .ref('temp_registrations')
+                      .child(user.uid)
+                      .remove();
+                }
+              } catch (e) {
+                print('Lỗi khi lấy thông tin đăng ký tạm thời: $e');
+              }
+              
               UserModel newUser = UserModel(
                 id: user.uid,
-                name: 'New User', // Hoặc tách field tên ra form đăng ký
+                name: name,
                 email: _emailController.text.trim(),
                 role: 'user',
+                phone: phone,
+                dateOfBirth: dateOfBirth,
               );
               await DatabaseService().saveUser(newUser);
               print('✅ Đã khởi tạo user trong DB sau khi verify');
@@ -301,6 +385,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         children: [
           _buildTabSelector(),
           const SizedBox(height: 24),
+          if (_isRegister) ...[
+            _buildNameField(),
+            const SizedBox(height: 16),
+            _buildPhoneField(),
+            const SizedBox(height: 16),
+            _buildDateOfBirthField(),
+            const SizedBox(height: 16),
+          ],
           _buildEmailField(),
           const SizedBox(height: 16),
           _buildPasswordField(),
@@ -337,7 +429,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   Widget _buildTabButton(String text, bool isSelected) {
     return GestureDetector(
-      onTap: () => setState(() => _isRegister = !_isRegister),
+      onTap: () {
+        setState(() {
+          _isRegister = !_isRegister;
+          // Reset các trường đăng ký khi chuyển sang đăng nhập
+          if (!_isRegister) {
+            _nameController.clear();
+            _phoneController.clear();
+            _selectedDateOfBirth = null;
+          }
+        });
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -413,6 +515,114 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               color: Colors.grey[500],
             ),
             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNameField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF3A3A3A),
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: _nameController,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: 'Họ tên',
+          labelStyle: TextStyle(color: Colors.grey[500]),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          prefixIcon: const Icon(Icons.person_outline, color: Color(0xFFE50914)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF3A3A3A),
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: _phoneController,
+        keyboardType: TextInputType.phone,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: 'Số điện thoại',
+          labelStyle: TextStyle(color: Colors.grey[500]),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFFE50914)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateOfBirthField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF3A3A3A),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () async {
+          final DateTime? picked = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+            firstDate: DateTime(1900),
+            lastDate: DateTime.now(),
+            builder: (context, child) {
+              return Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: const ColorScheme.dark(
+                    primary: Color(0xFFE50914),
+                    onPrimary: Colors.white,
+                    surface: Color(0xFF1A1A1A),
+                    onSurface: Colors.white,
+                  ),
+                ),
+                child: child!,
+              );
+            },
+          );
+          if (picked != null) {
+            setState(() {
+              _selectedDateOfBirth = picked;
+            });
+          }
+        },
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Ngày tháng năm sinh',
+            labelStyle: TextStyle(color: Colors.grey[500]),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            prefixIcon: const Icon(Icons.calendar_today_outlined, color: Color(0xFFE50914)),
+          ),
+          child: Text(
+            _selectedDateOfBirth == null
+                ? 'Chọn ngày sinh'
+                : DateFormat('dd/MM/yyyy').format(_selectedDateOfBirth!),
+            style: TextStyle(
+              color: _selectedDateOfBirth == null ? Colors.grey[500] : Colors.white,
+              fontSize: 16,
+            ),
           ),
         ),
       ),

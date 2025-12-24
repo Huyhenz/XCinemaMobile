@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ltdd/models/user.dart';
 import 'package:ltdd/screens/admin_dashboard_screen.dart';
 import 'package:ltdd/screens/home_screen.dart';
 import 'package:ltdd/screens/profile_screen.dart';
 import 'package:ltdd/services/database_services.dart';
+import 'package:ltdd/blocs/movies/movies_bloc.dart';
+import 'package:ltdd/blocs/movies/movies_event.dart';
 
 
 class MainWrapper extends StatefulWidget {
@@ -60,12 +63,15 @@ class _MainWrapperState extends State<MainWrapper> {
       );
     }
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _isAdmin ? _adminScreens : _screens,
+    return BlocProvider(
+      create: (context) => MovieBloc()..add(LoadMovies()),
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _isAdmin ? _adminScreens : _screens,
+        ),
+        bottomNavigationBar: _buildBottomNavBar(),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
