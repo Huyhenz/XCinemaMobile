@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../blocs/movies/movies_bloc.dart';
 import '../blocs/movies/movies_event.dart';
 import '../blocs/movies/movies_state.dart';
 import '../models/movie.dart';
+import '../services/database_services.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 import 'movie_detail_screen.dart';
 import 'cinema_selection_screen.dart';
+import 'notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? selectedCinemaId; // ID của rạp đã chọn
@@ -24,6 +27,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
+  int _unreadNotificationCount = 0;
+  Timer? _notificationRefreshTimer;
 
   @override
   void initState() {
@@ -36,7 +41,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       context.read<MovieBloc>().add(
         FilterMoviesByCategory('nowShowing', cinemaId: widget.selectedCinemaId),
       );
+      // Load notification count
+      _loadNotificationCount();
+      // Refresh notification count every 30 seconds
+      _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        _loadNotificationCount();
+      });
     });
+  }
+
+  Future<void> _loadNotificationCount() async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return;
+
+      final notifications = await DatabaseService().getNotificationsByUser(userId);
+      final unreadCount = notifications.where((n) => (n['isRead'] as bool?) != true).length;
+
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = unreadCount;
+        });
+      }
+    } catch (e) {
+      print('Error loading notification count: $e');
+    }
   }
 
   void _onTabChanged() {
@@ -67,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _tabController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
+    _notificationRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -150,22 +180,52 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ],
             ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF2A2A2A)),
-                  ),
-                  child: const Icon(
-                    Icons.notifications_outlined,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                ).then((_) {
+                  // Reload notification count when returning from notification screen
+                  _loadNotificationCount();
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF2A2A2A)),
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    if (_unreadNotificationCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE50914),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ],
         ),

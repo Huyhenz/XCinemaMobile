@@ -16,16 +16,29 @@ void main() async {
     // Try loading from assets first (for mobile)
     await dotenv.load(fileName: ".env");
     print('✅ Loaded .env file successfully');
+    
+    // Check PayPal config
     final clientId = dotenv.env['PAYPAL_CLIENT_ID'] ?? '';
     if (clientId.isNotEmpty) {
       print('📝 PayPal Client ID: ${clientId.substring(0, clientId.length > 10 ? 10 : clientId.length)}...');
     } else {
       print('⚠️ PayPal Client ID not found in .env');
     }
+    
+    // Check SMTP config
+    final smtpUsername = dotenv.env['SMTP_USERNAME'] ?? '';
+    final smtpPassword = dotenv.env['SMTP_PASSWORD'] ?? '';
+    if (smtpUsername.isNotEmpty && smtpPassword.isNotEmpty) {
+      print('✅ SMTP credentials found in .env');
+      print('📧 SMTP Host: ${dotenv.env['SMTP_HOST'] ?? 'smtp.gmail.com'}');
+    } else {
+      print('⚠️ SMTP credentials not found in .env (email confirmation will be skipped)');
+      print('💡 To enable email confirmation, add SMTP config to .env file');
+    }
   } catch (e) {
     print('⚠️ Warning: Could not load .env file: $e');
     print('💡 Tip: Make sure .env file exists and is added to pubspec.yaml assets');
-    // App will continue but PayPal payment will use mock mode
+    // App will continue but PayPal payment and email will use fallback modes
   }
 
   await Firebase.initializeApp(

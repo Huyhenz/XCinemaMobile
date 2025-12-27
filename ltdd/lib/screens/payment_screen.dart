@@ -6,6 +6,7 @@ import '../models/payment.dart';
 import '../models/tempbooking.dart';
 import '../services/database_services.dart';
 import '../services/payment_service.dart';
+import '../services/email_service.dart';
 import '../utils/booking_helper.dart';
 import 'payment_success_screen.dart';
 import 'payment_failure_screen.dart';
@@ -142,12 +143,65 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           // Delete temp booking (không add seats back vì đã confirm)
           await DatabaseService().deleteTempBooking(_tempBookingId!, addBackSeats: false);
 
-          // Tạo notification
-          await BookingHelper.createBookingSuccessNotification(
-            userId: userId,
-            bookingId: bookingId,
-            booking: booking,
-          );
+          // Gửi email xác nhận và tạo notification
+          try {
+            // Lấy thông tin user để gửi email
+            final user = await DatabaseService().getUser(userId);
+            if (user != null && user.email != null && user.email!.isNotEmpty) {
+              // Gửi email xác nhận
+              final emailSent = await EmailService.sendBookingConfirmationEmail(
+                userEmail: user.email!,
+                userName: user.name ?? 'Khách hàng',
+                booking: booking,
+                bookingId: bookingId,
+              );
+
+              if (emailSent) {
+                print('✅ Email xác nhận đã được gửi thành công đến ${user.email}');
+                // Tạo notification xác nhận email đã được gửi
+                await BookingHelper.createBookingSuccessNotification(
+                  userId: userId,
+                  bookingId: bookingId,
+                  booking: booking,
+                );
+                // Tạo thêm notification về email
+                await DatabaseService().createNotification(
+                  userId: userId,
+                  title: 'Email xác nhận đã được gửi',
+                  message: 'Email xác nhận đặt vé đã được gửi đến ${user.email}',
+                  type: 'system',
+                );
+              } else {
+                print('⚠️ Không thể gửi email (SMTP chưa được cấu hình hoặc có lỗi)');
+                // Vẫn tạo notification dù email không gửi được
+                await BookingHelper.createBookingSuccessNotification(
+                  userId: userId,
+                  bookingId: bookingId,
+                  booking: booking,
+                );
+              }
+            } else {
+              print('⚠️ User không có email, chỉ tạo notification');
+              // Tạo notification nếu không có email
+              await BookingHelper.createBookingSuccessNotification(
+                userId: userId,
+                bookingId: bookingId,
+                booking: booking,
+              );
+            }
+          } catch (e) {
+            print('❌ Lỗi khi gửi email hoặc tạo notification: $e');
+            // Vẫn tạo notification cơ bản nếu có lỗi
+            try {
+              await BookingHelper.createBookingSuccessNotification(
+                userId: userId,
+                bookingId: bookingId,
+                booking: booking,
+              );
+            } catch (notifError) {
+              print('❌ Lỗi tạo notification: $notifError');
+            }
+          }
 
           // Sync seats để cập nhật trạng thái
           await DatabaseService().syncShowtimeSeats(booking.showtimeId);
