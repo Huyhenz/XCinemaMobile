@@ -15,6 +15,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 import 'user_info_screen.dart';
 import 'notification_screen.dart';
+import 'chatbot_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -337,6 +338,19 @@ class ProfileScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const NotificationScreen(),
+                ),
+              );
+            },
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            Icons.smart_toy,
+            'Chatbot Hỗ Trợ',
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ChatBotScreen(),
                 ),
               );
             },
