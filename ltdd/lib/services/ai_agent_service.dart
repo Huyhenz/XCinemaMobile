@@ -3,6 +3,7 @@
 
 import '../models/movie.dart';
 import '../models/showtime.dart';
+import '../models/cinema.dart';
 import 'database_services.dart';
 import 'package:intl/intl.dart';
 
@@ -29,6 +30,7 @@ class ChatBotResponse {
   final List<ShowtimeModel>? showtimes;
   final List<String>? suggestions;
   final ConversationContext? context;
+  final List<CinemaModel>? cinemas; // Danh sách rạp để user chọn
 
   ChatBotResponse({
     required this.text,
@@ -37,6 +39,7 @@ class ChatBotResponse {
     this.showtimes,
     this.suggestions,
     this.context,
+    this.cinemas,
   });
 }
 
@@ -175,14 +178,24 @@ class AIAgentService {
     ConversationContext? newContext;
 
     try {
-      switch (intent) {
-        case Intent.greeting:
-          response = await _handleGreeting(updatedHistory);
-          break;
-        case Intent.searchMovie:
-          response = await _handleSearchMovie(userMessage, entities, updatedHistory, oldContext);
-          newContext = response.context;
-          break;
+      // Kiểm tra nếu đang chờ chọn rạp
+      if (oldContext?.isWaitingForInput == true && oldContext?.waitingFor == 'cinema_selection') {
+        // Chọn rạp để tìm phim
+        response = await _handleSearchMovieInCinema(userMessage, oldContext!);
+        newContext = response.context;
+      } else if (oldContext?.isWaitingForInput == true && oldContext?.waitingFor == 'cinema_selection_for_movies') {
+        // Chọn rạp từ danh sách rạp (askCinemas)
+        response = await _handleCinemaSelectionFromList(userMessage, oldContext!);
+        newContext = response.context;
+      } else {
+        switch (intent) {
+          case Intent.greeting:
+            response = await _handleGreeting(updatedHistory);
+            break;
+          case Intent.searchMovie:
+            response = await _handleSearchMovie(userMessage, entities, updatedHistory, oldContext);
+            newContext = response.context;
+            break;
         case Intent.movieNowShowing:
           response = await _handleMovieNowShowing(updatedHistory);
           break;
@@ -217,6 +230,7 @@ class AIAgentService {
           break;
         default:
           response = await _handleUnknown(userMessage, updatedHistory);
+        }
       }
     } catch (e) {
       // ignore: avoid_print
@@ -277,8 +291,12 @@ class AIAgentService {
 
     // Kiểm tra context trước - nếu đang chờ input, không cần recognize intent mới
     if (history.context['waitingFor'] != null) {
+      final waitingFor = history.context['waitingFor'];
       final lastIntent = history.context['lastIntent'];
-      if (lastIntent == 'search_movie') {
+      
+      if (waitingFor == 'cinema_selection') {
+        return Intent.searchMovie; // Vẫn là search movie nhưng đang chờ chọn rạp
+      } else if (lastIntent == 'search_movie') {
         return Intent.searchMovie;
       } else if (lastIntent == 'check_seats') {
         return Intent.checkSeats;
@@ -496,6 +514,11 @@ class AIAgentService {
     ConversationHistory history,
     ConversationContext? oldContext,
   ) async {
+    // Nếu đang trong context chọn rạp, xử lý tìm phim trong rạp đó
+    if (oldContext?.isWaitingForInput == true && oldContext?.waitingFor == 'cinema_selection') {
+      return _handleSearchMovieInCinema(userMessage, oldContext!);
+    }
+    
     // Nếu đang trong context, xử lý contextual
     if (oldContext?.isWaitingForInput == true && oldContext?.waitingFor == 'movie_name') {
       return _handleContextualSearchMovie(userMessage, oldContext!);
@@ -503,108 +526,35 @@ class AIAgentService {
 
     final msg = userMessage.toLowerCase().trim();
     
-    // Nếu user hỏi "có phim gì", "phim gì", "tất cả phim" → hiển thị tất cả phim
+    // Nếu user hỏi "có phim gì", "phim gì", "tất cả phim" → hỏi rạp trước
     if (_matchesAny(msg, ['có phim gì', 'phim gì', 'tất cả phim', 'danh sách phim', 'list phim'])) {
-      try {
-        final allMovies = await _dbService.getAllMovies();
-        if (allMovies.isEmpty) {
-          return ChatBotResponse(
-            text: 'Hiện tại không có phim nào trong hệ thống.',
-            type: ChatBotResponseType.text,
-          );
-        }
-        String response = '🎬 Danh sách tất cả phim (${allMovies.length} phim):\n\n';
-        for (var movie in allMovies.take(10)) {
-          response += '• ${movie.title}\n';
-          if (movie.genre.isNotEmpty) {
-            response += '  Thể loại: ${movie.genre}\n';
-          }
-          if (movie.duration > 0) {
-            response += '  Thời lượng: ${movie.duration} phút\n';
-          }
-          response += '\n';
-        }
-        if (allMovies.length > 10) {
-          response += '... và ${allMovies.length - 10} phim khác.\n\n';
-        }
-        response += 'Bạn muốn xem chi tiết phim nào?';
-        return ChatBotResponse(
-          text: response,
-          type: ChatBotResponseType.text,
-          movies: allMovies,
-        );
-      } catch (e) {
-        return ChatBotResponse(
-          text: 'Xin lỗi, tôi không thể lấy danh sách phim lúc này. Vui lòng thử lại sau.',
-          type: ChatBotResponseType.text,
-        );
-      }
+      return _askCinemaFirst('Bạn muốn xem phim ở rạp nào?');
     }
 
     final movieName = entities['movie_name'] as String?;
     
-    if (movieName == null || movieName.isEmpty) {
-      // Không có tên phim, hỏi lại
-      return ChatBotResponse(
-        text: 'Bạn muốn tìm phim nào?\n\n'
-            'Vui lòng cho tôi biết:\n'
-            '• Tên phim bạn muốn tìm\n'
-            '• Hoặc thể loại phim\n\n'
-            'Ví dụ: "Tìm phim Avengers" hoặc "Phim hành động"',
-        type: ChatBotResponseType.text,
-        context: ConversationContext(
-          waitingFor: 'movie_name',
-          lastIntent: 'search_movie',
-        ),
-        suggestions: ['Có phim gì', 'Phim đang chiếu'],
+    // Nếu có tên phim, vẫn cần hỏi rạp trước
+    if (movieName != null && movieName.isNotEmpty) {
+      return _askCinemaFirst(
+        'Bạn muốn tìm phim "$movieName" ở rạp nào?',
+        movieName: movieName,
       );
     }
-
-    // Tìm phim
-    try {
-      final allMovies = await _dbService.getAllMovies();
-      final movieNameLower = movieName.toLowerCase();
-      final matchedMovies = allMovies.where((movie) {
-        return movie.title.toLowerCase().contains(movieNameLower) ||
-               movie.genre.toLowerCase().contains(movieNameLower);
-      }).toList();
-
-      if (matchedMovies.isEmpty) {
-        return ChatBotResponse(
-          text: 'Không tìm thấy phim nào với từ khóa "$movieName".\n\n'
-              'Bạn có thể:\n'
-              '• Thử tìm với tên khác\n'
-              '• Xem danh sách tất cả phim\n'
-              '• Xem phim đang chiếu',
-          type: ChatBotResponseType.text,
-          suggestions: ['Có phim gì', 'Phim đang chiếu'],
-        );
-      }
-
-      String response = '🎬 Tìm thấy ${matchedMovies.length} phim:\n\n';
-      for (var movie in matchedMovies.take(5)) {
-        response += '• ${movie.title}\n';
-        if (movie.genre.isNotEmpty) {
-          response += '  Thể loại: ${movie.genre}\n';
-        }
-        response += '\n';
-      }
-      if (matchedMovies.length > 5) {
-        response += '... và ${matchedMovies.length - 5} phim khác.\n\n';
-      }
-      response += 'Bạn muốn xem chi tiết phim nào?';
-      
-      return ChatBotResponse(
-        text: response,
-        type: ChatBotResponseType.text,
-        movies: matchedMovies,
-      );
-    } catch (e) {
-      return ChatBotResponse(
-        text: 'Xin lỗi, tôi không thể tìm phim lúc này. Vui lòng thử lại sau.',
-        type: ChatBotResponseType.text,
-      );
-    }
+    
+    // Không có tên phim, hỏi tên phim và rạp
+    return ChatBotResponse(
+      text: 'Bạn muốn tìm phim nào và ở rạp nào?\n\n'
+          'Vui lòng cho tôi biết:\n'
+          '• Tên phim bạn muốn tìm\n'
+          '• Rạp chiếu phim\n\n'
+          'Ví dụ: "Tìm phim Avengers ở Rạp 1" hoặc "Phim hành động ở CGV"',
+      type: ChatBotResponseType.text,
+      context: ConversationContext(
+        waitingFor: 'movie_name',
+        lastIntent: 'search_movie',
+      ),
+      suggestions: ['Có phim gì', 'Phim đang chiếu'],
+    );
   }
 
   static Future<ChatBotResponse> _handleContextualSearchMovie(
@@ -1093,16 +1043,33 @@ class AIAgentService {
         );
       }
       String response = '🎭 Các rạp chiếu:\n\n';
+      List<String> cinemaSuggestions = [];
+      
+      int index = 1;
       for (var cinema in cinemas) {
-        response += '• ${cinema.name}\n';
+        response += '$index. ${cinema.name}\n';
         if (cinema.address.isNotEmpty) {
-          response += '  Địa chỉ: ${cinema.address}\n';
+          response += '   Địa chỉ: ${cinema.address}\n';
         }
         response += '\n';
+        cinemaSuggestions.add(cinema.name);
+        index++;
       }
+      
+      response += 'Bạn muốn xem phim ở rạp nào?\n\n'
+          'Vui lòng chọn rạp bằng cách:\n'
+          '• Nói số thứ tự (ví dụ: "1" hoặc "rạp 1")\n'
+          '• Hoặc nói tên rạp';
+      
       return ChatBotResponse(
         text: response,
         type: ChatBotResponseType.text,
+        suggestions: cinemaSuggestions,
+        cinemas: cinemas, // Trả về danh sách rạp để UI hiển thị
+        context: ConversationContext(
+          waitingFor: 'cinema_selection_for_movies',
+          lastIntent: 'ask_cinemas',
+        ),
       );
     } catch (e) {
       return ChatBotResponse(
@@ -1178,6 +1145,392 @@ class AIAgentService {
           'Hoặc gõ "giúp" để xem danh sách câu hỏi thường gặp.',
       type: ChatBotResponseType.text,
       suggestions: ['Phim đang chiếu', 'Có phim gì', 'Giúp'],
+    );
+  }
+
+  /// Hỏi rạp trước khi tìm phim
+  static Future<ChatBotResponse> _askCinemaFirst(
+    String message, {
+    String? movieName,
+  }) async {
+    try {
+      final cinemas = await _dbService.getAllCinemas();
+      if (cinemas.isEmpty) {
+        return ChatBotResponse(
+          text: 'Hiện tại chưa có thông tin về rạp chiếu.',
+          type: ChatBotResponseType.text,
+        );
+      }
+      
+      String response = '$message\n\n';
+      response += '🎭 Các rạp chiếu:\n\n';
+      
+      int index = 1;
+      for (var cinema in cinemas) {
+        response += '$index. ${cinema.name}\n';
+        if (cinema.address.isNotEmpty) {
+          response += '   Địa chỉ: ${cinema.address}\n';
+        }
+        response += '\n';
+        index++;
+      }
+      
+      response += 'Vui lòng chọn rạp bằng cách:\n'
+          '• Nói số thứ tự (ví dụ: "1" hoặc "rạp 1")\n'
+          '• Hoặc nói tên rạp';
+      
+      return ChatBotResponse(
+        text: response,
+        type: ChatBotResponseType.text,
+        context: ConversationContext(
+          waitingFor: 'cinema_selection',
+          lastIntent: 'search_movie',
+          data: {
+            if (movieName != null) 'movie_name': movieName,
+          },
+        ),
+      );
+    } catch (e) {
+      return ChatBotResponse(
+        text: 'Xin lỗi, tôi không thể lấy thông tin rạp chiếu lúc này.',
+        type: ChatBotResponseType.text,
+      );
+    }
+  }
+
+  /// Tìm phim trong rạp đã chọn
+  static Future<ChatBotResponse> _handleSearchMovieInCinema(
+    String userMessage,
+    ConversationContext context,
+  ) async {
+    final movieName = context.data['movie_name'] as String?;
+    final msg = userMessage.toLowerCase().trim();
+    
+    // Tìm rạp được chọn
+    String? selectedCinemaId;
+    String? selectedCinemaName;
+    
+    try {
+      final cinemas = await _dbService.getAllCinemas();
+      
+      for (var cinema in cinemas) {
+        final cinemaName = cinema.name.toLowerCase();
+        final index = cinemas.indexOf(cinema) + 1;
+        
+        // Kiểm tra số thứ tự
+        if (msg.contains(index.toString()) || msg == index.toString()) {
+          selectedCinemaId = cinema.id;
+          selectedCinemaName = cinema.name;
+          break;
+        }
+        
+        // Kiểm tra tên rạp
+        if (msg.contains(cinemaName) || cinemaName.contains(msg)) {
+          selectedCinemaId = cinema.id;
+          selectedCinemaName = cinema.name;
+          break;
+        }
+      }
+      
+      if (selectedCinemaId == null) {
+        // Không tìm thấy rạp, liệt kê lại
+        String response = 'Tôi chưa hiểu rõ bạn muốn chọn rạp nào.\n\n';
+        response += '🎭 Các rạp chiếu:\n\n';
+        
+        int index = 1;
+        for (var cinema in cinemas) {
+          response += '$index. ${cinema.name}\n';
+          if (cinema.address.isNotEmpty) {
+            response += '   Địa chỉ: ${cinema.address}\n';
+          }
+          response += '\n';
+          index++;
+        }
+        
+        response += 'Vui lòng chọn rạp bằng cách:\n'
+            '• Nói số thứ tự (ví dụ: "1" hoặc "rạp 1")\n'
+            '• Hoặc nói tên rạp';
+        
+        return ChatBotResponse(
+          text: response,
+          type: ChatBotResponseType.text,
+          context: context,
+        );
+      }
+      
+      // Đã chọn rạp, tìm phim trong rạp đó
+      if (movieName != null && movieName.isNotEmpty) {
+        // Tìm phim cụ thể
+        final allMovies = await _dbService.getMoviesByCinema(selectedCinemaId);
+        final movieNameLower = movieName.toLowerCase();
+        final matchedMovies = allMovies.where((movie) {
+          return movie.title.toLowerCase().contains(movieNameLower) ||
+                 movie.genre.toLowerCase().contains(movieNameLower);
+        }).toList();
+        
+        if (matchedMovies.isEmpty) {
+          return ChatBotResponse(
+            text: 'Không tìm thấy phim "$movieName" ở $selectedCinemaName.\n\n'
+                'Bạn có thể:\n'
+                '• Thử tìm với tên khác\n'
+                '• Xem danh sách tất cả phim ở $selectedCinemaName',
+            type: ChatBotResponseType.text,
+            suggestions: ['Có phim gì', 'Phim đang chiếu'],
+          );
+        }
+        
+        String response = '🎬 Tìm thấy phim "$movieName" ở $selectedCinemaName:\n\n';
+        for (var movie in matchedMovies) {
+          response += '• ${movie.title}\n';
+          if (movie.genre.isNotEmpty) {
+            response += '  Thể loại: ${movie.genre}\n';
+          }
+          if (movie.duration > 0) {
+            response += '  Thời lượng: ${movie.duration} phút\n';
+          }
+          response += '\n';
+        }
+        response += 'Bạn muốn xem chi tiết phim nào?';
+        
+        return ChatBotResponse(
+          text: response,
+          type: ChatBotResponseType.text,
+          movies: matchedMovies,
+          context: null,
+        );
+      } else {
+        // Hiển thị tất cả phim ở rạp đó
+        final allMovies = await _dbService.getMoviesByCinema(selectedCinemaId);
+        
+        if (allMovies.isEmpty) {
+          return ChatBotResponse(
+            text: 'Hiện tại không có phim nào ở $selectedCinemaName.',
+            type: ChatBotResponseType.text,
+            context: null,
+          );
+        }
+        
+        String response = '🎬 Danh sách phim ở $selectedCinemaName (${allMovies.length} phim):\n\n';
+        for (var movie in allMovies.take(10)) {
+          response += '• ${movie.title}\n';
+          if (movie.genre.isNotEmpty) {
+            response += '  Thể loại: ${movie.genre}\n';
+          }
+          if (movie.duration > 0) {
+            response += '  Thời lượng: ${movie.duration} phút\n';
+          }
+          response += '\n';
+        }
+        if (allMovies.length > 10) {
+          response += '... và ${allMovies.length - 10} phim khác.\n\n';
+        }
+        response += 'Bạn muốn xem chi tiết phim nào?';
+        
+        return ChatBotResponse(
+          text: response,
+          type: ChatBotResponseType.text,
+          movies: allMovies,
+          context: null,
+        );
+      }
+    } catch (e) {
+      return ChatBotResponse(
+        text: 'Xin lỗi, tôi không thể tìm phim lúc này. Vui lòng thử lại sau.',
+        type: ChatBotResponseType.text,
+        context: null,
+      );
+    }
+  }
+
+  /// Xử lý khi user chọn rạp từ danh sách rạp (từ askCinemas)
+  static Future<ChatBotResponse> _handleCinemaSelectionFromList(
+    String userMessage,
+    ConversationContext context,
+  ) async {
+    final msg = userMessage.toLowerCase().trim();
+    
+    // Tìm rạp được chọn
+    String? selectedCinemaId;
+    String? selectedCinemaName;
+    
+    try {
+      final cinemas = await _dbService.getAllCinemas();
+      
+      for (var cinema in cinemas) {
+        final cinemaName = cinema.name.toLowerCase();
+        final index = cinemas.indexOf(cinema) + 1;
+        
+        // Kiểm tra số thứ tự
+        if (msg.contains(index.toString()) || msg == index.toString()) {
+          selectedCinemaId = cinema.id;
+          selectedCinemaName = cinema.name;
+          break;
+        }
+        
+        // Kiểm tra tên rạp
+        if (msg.contains(cinemaName) || cinemaName.contains(msg)) {
+          selectedCinemaId = cinema.id;
+          selectedCinemaName = cinema.name;
+          break;
+        }
+      }
+      
+      if (selectedCinemaId == null) {
+        // Không tìm thấy rạp, liệt kê lại
+        String response = 'Tôi chưa hiểu rõ bạn muốn chọn rạp nào.\n\n';
+        response += '🎭 Các rạp chiếu:\n\n';
+        
+        int index = 1;
+        for (var cinema in cinemas) {
+          response += '$index. ${cinema.name}\n';
+          if (cinema.address.isNotEmpty) {
+            response += '   Địa chỉ: ${cinema.address}\n';
+          }
+          response += '\n';
+          index++;
+        }
+        
+        response += 'Vui lòng chọn rạp bằng cách:\n'
+            '• Click vào tên rạp bên dưới\n'
+            '• Nói số thứ tự (ví dụ: "1" hoặc "rạp 1")\n'
+            '• Hoặc nói tên rạp';
+        
+        return ChatBotResponse(
+          text: response,
+          type: ChatBotResponseType.text,
+          cinemas: cinemas,
+          context: context,
+        );
+      }
+      
+      // Đã chọn rạp, hiển thị phim của rạp đó
+      final allMovies = await _dbService.getMoviesByCinema(selectedCinemaId);
+      
+      if (allMovies.isEmpty) {
+        return ChatBotResponse(
+          text: 'Hiện tại không có phim nào ở $selectedCinemaName.\n\n'
+              'Bạn có thể thử chọn rạp khác.',
+          type: ChatBotResponseType.text,
+          context: null,
+          suggestions: ['Rạp nào', 'Phim đang chiếu'],
+        );
+      }
+      
+      String response = '🎬 Danh sách phim ở $selectedCinemaName (${allMovies.length} phim):\n\n';
+      for (var movie in allMovies.take(10)) {
+        response += '• ${movie.title}\n';
+        if (movie.genre.isNotEmpty) {
+          response += '  Thể loại: ${movie.genre}\n';
+        }
+        if (movie.duration > 0) {
+          response += '  Thời lượng: ${movie.duration} phút\n';
+        }
+        response += '\n';
+      }
+      if (allMovies.length > 10) {
+        response += '... và ${allMovies.length - 10} phim khác.\n\n';
+      }
+      response += 'Bạn muốn xem chi tiết phim nào?';
+      
+      return ChatBotResponse(
+        text: response,
+        type: ChatBotResponseType.text,
+        movies: allMovies,
+        context: null,
+      );
+    } catch (e) {
+      return ChatBotResponse(
+        text: 'Xin lỗi, tôi không thể lấy thông tin phim lúc này. Vui lòng thử lại sau.',
+        type: ChatBotResponseType.text,
+        context: null,
+      );
+    }
+  }
+
+  /// Xử lý khi user chọn rạp (deprecated - dùng _handleSearchMovieInCinema hoặc _handleCinemaSelectionFromList)
+  static Future<ChatBotResponse> _handleCinemaSelection(
+    String userMessage,
+    ConversationContext context,
+  ) async {
+    final moviesByCinema = context.data['movies_by_cinema'] as Map<String, List<MovieModel>>?;
+    final cinemaNames = context.data['cinema_names'] as Map<String, String>?;
+    final movieName = context.data['movie_name'] as String?;
+    
+    if (moviesByCinema == null || cinemaNames == null) {
+      return ChatBotResponse(
+        text: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.',
+        type: ChatBotResponseType.text,
+        context: null,
+      );
+    }
+
+    final msg = userMessage.toLowerCase().trim();
+    String? selectedCinemaId;
+    
+    // Tìm rạp được chọn
+    for (var entry in cinemaNames.entries) {
+      final cinemaName = entry.value.toLowerCase();
+      final cinemaId = entry.key;
+      
+      // Kiểm tra số thứ tự (1, 2, 3...)
+      final index = moviesByCinema.keys.toList().indexOf(cinemaId) + 1;
+      if (msg.contains(index.toString()) || msg == index.toString()) {
+        selectedCinemaId = cinemaId;
+        break;
+      }
+      
+      // Kiểm tra tên rạp
+      if (msg.contains(cinemaName) || cinemaName.contains(msg)) {
+        selectedCinemaId = cinemaId;
+        break;
+      }
+    }
+
+    if (selectedCinemaId == null) {
+      // Không tìm thấy rạp, liệt kê lại
+      String response = 'Tôi chưa hiểu rõ bạn muốn chọn rạp nào.\n\n';
+      response += '🎬 Phim "$movieName" có ở các rạp sau:\n\n';
+      
+      int index = 1;
+      for (var cinemaId in moviesByCinema.keys) {
+        final cinemaName = cinemaNames[cinemaId] ?? 'Rạp không xác định';
+        response += '$index. $cinemaName\n';
+        index++;
+      }
+      
+      response += '\nVui lòng chọn rạp bằng cách:\n'
+          '• Nói số thứ tự (ví dụ: "1" hoặc "rạp 1")\n'
+          '• Hoặc nói tên rạp';
+      
+      return ChatBotResponse(
+        text: response,
+        type: ChatBotResponseType.text,
+        context: context,
+      );
+    }
+
+    // Tìm thấy rạp, hiển thị phim
+    final selectedCinemaName = cinemaNames[selectedCinemaId] ?? 'Rạp không xác định';
+    final movies = moviesByCinema[selectedCinemaId]!;
+    
+    String response = '🎬 Phim "$movieName" ở $selectedCinemaName:\n\n';
+    for (var movie in movies) {
+      response += '• ${movie.title}\n';
+      if (movie.genre.isNotEmpty) {
+        response += '  Thể loại: ${movie.genre}\n';
+      }
+      if (movie.duration > 0) {
+        response += '  Thời lượng: ${movie.duration} phút\n';
+      }
+      response += '\n';
+    }
+    response += 'Bạn muốn xem chi tiết phim nào?';
+    
+    return ChatBotResponse(
+      text: response,
+      type: ChatBotResponseType.text,
+      movies: movies,
+      context: null, // Clear context
     );
   }
 

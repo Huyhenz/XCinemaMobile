@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/ai_agent_service.dart';
 import '../models/movie.dart';
 import '../models/showtime.dart';
+import '../models/cinema.dart';
 import 'movie_detail_screen.dart';
 
 class ChatBotScreen extends StatefulWidget {
@@ -38,6 +39,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
       suggestions: [
         'Phim đang chiếu',
         'Phim sắp chiếu',
+        'Rạp nào',
         'Giá vé',
         'Cách đặt vé',
       ],
@@ -84,6 +86,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
           movies: response.movies,
           showtimes: response.showtimes,
           suggestions: response.suggestions,
+          cinemas: response.cinemas,
         ));
         
         // Cập nhật context từ response
@@ -210,6 +213,11 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                         const SizedBox(height: 12),
                         ...message.movies!.take(3).map((movie) => _buildMovieCard(movie)),
                       ],
+                      // Cinema list if available
+                      if (message.cinemas != null && message.cinemas!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        ...message.cinemas!.map((cinema) => _buildCinemaCard(cinema)),
+                      ],
                     ],
                   ),
                 ),
@@ -301,6 +309,54 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                   if (movie.genre.isNotEmpty)
                     Text(
                       movie.genre,
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCinemaCard(CinemaModel cinema) {
+    return InkWell(
+      onTap: () {
+        // Gửi tên rạp để chatbot xử lý
+        _sendMessage(cinema.name);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE50914).withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on, color: Color(0xFFE50914), size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cinema.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (cinema.address.isNotEmpty)
+                    Text(
+                      cinema.address,
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 12,
@@ -416,6 +472,7 @@ class ChatMessage {
   final List<MovieModel>? movies;
   final List<ShowtimeModel>? showtimes;
   final List<String>? suggestions;
+  final List<CinemaModel>? cinemas;
 
   ChatMessage({
     required this.text,
@@ -424,6 +481,7 @@ class ChatMessage {
     this.movies,
     this.showtimes,
     this.suggestions,
+    this.cinemas,
   });
 }
 

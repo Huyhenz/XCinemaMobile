@@ -969,7 +969,11 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                 items: _movies.map((movie) {
                   return DropdownMenuItem<String>(
                     value: movie.id,
-                    child: Text(movie.title),
+                    child: Text(
+                      movie.title,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
                   );
                 }).toList(),
                 onChanged: (value) {
