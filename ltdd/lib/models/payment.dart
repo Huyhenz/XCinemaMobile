@@ -6,7 +6,8 @@ class PaymentModel {
   final String cinemaId; // ID của rạp chiếu (để biết thanh toán ở rạp nào)
   final double amount; // Số tiền cuối cùng (sau voucher)
   final String status; // 'success', 'failed', 'pending'
-  final String? transactionId; // Từ VNPay hoặc gateway khác
+  final String? transactionId; // Từ PayPal, Google Pay, ZaloPay hoặc gateway khác
+  final String? paymentMethod; // 'paypal', 'googlepay', 'zalopay'
   final int? paidAt; // Timestamp
 
   PaymentModel({
@@ -16,6 +17,7 @@ class PaymentModel {
     required this.amount,
     required this.status,
     this.transactionId,
+    this.paymentMethod,
     this.paidAt,
   });
 
@@ -27,6 +29,7 @@ class PaymentModel {
       amount: data['amount']?.toDouble() ?? 0.0,
       status: data['status'] ?? 'pending',
       transactionId: data['transactionId'],
+      paymentMethod: data['paymentMethod'],
       paidAt: data['paidAt'],
     );
   }
@@ -38,6 +41,7 @@ class PaymentModel {
       'amount': amount,
       'status': status,
       'transactionId': transactionId,
+      'paymentMethod': paymentMethod,
       'paidAt': ServerValue.timestamp,
     };
   }

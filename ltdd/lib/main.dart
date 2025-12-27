@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:ltdd/widgets/main_wrapper.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
@@ -9,6 +10,23 @@ import 'screens/email_verification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables from .env file
+  try {
+    // Try loading from assets first (for mobile)
+    await dotenv.load(fileName: ".env");
+    print('✅ Loaded .env file successfully');
+    final clientId = dotenv.env['PAYPAL_CLIENT_ID'] ?? '';
+    if (clientId.isNotEmpty) {
+      print('📝 PayPal Client ID: ${clientId.substring(0, clientId.length > 10 ? 10 : clientId.length)}...');
+    } else {
+      print('⚠️ PayPal Client ID not found in .env');
+    }
+  } catch (e) {
+    print('⚠️ Warning: Could not load .env file: $e');
+    print('💡 Tip: Make sure .env file exists and is added to pubspec.yaml assets');
+    // App will continue but PayPal payment will use mock mode
+  }
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

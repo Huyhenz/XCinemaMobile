@@ -5,6 +5,7 @@ import '../models/booking.dart';
 import '../models/payment.dart';
 import '../models/tempbooking.dart';
 import '../services/database_services.dart';
+import '../services/payment_service.dart';
 import '../utils/booking_helper.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -30,7 +31,7 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateMixin {
   String? _tempBookingId;
   bool _isProcessing = false;
-  String _selectedPaymentMethod = 'vnpay';
+  String _selectedPaymentMethod = 'paypal'; // Default to PayPal
   late AnimationController _pulseController;
 
   @override
@@ -80,11 +81,32 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     setState(() => _isProcessing = true);
 
     try {
-      // Simulate payment processing
-      await Future.delayed(const Duration(seconds: 2));
-      bool paymentSuccess = true;
+      // Convert selected payment method to PaymentMethod enum
+      PaymentMethod paymentMethod;
+      switch (_selectedPaymentMethod) {
+        case 'paypal':
+          paymentMethod = PaymentMethod.paypal;
+          break;
+        case 'googlepay':
+          paymentMethod = PaymentMethod.googlePay;
+          break;
+        case 'zalopay':
+          paymentMethod = PaymentMethod.zaloPay;
+          break;
+        default:
+          paymentMethod = PaymentMethod.paypal;
+      }
 
-      if (paymentSuccess) {
+      // Process payment using PaymentService
+      PaymentResult result = await PaymentService.processPayment(
+        method: paymentMethod,
+        amount: widget.totalPrice,
+        description: 'Đặt vé xem phim - ${widget.selectedSeats.length} ghế',
+        currency: 'VND',
+        context: context,
+      );
+
+      if (result.success && result.transactionId != null) {
         TempBookingModel? temp = await DatabaseService().getTempBooking(_tempBookingId!);
         if (temp != null) {
           String userId = FirebaseAuth.instance.currentUser!.uid;
@@ -110,7 +132,8 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             cinemaId: widget.cinemaId,
             amount: widget.totalPrice,
             status: 'success',
-            transactionId: 'TXN${DateTime.now().millisecondsSinceEpoch}',
+            transactionId: result.transactionId,
+            paymentMethod: _selectedPaymentMethod,
           );
           await DatabaseService().savePayment(payment);
 
@@ -135,9 +158,10 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         setState(() => _isProcessing = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Thanh toán thất bại! Vui lòng thử lại.'),
-              backgroundColor: Color(0xFFE50914),
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: const Color(0xFFE50914),
+              duration: const Duration(seconds: 3),
             ),
           );
         }
@@ -252,13 +276,12 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
       );
     }
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (!_isProcessing) {
+    return PopScope(
+      canPop: !_isProcessing,
+      onPopInvoked: (didPop) async {
+        if (!didPop && !_isProcessing) {
           await _handleCancel();
-          return true;
         }
-        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
@@ -383,22 +406,25 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           ),
           const SizedBox(height: 16),
           _buildPaymentMethodTile(
-            'vnpay',
-            'VNPay',
-            'Thanh toán qua VNPay',
+            'paypal',
+            'PayPal',
+            'Thanh toán qua PayPal',
             Icons.account_balance_wallet,
+            const Color(0xFF0070BA), // PayPal blue
           ),
           _buildPaymentMethodTile(
-            'momo',
-            'MoMo',
-            'Thanh toán qua Ví MoMo',
+            'googlepay',
+            'Google Pay',
+            'Thanh toán qua Google Pay',
+            Icons.payment,
+            const Color(0xFF4285F4), // Google blue
+          ),
+          _buildPaymentMethodTile(
+            'zalopay',
+            'ZaloPay',
+            'Thanh toán qua ZaloPay',
             Icons.phone_android,
-          ),
-          _buildPaymentMethodTile(
-            'card',
-            'Thẻ ATM/Visa',
-            'Thanh toán bằng thẻ',
-            Icons.credit_card,
+            const Color(0xFF0068FF), // ZaloPay blue
           ),
         ],
       ),
@@ -406,11 +432,12 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   }
 
   Widget _buildPaymentMethodTile(
-      String value,
-      String title,
-      String subtitle,
-      IconData icon,
-      ) {
+    String value,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color brandColor,
+  ) {
     bool isSelected = _selectedPaymentMethod == value;
 
     return GestureDetector(
@@ -423,7 +450,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFFE50914) : const Color(0xFF2A2A2A),
+            color: isSelected ? brandColor : const Color(0xFF2A2A2A),
             width: 2,
           ),
         ),
@@ -433,13 +460,13 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? const Color(0xFFE50914).withOpacity(0.2)
+                    ? brandColor.withOpacity(0.2)
                     : const Color(0xFF2A2A2A),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
-                color: isSelected ? const Color(0xFFE50914) : Colors.grey,
+                color: isSelected ? brandColor : Colors.grey,
                 size: 28,
               ),
             ),
@@ -450,8 +477,8 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isSelected ? brandColor : Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -468,9 +495,9 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               ),
             ),
             if (isSelected)
-              const Icon(
+              Icon(
                 Icons.check_circle,
-                color: Color(0xFFE50914),
+                color: brandColor,
                 size: 28,
               ),
           ],
