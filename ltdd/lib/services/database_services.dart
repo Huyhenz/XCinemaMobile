@@ -366,6 +366,43 @@ class DatabaseService {
     await _db.child('showtimes').child(showtimeId).update({'availableSeats': newAvailableSeats});
   }
 
+  Future<void> updateShowtime(ShowtimeModel showtime) async {
+    await _db.child('showtimes').child(showtime.id).update(showtime.toMap());
+  }
+
+  Future<void> deleteShowtime(String showtimeId) async {
+    await _db.child('showtimes').child(showtimeId).remove();
+  }
+
+  Future<List<ShowtimeModel>> getAllShowtimes() async {
+    try {
+      DataSnapshot snapshot = await _db.child('showtimes').get();
+      List<ShowtimeModel> showtimes = [];
+
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+
+        if (value is Map) {
+          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+          data.forEach((key, itemValue) {
+            try {
+              if (itemValue is Map) {
+                Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+                showtimes.add(ShowtimeModel.fromMap(itemMap, key.toString()));
+              }
+            } catch (e) {
+              print('⚠️ Error parsing showtime $key: $e');
+            }
+          });
+        }
+      }
+      return showtimes;
+    } catch (e) {
+      print('Error getting all showtimes: $e');
+      return [];
+    }
+  }
+
   //TEMP BOOKING
   Future<String> saveTempBooking(TempBookingModel temp) async {
     final ref = _db.child('temp_bookings').push();
@@ -697,6 +734,14 @@ class DatabaseService {
     }
   }
 
+  Future<void> updateTheater(TheaterModel theater) async {
+    await _db.child('theaters').child(theater.id).update(theater.toMap());
+  }
+
+  Future<void> deleteTheater(String theaterId) async {
+    await _db.child('theaters').child(theaterId).remove();
+  }
+
   Future<List<TheaterModel>> getTheatersByCinema(String cinemaId) async {
     try {
       DataSnapshot snapshot = await _db.child('theaters').get();
@@ -769,6 +814,204 @@ class DatabaseService {
       return showtimes.where((showtime) => theaterIds.contains(showtime.theaterId)).toList();
     } catch (e) {
       print('Error getting showtimes by movie and cinema: $e');
+      return [];
+    }
+  }
+
+  // Get movies that have showtimes today (filter by cinema if specified)
+  Future<List<MovieModel>> getMoviesShowingToday({String? cinemaId}) async {
+    try {
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day); // 00:00:00 hôm nay
+      final todayEnd = todayStart.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)); // 23:59:59 hôm nay
+      final todayStartMillis = todayStart.millisecondsSinceEpoch;
+      final todayEndMillis = todayEnd.millisecondsSinceEpoch;
+
+      // Get theaters of this cinema if cinemaId is specified
+      Set<String> theaterIds = {};
+      bool hasTheaters = false;
+      if (cinemaId != null && cinemaId.isNotEmpty) {
+        List<TheaterModel> theaters = await getTheatersByCinema(cinemaId);
+        theaterIds = theaters.map((t) => t.id).toSet();
+        hasTheaters = theaterIds.isNotEmpty;
+        print('🎬 getMoviesShowingToday: Found ${theaters.length} theaters for cinema $cinemaId');
+        print('🎬 Theater IDs: $theaterIds');
+        if (!hasTheaters) {
+          print('⚠️ Warning: Cinema $cinemaId has no theaters! Returning empty list.');
+          // If cinema has no theaters, it cannot have showtimes, so return empty list
+          return [];
+        }
+      }
+
+      // Get all showtimes
+      DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
+      Set<String> movieIds = {};
+
+      if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
+        final showtimesData = _convertMap(showtimesSnapshot.value);
+        int showtimesChecked = 0;
+        int showtimesMatched = 0;
+        
+        showtimesData.forEach((key, value) {
+          try {
+            if (value is Map) {
+              final showtimeMap = Map<dynamic, dynamic>.from(value);
+              final startTime = showtimeMap['startTime'];
+              final movieId = showtimeMap['movieId']?.toString();
+              final theaterId = showtimeMap['theaterId']?.toString();
+              
+              // If cinemaId is specified, only include showtimes from theaters of that cinema
+              if (cinemaId != null && cinemaId.isNotEmpty) {
+                if (theaterId == null || !theaterIds.contains(theaterId)) {
+                  return; // Skip this showtime
+                }
+              }
+              
+              if (movieId != null && startTime != null) {
+                showtimesChecked++;
+                int startTimeMillis = 0;
+                if (startTime is num) {
+                  startTimeMillis = startTime.toInt();
+                } else if (startTime is String) {
+                  startTimeMillis = int.tryParse(startTime) ?? 0;
+                }
+
+                // Check if showtime is today
+                if (startTimeMillis >= todayStartMillis && startTimeMillis <= todayEndMillis) {
+                  movieIds.add(movieId);
+                  showtimesMatched++;
+                }
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing showtime $key: $e');
+          }
+        });
+        
+        print('🎬 getMoviesShowingToday: Checked $showtimesChecked showtimes, matched $showtimesMatched for today');
+        print('🎬 Found ${movieIds.length} unique movieIds: $movieIds');
+      }
+
+      // Load movies for these movieIds - filter by cinemaId if specified
+      List<MovieModel> movies = [];
+      if (movieIds.isNotEmpty) {
+        DataSnapshot moviesSnapshot = await _db.child('movies').get();
+        if (moviesSnapshot.exists && moviesSnapshot.value != null) {
+          final moviesData = _convertMap(moviesSnapshot.value);
+          moviesData.forEach((key, value) {
+            try {
+              if (value is Map && movieIds.contains(key.toString())) {
+                final movieMap = Map<dynamic, dynamic>.from(value);
+                final movieCinemaId = movieMap['cinemaId']?.toString() ?? '';
+                // Filter by cinemaId if specified
+                if (cinemaId == null || cinemaId.isEmpty || movieCinemaId == cinemaId) {
+                  movies.add(MovieModel.fromMap(movieMap, key.toString()));
+                } else {
+                  print('🎬 Skipping movie $key: cinemaId mismatch (movie: $movieCinemaId, filter: $cinemaId)');
+                }
+              }
+            } catch (e) {
+              print('⚠️ Error parsing movie $key: $e');
+            }
+          });
+        }
+      }
+
+      print('🎬 getMoviesShowingToday: Returning ${movies.length} movies for cinema ${cinemaId ?? "all"}');
+      return movies;
+    } catch (e) {
+      print('Error getting movies showing today: $e');
+      return [];
+    }
+  }
+
+  // Get movies that have showtimes from tomorrow onwards (filter by cinema if specified)
+  Future<List<MovieModel>> getMoviesComingSoon({String? cinemaId}) async {
+    try {
+      final now = DateTime.now();
+      final tomorrowStart = DateTime(now.year, now.month, now.day).add(const Duration(days: 1)); // 00:00:00 ngày mai
+      final tomorrowStartMillis = tomorrowStart.millisecondsSinceEpoch;
+
+      // Get theaters of this cinema if cinemaId is specified
+      Set<String> theaterIds = {};
+      bool hasTheaters = false;
+      if (cinemaId != null && cinemaId.isNotEmpty) {
+        List<TheaterModel> theaters = await getTheatersByCinema(cinemaId);
+        theaterIds = theaters.map((t) => t.id).toSet();
+        hasTheaters = theaterIds.isNotEmpty;
+        if (!hasTheaters) {
+          print('⚠️ Warning: Cinema $cinemaId has no theaters! Returning empty list.');
+          // If cinema has no theaters, it cannot have showtimes, so return empty list
+          return [];
+        }
+      }
+
+      // Get all showtimes
+      DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
+      Set<String> movieIds = {};
+
+      if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
+        final showtimesData = _convertMap(showtimesSnapshot.value);
+        showtimesData.forEach((key, value) {
+          try {
+            if (value is Map) {
+              final showtimeMap = Map<dynamic, dynamic>.from(value);
+              final startTime = showtimeMap['startTime'];
+              final movieId = showtimeMap['movieId']?.toString();
+              final theaterId = showtimeMap['theaterId']?.toString();
+              
+              // If cinemaId is specified, only include showtimes from theaters of that cinema
+              if (cinemaId != null && cinemaId.isNotEmpty) {
+                if (theaterId == null || !theaterIds.contains(theaterId)) {
+                  return; // Skip this showtime
+                }
+              }
+              
+              if (movieId != null && startTime != null) {
+                int startTimeMillis = 0;
+                if (startTime is num) {
+                  startTimeMillis = startTime.toInt();
+                } else if (startTime is String) {
+                  startTimeMillis = int.tryParse(startTime) ?? 0;
+                }
+
+                // Check if showtime is from tomorrow onwards
+                if (startTimeMillis >= tomorrowStartMillis) {
+                  movieIds.add(movieId);
+                }
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing showtime $key: $e');
+          }
+        });
+      }
+
+      // Load movies for these movieIds - filter by cinemaId if specified
+      List<MovieModel> movies = [];
+      if (movieIds.isNotEmpty) {
+        DataSnapshot moviesSnapshot = await _db.child('movies').get();
+        if (moviesSnapshot.exists && moviesSnapshot.value != null) {
+          final moviesData = _convertMap(moviesSnapshot.value);
+          moviesData.forEach((key, value) {
+            try {
+              if (value is Map && movieIds.contains(key.toString())) {
+                final movieMap = Map<dynamic, dynamic>.from(value);
+                // Filter by cinemaId if specified
+                if (cinemaId == null || cinemaId.isEmpty || movieMap['cinemaId']?.toString() == cinemaId) {
+                  movies.add(MovieModel.fromMap(movieMap, key.toString()));
+                }
+              }
+            } catch (e) {
+              print('⚠️ Error parsing movie $key: $e');
+            }
+          });
+        }
+      }
+
+      return movies;
+    } catch (e) {
+      print('Error getting movies coming soon: $e');
       return [];
     }
   }

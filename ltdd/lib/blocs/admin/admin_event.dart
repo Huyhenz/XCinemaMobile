@@ -24,3 +24,19 @@ class CreateTheater extends AdminEvent {
   final TheaterModel theater;
   CreateTheater(this.theater);
 }
+class UpdateShowtime extends AdminEvent {
+  final ShowtimeModel showtime;
+  UpdateShowtime(this.showtime);
+}
+class DeleteShowtime extends AdminEvent {
+  final String showtimeId;
+  DeleteShowtime(this.showtimeId);
+}
+class UpdateTheater extends AdminEvent {
+  final TheaterModel theater;
+  UpdateTheater(this.theater);
+}
+class DeleteTheater extends AdminEvent {
+  final String theaterId;
+  DeleteTheater(this.theaterId);
+}

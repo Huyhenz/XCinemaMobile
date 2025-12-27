@@ -8,6 +8,7 @@ class MovieState {
   final String? searchQuery;
   final String? category;
   final bool isLoading;
+  final String? cinemaId; // ID của rạp đã chọn
 
   MovieState({
     List<MovieModel>? allMovies,
@@ -15,6 +16,7 @@ class MovieState {
     this.searchQuery,
     this.category,
     this.isLoading = false,
+    this.cinemaId,
   })  : allMovies = allMovies ?? [],
         movies = movies ?? allMovies ?? [];
 
@@ -24,6 +26,7 @@ class MovieState {
     String? searchQuery,
     String? category,
     bool? isLoading,
+    String? cinemaId,
   }) {
     return MovieState(
       allMovies: allMovies ?? this.allMovies,
@@ -31,6 +34,7 @@ class MovieState {
       searchQuery: searchQuery ?? this.searchQuery,
       category: category ?? this.category,
       isLoading: isLoading ?? this.isLoading,
+      cinemaId: cinemaId ?? this.cinemaId,
     );
   }
 }

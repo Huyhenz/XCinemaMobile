@@ -25,7 +25,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -57,11 +57,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ],
           bottom: TabBar(
             controller: _tabController,
+            isScrollable: true,
             tabs: const [
               Tab(text: 'Create Cinema'),
               Tab(text: 'Create Movie'),
               Tab(text: 'Manage Movies'),
               Tab(text: 'Create Showtime'),
+              Tab(text: 'Manage Showtimes'),
               Tab(text: 'Manage Theaters'),
             ],
           ),
@@ -73,7 +75,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             _CreateMovieTab(),
             _ManageMoviesTab(),
             _CreateShowtimeTab(),
-            _CreateTheaterTab(),
+            _ManageShowtimesTab(),
+            _ManageTheatersTab(),
           ],
         ),
       ),
@@ -1077,7 +1080,791 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
   }
 }
 
-// Tab 4: Create Theater
+// Tab 5: Manage Showtimes (Edit & Delete)
+class _ManageShowtimesTab extends StatelessWidget {
+  const _ManageShowtimesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AdminBloc, AdminState>(
+      builder: (context, state) {
+        if (state.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE50914)),
+          );
+        }
+
+        if (state.showtimes.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.schedule, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'Chưa có lịch chiếu nào',
+                    style: TextStyle(color: Colors.grey, fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Hãy tạo lịch chiếu mới ở tab "Create Showtime"',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: state.showtimes.length,
+          itemBuilder: (context, index) {
+            final showtime = state.showtimes[index];
+            return FutureBuilder<Map<String, dynamic>>(
+              future: _getShowtimeDetails(showtime),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Card(
+                    color: Color(0xFF1A1A1A),
+                    child: ListTile(
+                      leading: CircularProgressIndicator(),
+                      title: Text('Đang tải...', style: TextStyle(color: Colors.white)),
+                    ),
+                  );
+                }
+
+                final details = snapshot.data!;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  color: const Color(0xFF1A1A1A),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    title: Text(
+                      details['movieTitle'] ?? 'Phim không xác định',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text(
+                          'Phòng: ${details['theaterName'] ?? 'N/A'}',
+                          style: TextStyle(color: Colors.grey[400]),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Thời gian: ${details['time']}',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        ),
+                        Text(
+                          'Giá: ${NumberFormat('#,###', 'vi_VN').format(showtime.price)}₫',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        ),
+                        Text(
+                          'Ghế trống: ${showtime.availableSeats.length}/${details['totalSeats'] ?? 0}',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Color(0xFF4CAF50)),
+                          onPressed: () => _showEditShowtimeDialog(context, showtime),
+                          tooltip: 'Sửa lịch chiếu',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Color(0xFFE50914)),
+                          onPressed: () => _showDeleteShowtimeConfirmDialog(context, showtime, details),
+                          tooltip: 'Xóa lịch chiếu',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _getShowtimeDetails(ShowtimeModel showtime) async {
+    final dbService = DatabaseService();
+    final movie = await dbService.getMovie(showtime.movieId);
+    final theater = await dbService.getTheater(showtime.theaterId);
+    
+    return {
+      'movieTitle': movie?.title ?? 'N/A',
+      'theaterName': theater?.name ?? 'N/A',
+      'totalSeats': theater?.seats.length ?? 0,
+      'time': DateFormat('dd/MM/yyyy HH:mm').format(
+        DateTime.fromMillisecondsSinceEpoch(showtime.startTime),
+      ),
+    };
+  }
+
+  void _showEditShowtimeDialog(BuildContext context, ShowtimeModel showtime) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => BlocProvider.value(
+        value: adminBloc,
+        child: _EditShowtimeDialog(showtime: showtime),
+      ),
+    );
+  }
+
+  void _showDeleteShowtimeConfirmDialog(BuildContext context, ShowtimeModel showtime, Map<String, dynamic> details) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              'Bạn có chắc chắn muốn xóa lịch chiếu "${details['movieTitle']}"?\n\nThời gian: ${details['time']}\n\nHành động này không thể hoàn tác.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteShowtime(showtime.id));
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Đã xóa lịch chiếu'),
+                      backgroundColor: Color(0xFF4CAF50),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                ),
+                child: const Text('Xóa'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Edit Showtime Dialog Widget
+class _EditShowtimeDialog extends StatefulWidget {
+  final ShowtimeModel showtime;
+  const _EditShowtimeDialog({required this.showtime});
+
+  @override
+  State<_EditShowtimeDialog> createState() => _EditShowtimeDialogState();
+}
+
+class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _priceController = TextEditingController();
+  DateTime _startTime = DateTime.now();
+  TimeOfDay _selectedTime = TimeOfDay.now();
+  String? _selectedTheaterId;
+  List<TheaterModel> _theaters = [];
+  bool _isSaving = false;
+  bool _isLoadingTheaters = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.fromMillisecondsSinceEpoch(widget.showtime.startTime);
+    _selectedTime = TimeOfDay.fromDateTime(_startTime);
+    _priceController.text = widget.showtime.price.toString();
+    _selectedTheaterId = widget.showtime.theaterId;
+    _loadTheaters();
+  }
+
+  Future<void> _loadTheaters() async {
+    try {
+      // Load theater hiện tại để lấy cinemaId
+      final currentTheater = await DatabaseService().getTheater(widget.showtime.theaterId);
+      if (currentTheater != null) {
+        // Load tất cả theaters của cinema này
+        final theaters = await DatabaseService().getTheatersByCinema(currentTheater.cinemaId);
+        setState(() {
+          _theaters = theaters;
+          _isLoadingTheaters = false;
+        });
+      } else {
+        // Nếu không tìm thấy theater, load tất cả
+        final allTheaters = await DatabaseService().getAllTheaters();
+        setState(() {
+          _theaters = allTheaters;
+          _isLoadingTheaters = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading theaters: $e');
+      setState(() => _isLoadingTheaters = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _startTime,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        _startTime = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedTime.hour,
+          _selectedTime.minute,
+        );
+      });
+    }
+  }
+
+  Future<void> _selectTime() async {
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (pickedTime != null) {
+      setState(() {
+        _selectedTime = pickedTime;
+        _startTime = DateTime(
+          _startTime.year,
+          _startTime.month,
+          _startTime.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: const Text(
+        'Sửa Lịch Chiếu',
+        style: TextStyle(color: Colors.white),
+      ),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_isLoadingTheaters)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(color: Color(0xFFE50914)),
+                  ),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _selectedTheaterId,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Chọn Phòng Chiếu *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.meeting_room),
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  dropdownColor: const Color(0xFF2A2A2A),
+                  items: _theaters.map((theater) {
+                    return DropdownMenuItem<String>(
+                      value: theater.id,
+                      child: Text(theater.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedTheaterId = value;
+                    });
+                  },
+                  validator: (value) => value == null ? 'Vui lòng chọn phòng chiếu' : null,
+                ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _priceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Giá Vé (VND) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập giá vé';
+                  final price = double.tryParse(value!);
+                  if (price == null || price <= 0) return 'Giá vé phải là số dương';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Ngày chiếu', style: TextStyle(color: Colors.white)),
+                subtitle: Text(
+                  DateFormat('dd/MM/yyyy').format(_startTime),
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                trailing: const Icon(Icons.calendar_today, color: Colors.white),
+                onTap: _selectDate,
+              ),
+              ListTile(
+                title: const Text('Giờ chiếu', style: TextStyle(color: Colors.white)),
+                subtitle: Text(
+                  _selectedTime.format(context),
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                trailing: const Icon(Icons.access_time, color: Colors.white),
+                onTap: _selectTime,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : () async {
+            if (_formKey.currentState!.validate()) {
+              setState(() => _isSaving = true);
+              try {
+                // Nếu chọn theater mới, cần lấy seats từ theater mới
+                List<String> availableSeats = widget.showtime.availableSeats;
+                if (_selectedTheaterId != null && _selectedTheaterId != widget.showtime.theaterId) {
+                  // Theater đã thay đổi, cần lấy seats mới từ theater
+                  final newTheater = await DatabaseService().getTheater(_selectedTheaterId!);
+                  if (newTheater != null) {
+                    // Giữ lại các ghế đã được đặt (không có trong availableSeats của theater mới)
+                    // Nhưng thực tế nên reset về tất cả seats của theater mới
+                    availableSeats = List.from(newTheater.seats);
+                  }
+                }
+
+                final updatedShowtime = ShowtimeModel(
+                  id: widget.showtime.id,
+                  movieId: widget.showtime.movieId,
+                  theaterId: _selectedTheaterId ?? widget.showtime.theaterId,
+                  startTime: _startTime.millisecondsSinceEpoch,
+                  price: double.parse(_priceController.text),
+                  availableSeats: availableSeats,
+                );
+                context.read<AdminBloc>().add(UpdateShowtime(updatedShowtime));
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Đã cập nhật lịch chiếu'),
+                    backgroundColor: Color(0xFF4CAF50),
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Lỗi: $e'),
+                    backgroundColor: const Color(0xFFE50914),
+                  ),
+                );
+              } finally {
+                setState(() => _isSaving = false);
+              }
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE50914),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Lưu'),
+        ),
+      ],
+    );
+  }
+}
+
+// Tab 6: Manage Theaters (Edit & Delete)
+class _ManageTheatersTab extends StatelessWidget {
+  const _ManageTheatersTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AdminBloc, AdminState>(
+      builder: (context, state) {
+        if (state.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE50914)),
+          );
+        }
+
+        if (state.theaters.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.meeting_room, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'Chưa có phòng chiếu nào',
+                    style: TextStyle(color: Colors.grey, fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Hãy tạo phòng chiếu mới ở tab "Manage Theaters"',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: state.theaters.length,
+          itemBuilder: (context, index) {
+            final theater = state.theaters[index];
+            return FutureBuilder<CinemaModel?>(
+              future: DatabaseService().getCinema(theater.cinemaId),
+              builder: (context, snapshot) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  color: const Color(0xFF1A1A1A),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: const Icon(Icons.meeting_room, color: Color(0xFFE50914), size: 40),
+                    title: Text(
+                      theater.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text(
+                          'Rạp: ${snapshot.data?.name ?? 'N/A'}',
+                          style: TextStyle(color: Colors.grey[400]),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sức chứa: ${theater.capacity} ghế',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        ),
+                        Text(
+                          'Số ghế: ${theater.seats.length}',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Color(0xFF4CAF50)),
+                          onPressed: () => _showEditTheaterDialog(context, theater),
+                          tooltip: 'Sửa phòng chiếu',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Color(0xFFE50914)),
+                          onPressed: () => _showDeleteTheaterConfirmDialog(context, theater),
+                          tooltip: 'Xóa phòng chiếu',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditTheaterDialog(BuildContext context, TheaterModel theater) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => BlocProvider.value(
+        value: adminBloc,
+        child: _EditTheaterDialog(theater: theater),
+      ),
+    );
+  }
+
+  void _showDeleteTheaterConfirmDialog(BuildContext context, TheaterModel theater) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              'Bạn có chắc chắn muốn xóa phòng chiếu "${theater.name}"?\n\nHành động này không thể hoàn tác và sẽ xóa tất cả lịch chiếu liên quan.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteTheater(theater.id));
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Đã xóa phòng chiếu "${theater.name}"'),
+                      backgroundColor: const Color(0xFF4CAF50),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                ),
+                child: const Text('Xóa'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Edit Theater Dialog Widget
+class _EditTheaterDialog extends StatefulWidget {
+  final TheaterModel theater;
+  const _EditTheaterDialog({required this.theater});
+
+  @override
+  State<_EditTheaterDialog> createState() => _EditTheaterDialogState();
+}
+
+class _EditTheaterDialogState extends State<_EditTheaterDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _rowsController = TextEditingController();
+  final _seatsPerRowController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.theater.name;
+    // Tính số hàng và số ghế mỗi hàng từ seats hiện tại
+    if (widget.theater.seats.isNotEmpty) {
+      final rows = widget.theater.seats.map((seat) => seat[0]).toSet().length;
+      final seatsPerRow = widget.theater.seats.length ~/ rows;
+      _rowsController.text = rows.toString();
+      _seatsPerRowController.text = seatsPerRow.toString();
+    } else {
+      _rowsController.text = '5';
+      _seatsPerRowController.text = '10';
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _rowsController.dispose();
+    _seatsPerRowController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: const Text(
+        'Sửa Phòng Chiếu',
+        style: TextStyle(color: Colors.white),
+      ),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Tên Phòng Chiếu *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.meeting_room),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên phòng chiếu' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _rowsController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Số Hàng Ghế * (VD: 5 cho A-E)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.grid_view),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập số hàng';
+                  final rows = int.tryParse(value!);
+                  if (rows == null || rows <= 0) return 'Số hàng phải là số dương';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _seatsPerRowController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Số Ghế Mỗi Hàng * (VD: 10)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.event_seat),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập số ghế mỗi hàng';
+                  final seatsPerRow = int.tryParse(value!);
+                  if (seatsPerRow == null || seatsPerRow <= 0) return 'Số ghế mỗi hàng phải là số dương';
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : () async {
+            if (_formKey.currentState!.validate()) {
+              setState(() => _isSaving = true);
+              try {
+                final rows = int.parse(_rowsController.text);
+                final seatsPerRow = int.parse(_seatsPerRowController.text);
+                
+                if (rows <= 0 || seatsPerRow <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Số hàng và số ghế phải lớn hơn 0'),
+                      backgroundColor: Color(0xFFE50914),
+                    ),
+                  );
+                  setState(() => _isSaving = false);
+                  return;
+                }
+
+                // Regenerate seats based on rows and seatsPerRow
+                List<String> seats = [];
+                for (int i = 0; i < rows; i++) {
+                  String row = String.fromCharCode(65 + i); // A, B, C, ...
+                  for (int j = 1; j <= seatsPerRow; j++) {
+                    seats.add('$row$j');
+                  }
+                }
+                
+                final capacity = rows * seatsPerRow;
+                final updatedTheater = TheaterModel(
+                  id: widget.theater.id,
+                  name: _nameController.text.trim(),
+                  cinemaId: widget.theater.cinemaId,
+                  capacity: capacity,
+                  seats: seats,
+                );
+                context.read<AdminBloc>().add(UpdateTheater(updatedTheater));
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Đã cập nhật phòng chiếu'),
+                    backgroundColor: Color(0xFF4CAF50),
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Lỗi: $e'),
+                    backgroundColor: const Color(0xFFE50914),
+                  ),
+                );
+              } finally {
+                setState(() => _isSaving = false);
+              }
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE50914),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Lưu'),
+        ),
+      ],
+    );
+  }
+}
+
+// Tab 4: Create Theater (keep for creating new theaters)
 class _CreateTheaterTab extends StatefulWidget {
   const _CreateTheaterTab();
 

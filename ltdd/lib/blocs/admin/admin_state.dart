@@ -5,12 +5,14 @@ import '../../models/theater.dart'; // Nếu thêm
 class AdminState {
   final List<MovieModel> movies;
   final List<TheaterModel> theaters;
+  final List<ShowtimeModel> showtimes;
   final String? error;
   final bool isLoading;
 
   AdminState({
     this.movies = const [],
     this.theaters = const [],
+    this.showtimes = const [],
     this.error,
     this.isLoading = false,
   });

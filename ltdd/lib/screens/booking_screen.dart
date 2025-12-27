@@ -242,56 +242,44 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        color: const Color(0xFFE50914),
-        child: Column(
-          children: [
-            _buildScreen(),
-            _buildSeatLegend(),
-            Expanded(child: _buildSeatMap()),
-            _buildVoucherSection(),
-            _buildBottomBar(),
-          ],
-        ),
+      body: Column(
+        children: [
+          _buildScreen(),
+          _buildSeatLegend(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadData,
+              color: const Color(0xFFE50914),
+              child: _buildSeatMap(),
+            ),
+          ),
+          _buildVoucherSection(),
+          _buildBottomBar(),
+        ],
       ),
     );
   }
 
   Widget _buildScreen() {
     return Container(
-      margin: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  const Color(0xFFE50914).withOpacity(0.3),
-                  Colors.transparent,
-                ],
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.elliptical(200, 20),
-                bottomRight: Radius.elliptical(200, 20),
-              ),
-            ),
-            child: const Center(
-              child: Text(
-                'MÀN HÌNH',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4,
-                ),
-              ),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE50914),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
+          child: Text(
+            'MÀN HÌNH',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 3,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -342,42 +330,46 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
 
     List<String> sortedRows = rowSeats.keys.toList()..sort();
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: sortedRows.map((row) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 30,
-                    child: Text(
-                      row,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      children: sortedRows.map((row) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 30,
+                child: Text(
+                  row,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                  const SizedBox(width: 8),
-                  ...rowSeats[row]!.map((seat) => _buildSeat(seat)),
-                ],
+                  textAlign: TextAlign.center,
+                ),
               ),
-            );
-          }).toList(),
-        ),
-      ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: rowSeats[row]!.map((seat) => _buildSeat(seat)).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildSeat(String seat) {
     bool isAvailable = _showtime!.availableSeats.contains(seat);
     bool isSelected = _selectedSeats.contains(seat);
+    bool isBooked = !isAvailable && !isSelected;
 
     Color seatColor;
     if (isSelected) {
@@ -392,30 +384,34 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
       onTap: isAvailable ? () => _toggleSeat(seat) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 32,
-        height: 32,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: seatColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? Colors.white : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: isSelected
-              ? [
-            BoxShadow(
-              color: const Color(0xFFE50914).withOpacity(0.5),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ]
+          borderRadius: BorderRadius.circular(6),
+          border: isBooked
+              ? Border.all(
+                  color: Colors.grey[700]!,
+                  width: 1,
+                )
               : null,
         ),
         child: Center(
           child: isSelected
-              ? const Icon(Icons.check, color: Colors.white, size: 16)
-              : null,
+              ? const Icon(Icons.check, color: Colors.white, size: 18)
+              : isBooked
+                  ? Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.grey,
+                        size: 14,
+                      ),
+                    )
+                  : null,
         ),
       ),
     );
@@ -479,49 +475,20 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${_selectedSeats.length} ghế đã chọn',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (_selectedSeats.isNotEmpty)
-                      Text(
-                        _selectedSeats.join(', '),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
+                Text(
+                  '${_selectedSeats.length} ghế đã chọn',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (_discount > 0) ...[
-                      Text(
-                        '${NumberFormat('#,###', 'vi_VN').format(_selectedSeats.length * _showtime!.price)}đ',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      '${NumberFormat('#,###', 'vi_VN').format(_totalPrice)}đ',
-                      style: const TextStyle(
-                        color: Color(0xFFE50914),
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '${NumberFormat('#,###', 'vi_VN').format(_totalPrice)}₫',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -533,18 +500,19 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
                 onPressed: _selectedSeats.isNotEmpty ? _proceedToPayment : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _selectedSeats.isNotEmpty
-                      ? const Color(0xFFE50914)
+                      ? const Color(0xFF2A2A2A)
                       : Colors.grey[800],
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 0,
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.payment, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text(
+                    const Icon(Icons.payment, color: Colors.white, size: 20),
+                    const SizedBox(width: 12),
+                    const Text(
                       'TIẾP TỤC THANH TOÁN',
                       style: TextStyle(
                         color: Colors.white,

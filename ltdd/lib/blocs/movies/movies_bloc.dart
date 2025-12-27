@@ -26,22 +26,121 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         allMovies: allMovies,
         movies: allMovies,
         isLoading: false,
+        cinemaId: event.cinemaId,
       ));
     });
 
-    on<SearchMovies>((event, emit) {
-      List<MovieModel> filtered = _filterMovies(state.allMovies, event.query, state.category);
-      emit(state.copyWith(
-        movies: filtered,
-        searchQuery: event.query.isEmpty ? null : event.query,
-      ));
+    on<SearchMovies>((event, emit) async {
+      // Search on current filtered movies, not allMovies
+      // If there's a category filter active, we need to reload from DB first
+      if (state.category != null && state.category!.isNotEmpty) {
+        // Reload filtered movies first, then apply search
+        List<MovieModel> filteredMovies = [];
+        
+        if (state.category == 'nowShowing') {
+          filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: state.cinemaId);
+        } else if (state.category == 'comingSoon') {
+          filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: state.cinemaId);
+        } else if (state.category == 'popular') {
+          List<MovieModel> allMovies;
+          if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
+            allMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+          } else {
+            allMovies = await _dbService.getAllMovies();
+          }
+          _movieBookingCounts = await _dbService.getBookingCountsByMovie();
+          filteredMovies = allMovies.where((movie) {
+            final bookingCount = _movieBookingCounts[movie.id] ?? 0;
+            return bookingCount >= 5;
+          }).toList();
+        } else {
+          if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
+            filteredMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+          } else {
+            filteredMovies = await _dbService.getAllMovies();
+          }
+        }
+        
+        // Apply search query
+        if (event.query.isNotEmpty && event.query.trim().isNotEmpty) {
+          final lowerQuery = event.query.toLowerCase().trim();
+          filteredMovies = filteredMovies.where((movie) {
+            return movie.title.toLowerCase().contains(lowerQuery) ||
+                   movie.genre.toLowerCase().contains(lowerQuery);
+          }).toList();
+        }
+        
+        emit(state.copyWith(
+          movies: filteredMovies,
+          searchQuery: event.query.isEmpty ? null : event.query,
+        ));
+      } else {
+        // No category filter, search on current movies
+        final lowerQuery = event.query.toLowerCase().trim();
+        final filtered = state.movies.where((movie) {
+          return movie.title.toLowerCase().contains(lowerQuery) ||
+                 movie.genre.toLowerCase().contains(lowerQuery);
+        }).toList();
+        
+        emit(state.copyWith(
+          movies: filtered,
+          searchQuery: event.query.isEmpty ? null : event.query,
+        ));
+      }
     });
 
-    on<FilterMoviesByCategory>((event, emit) {
-      List<MovieModel> filtered = _filterMovies(state.allMovies, state.searchQuery, event.category);
+    on<FilterMoviesByCategory>((event, emit) async {
+      emit(state.copyWith(isLoading: true));
+      
+      print('🎬 FilterMoviesByCategory: category=${event.category}, cinemaId=${state.cinemaId}');
+      
+      List<MovieModel> filteredMovies = [];
+      
+      // Reload movies from DB based on category - filter by cinemaId if specified
+      if (event.category == 'nowShowing') {
+        // Load movies showing today - filter by cinema if selected
+        filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: state.cinemaId);
+        print('🎬 FilterMoviesByCategory (nowShowing): Loaded ${filteredMovies.length} movies');
+      } else if (event.category == 'comingSoon') {
+        // Load movies coming soon (from tomorrow onwards) - filter by cinema if selected
+        filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: state.cinemaId);
+      } else if (event.category == 'popular') {
+        // Load movies by cinema if specified, then filter by booking count
+        List<MovieModel> allMovies;
+        if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
+          allMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+        } else {
+          allMovies = await _dbService.getAllMovies();
+        }
+        // Reload booking counts
+        _movieBookingCounts = await _dbService.getBookingCountsByMovie();
+        // Filter by booking count >= 5
+        filteredMovies = allMovies.where((movie) {
+          final bookingCount = _movieBookingCounts[movie.id] ?? 0;
+          return bookingCount >= 5;
+        }).toList();
+      } else {
+        // Default: load movies by cinema if specified
+        if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
+          filteredMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+        } else {
+          filteredMovies = await _dbService.getAllMovies();
+        }
+      }
+      
+      // Apply search query if exists
+      if (state.searchQuery != null && state.searchQuery!.isNotEmpty) {
+        final lowerQuery = state.searchQuery!.toLowerCase().trim();
+        filteredMovies = filteredMovies.where((movie) {
+          return movie.title.toLowerCase().contains(lowerQuery) ||
+                 movie.genre.toLowerCase().contains(lowerQuery);
+        }).toList();
+      }
+      
       emit(state.copyWith(
-        movies: filtered,
+        movies: filteredMovies,
         category: event.category,
+        isLoading: false,
       ));
     });
   }
