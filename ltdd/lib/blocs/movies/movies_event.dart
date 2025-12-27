@@ -9,5 +9,6 @@ class SearchMovies extends MovieEvent {
 }
 class FilterMoviesByCategory extends MovieEvent {
   final String category; // 'nowShowing', 'comingSoon', 'popular'
-  FilterMoviesByCategory(this.category);
+  final String? cinemaId; // Optional: Filter by cinema
+  FilterMoviesByCategory(this.category, {this.cinemaId});
 }

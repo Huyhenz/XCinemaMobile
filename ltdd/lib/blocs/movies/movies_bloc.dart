@@ -31,20 +31,21 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     });
 
     on<SearchMovies>((event, emit) async {
-      // Search on current filtered movies, not allMovies
+      // Search on current filtered movies
       // If there's a category filter active, we need to reload from DB first
       if (state.category != null && state.category!.isNotEmpty) {
         // Reload filtered movies first, then apply search
         List<MovieModel> filteredMovies = [];
+        final cinemaId = state.cinemaId;
         
         if (state.category == 'nowShowing') {
-          filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: state.cinemaId);
+          filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
         } else if (state.category == 'comingSoon') {
-          filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: state.cinemaId);
+          filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
         } else if (state.category == 'popular') {
           List<MovieModel> allMovies;
-          if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
-            allMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+          if (cinemaId != null && cinemaId.isNotEmpty) {
+            allMovies = await _dbService.getMoviesByCinema(cinemaId);
           } else {
             allMovies = await _dbService.getAllMovies();
           }
@@ -54,8 +55,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
             return bookingCount >= 5;
           }).toList();
         } else {
-          if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
-            filteredMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+          if (cinemaId != null && cinemaId.isNotEmpty) {
+            filteredMovies = await _dbService.getMoviesByCinema(cinemaId);
           } else {
             filteredMovies = await _dbService.getAllMovies();
           }
@@ -92,23 +93,30 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     on<FilterMoviesByCategory>((event, emit) async {
       emit(state.copyWith(isLoading: true));
       
-      print('🎬 FilterMoviesByCategory: category=${event.category}, cinemaId=${state.cinemaId}');
+      // Use cinemaId from event if provided, otherwise use from state
+      // Priority: event.cinemaId > state.cinemaId
+      final cinemaId = event.cinemaId ?? state.cinemaId;
+      
+      print('🎬 FilterMoviesByCategory: category=${event.category}');
+      print('🎬   - event.cinemaId: ${event.cinemaId}');
+      print('🎬   - state.cinemaId: ${state.cinemaId}');
+      print('🎬   - Using cinemaId: $cinemaId');
       
       List<MovieModel> filteredMovies = [];
       
       // Reload movies from DB based on category - filter by cinemaId if specified
       if (event.category == 'nowShowing') {
         // Load movies showing today - filter by cinema if selected
-        filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: state.cinemaId);
+        filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
         print('🎬 FilterMoviesByCategory (nowShowing): Loaded ${filteredMovies.length} movies');
       } else if (event.category == 'comingSoon') {
         // Load movies coming soon (from tomorrow onwards) - filter by cinema if selected
-        filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: state.cinemaId);
+        filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
       } else if (event.category == 'popular') {
         // Load movies by cinema if specified, then filter by booking count
         List<MovieModel> allMovies;
-        if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
-          allMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+        if (cinemaId != null && cinemaId.isNotEmpty) {
+          allMovies = await _dbService.getMoviesByCinema(cinemaId);
         } else {
           allMovies = await _dbService.getAllMovies();
         }
@@ -121,8 +129,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         }).toList();
       } else {
         // Default: load movies by cinema if specified
-        if (state.cinemaId != null && state.cinemaId!.isNotEmpty) {
-          filteredMovies = await _dbService.getMoviesByCinema(state.cinemaId!);
+        if (cinemaId != null && cinemaId.isNotEmpty) {
+          filteredMovies = await _dbService.getMoviesByCinema(cinemaId);
         } else {
           filteredMovies = await _dbService.getAllMovies();
         }
@@ -141,7 +149,11 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         movies: filteredMovies,
         category: event.category,
         isLoading: false,
+        cinemaId: cinemaId, // Update cinemaId in state if provided in event
+        allMovies: filteredMovies, // Also update allMovies for consistency
       ));
+      
+      print('🎬 FilterMoviesByCategory: Emitted ${filteredMovies.length} movies for cinema $cinemaId');
     });
   }
 

@@ -777,23 +777,30 @@ class DatabaseService {
   // Get movies by cinemaId (movies belong to a specific cinema)
   Future<List<MovieModel>> getMoviesByCinema(String cinemaId) async {
     try {
+      print('🎬 getMoviesByCinema: Loading movies for cinema $cinemaId');
       DataSnapshot snapshot = await _db.child('movies').get();
       List<MovieModel> movies = [];
       if (snapshot.exists && snapshot.value != null) {
         final data = _convertMap(snapshot.value);
+        int totalMovies = 0;
         data.forEach((key, value) {
           try {
             if (value is Map) {
+              totalMovies++;
               Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(value);
               final movieCinemaId = itemMap['cinemaId']?.toString() ?? '';
               if (movieCinemaId == cinemaId) {
                 movies.add(MovieModel.fromMap(itemMap, key.toString()));
+                print('🎬   - Found movie: ${itemMap['title']} (ID: $key, cinemaId: $movieCinemaId)');
               }
             }
           } catch (e) {
             print('⚠️ Error parsing movie $key: $e');
           }
         });
+        print('🎬 getMoviesByCinema: Checked $totalMovies movies, found ${movies.length} for cinema $cinemaId');
+      } else {
+        print('🎬 getMoviesByCinema: No movies found in database');
       }
       return movies;
     } catch (e) {
@@ -829,16 +836,14 @@ class DatabaseService {
 
       // Get theaters of this cinema if cinemaId is specified
       Set<String> theaterIds = {};
-      bool hasTheaters = false;
       if (cinemaId != null && cinemaId.isNotEmpty) {
         List<TheaterModel> theaters = await getTheatersByCinema(cinemaId);
         theaterIds = theaters.map((t) => t.id).toSet();
-        hasTheaters = theaterIds.isNotEmpty;
         print('🎬 getMoviesShowingToday: Found ${theaters.length} theaters for cinema $cinemaId');
         print('🎬 Theater IDs: $theaterIds');
-        if (!hasTheaters) {
+        // If cinema has no theaters, return empty list (no movies can have showtimes)
+        if (theaterIds.isEmpty) {
           print('⚠️ Warning: Cinema $cinemaId has no theaters! Returning empty list.');
-          // If cinema has no theaters, it cannot have showtimes, so return empty list
           return [];
         }
       }
@@ -892,7 +897,9 @@ class DatabaseService {
         print('🎬 Found ${movieIds.length} unique movieIds: $movieIds');
       }
 
-      // Load movies for these movieIds - filter by cinemaId if specified
+      // Load movies for these movieIds
+      // Note: We don't filter by movie.cinemaId here because we already filtered by theaterId
+      // A movie can have showtimes in multiple cinemas, so we trust the theaterId filter
       List<MovieModel> movies = [];
       if (movieIds.isNotEmpty) {
         DataSnapshot moviesSnapshot = await _db.child('movies').get();
@@ -902,13 +909,9 @@ class DatabaseService {
             try {
               if (value is Map && movieIds.contains(key.toString())) {
                 final movieMap = Map<dynamic, dynamic>.from(value);
-                final movieCinemaId = movieMap['cinemaId']?.toString() ?? '';
-                // Filter by cinemaId if specified
-                if (cinemaId == null || cinemaId.isEmpty || movieCinemaId == cinemaId) {
-                  movies.add(MovieModel.fromMap(movieMap, key.toString()));
-                } else {
-                  print('🎬 Skipping movie $key: cinemaId mismatch (movie: $movieCinemaId, filter: $cinemaId)');
-                }
+                // If cinemaId is specified, we already filtered by theaterId, so just add the movie
+                // If cinemaId is null, add all movies that have showtimes today
+                movies.add(MovieModel.fromMap(movieMap, key.toString()));
               }
             } catch (e) {
               print('⚠️ Error parsing movie $key: $e');
@@ -918,6 +921,9 @@ class DatabaseService {
       }
 
       print('🎬 getMoviesShowingToday: Returning ${movies.length} movies for cinema ${cinemaId ?? "all"}');
+      
+      // Only return movies with showtimes today - no fallback
+      // Movies without showtimes or with showtimes not today will be in "coming soon"
       return movies;
     } catch (e) {
       print('Error getting movies showing today: $e');
@@ -925,30 +931,37 @@ class DatabaseService {
     }
   }
 
-  // Get movies that have showtimes from tomorrow onwards (filter by cinema if specified)
+  // Get movies that have showtimes from tomorrow onwards OR no showtimes at all (filter by cinema if specified)
   Future<List<MovieModel>> getMoviesComingSoon({String? cinemaId}) async {
     try {
       final now = DateTime.now();
-      final tomorrowStart = DateTime(now.year, now.month, now.day).add(const Duration(days: 1)); // 00:00:00 ngày mai
+      final todayStart = DateTime(now.year, now.month, now.day); // 00:00:00 hôm nay
+      final todayEnd = todayStart.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1)); // 23:59:59 hôm nay
+      final tomorrowStart = todayStart.add(const Duration(days: 1)); // 00:00:00 ngày mai
+      final todayStartMillis = todayStart.millisecondsSinceEpoch;
+      final todayEndMillis = todayEnd.millisecondsSinceEpoch;
       final tomorrowStartMillis = tomorrowStart.millisecondsSinceEpoch;
+
+      // Get all movies of this cinema first
+      List<MovieModel> allCinemaMovies = [];
+      if (cinemaId != null && cinemaId.isNotEmpty) {
+        allCinemaMovies = await getMoviesByCinema(cinemaId);
+      } else {
+        allCinemaMovies = await getAllMovies();
+      }
 
       // Get theaters of this cinema if cinemaId is specified
       Set<String> theaterIds = {};
-      bool hasTheaters = false;
       if (cinemaId != null && cinemaId.isNotEmpty) {
         List<TheaterModel> theaters = await getTheatersByCinema(cinemaId);
         theaterIds = theaters.map((t) => t.id).toSet();
-        hasTheaters = theaterIds.isNotEmpty;
-        if (!hasTheaters) {
-          print('⚠️ Warning: Cinema $cinemaId has no theaters! Returning empty list.');
-          // If cinema has no theaters, it cannot have showtimes, so return empty list
-          return [];
-        }
       }
 
-      // Get all showtimes
+      // Get all showtimes to find which movies have showtimes
       DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
-      Set<String> movieIds = {};
+      Set<String> moviesWithShowtimesToday = {}; // Movies with showtimes today
+      Set<String> moviesWithShowtimesFuture = {}; // Movies with showtimes from tomorrow onwards
+      Set<String> allMoviesWithShowtimes = {}; // All movies that have any showtimes
 
       if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
         final showtimesData = _convertMap(showtimesSnapshot.value);
@@ -975,9 +988,15 @@ class DatabaseService {
                   startTimeMillis = int.tryParse(startTime) ?? 0;
                 }
 
+                allMoviesWithShowtimes.add(movieId);
+
+                // Check if showtime is today
+                if (startTimeMillis >= todayStartMillis && startTimeMillis <= todayEndMillis) {
+                  moviesWithShowtimesToday.add(movieId);
+                }
                 // Check if showtime is from tomorrow onwards
-                if (startTimeMillis >= tomorrowStartMillis) {
-                  movieIds.add(movieId);
+                else if (startTimeMillis >= tomorrowStartMillis) {
+                  moviesWithShowtimesFuture.add(movieId);
                 }
               }
             }
@@ -987,27 +1006,23 @@ class DatabaseService {
         });
       }
 
-      // Load movies for these movieIds - filter by cinemaId if specified
+      // Filter movies: All movies of cinema EXCEPT those with showtimes today
+      // This includes:
+      // 1. Movies with no showtimes at all
+      // 2. Movies with showtimes from tomorrow onwards
+      // 3. Movies with showtimes but not today (past showtimes)
       List<MovieModel> movies = [];
-      if (movieIds.isNotEmpty) {
-        DataSnapshot moviesSnapshot = await _db.child('movies').get();
-        if (moviesSnapshot.exists && moviesSnapshot.value != null) {
-          final moviesData = _convertMap(moviesSnapshot.value);
-          moviesData.forEach((key, value) {
-            try {
-              if (value is Map && movieIds.contains(key.toString())) {
-                final movieMap = Map<dynamic, dynamic>.from(value);
-                // Filter by cinemaId if specified
-                if (cinemaId == null || cinemaId.isEmpty || movieMap['cinemaId']?.toString() == cinemaId) {
-                  movies.add(MovieModel.fromMap(movieMap, key.toString()));
-                }
-              }
-            } catch (e) {
-              print('⚠️ Error parsing movie $key: $e');
-            }
-          });
+      for (var movie in allCinemaMovies) {
+        // If movie has showtimes today, skip it (it's in "now showing")
+        if (!moviesWithShowtimesToday.contains(movie.id)) {
+          movies.add(movie);
         }
       }
+
+      print('🎬 getMoviesComingSoon: Returning ${movies.length} movies for cinema ${cinemaId ?? "all"}');
+      print('🎬   - Movies with showtimes today: ${moviesWithShowtimesToday.length} (excluded)');
+      print('🎬   - Movies with showtimes future: ${moviesWithShowtimesFuture.length}');
+      print('🎬   - Movies with no showtimes: ${allCinemaMovies.length - allMoviesWithShowtimes.length}');
 
       return movies;
     } catch (e) {

@@ -52,7 +52,9 @@ class _CinemaSelectionScreenState extends State<CinemaSelectionScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => BlocProvider(
-          create: (context) => MovieBloc()..add(LoadMovies(cinemaId: cinema.id)),
+          create: (context) => MovieBloc()..add(
+            FilterMoviesByCategory('nowShowing', cinemaId: cinema.id),
+          ),
           child: HomeScreen(selectedCinemaId: cinema.id),
         ),
       ),

@@ -30,14 +30,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
-    // Load movies by cinema if selected
+    // Load movies with filter directly (only 1 load)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.selectedCinemaId != null) {
-        context.read<MovieBloc>().add(LoadMovies(cinemaId: widget.selectedCinemaId));
-      } else {
-        context.read<MovieBloc>().add(LoadMovies());
-      }
-      _onTabChanged();
+      // Load with default filter (nowShowing - tab 0)
+      context.read<MovieBloc>().add(
+        FilterMoviesByCategory('nowShowing', cinemaId: widget.selectedCinemaId),
+      );
     });
   }
 
@@ -55,7 +53,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           category = 'popular';
           break;
       }
-      context.read<MovieBloc>().add(FilterMoviesByCategory(category));
+      // Always use cinemaId from widget (current cinema selection)
+      // This ensures we always filter by the correct cinema
+      context.read<MovieBloc>().add(
+        FilterMoviesByCategory(category, cinemaId: widget.selectedCinemaId),
+      );
     }
   }
 
@@ -252,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return BlocBuilder<MovieBloc, MovieState>(
       builder: (context, state) {
         // Loading state
-        if (state.isLoading && state.allMovies.isEmpty) {
+        if (state.isLoading) {
           return SliverToBoxAdapter(
             child: SizedBox(
               height: MediaQuery.of(context).size.height * 0.6,
@@ -263,15 +265,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
         // Empty state
         if (state.movies.isEmpty) {
+          String emptyTitle = 'Chưa có phim';
+          String emptySubtitle = 'Hãy quay lại sau';
+          
+          if (state.searchQuery != null) {
+            emptyTitle = 'Không tìm thấy phim';
+            emptySubtitle = 'Thử tìm kiếm với từ khóa khác';
+          } else if (state.category == 'nowShowing') {
+            emptyTitle = 'Chưa có phim hôm nay';
+            emptySubtitle = 'Không có phim nào có lịch chiếu hôm nay';
+          } else if (state.category == 'comingSoon') {
+            emptyTitle = 'Chưa có phim sắp chiếu';
+            emptySubtitle = 'Không có phim nào sắp chiếu';
+          } else if (state.category == 'popular') {
+            emptyTitle = 'Chưa có phim phổ biến';
+            emptySubtitle = 'Không có phim nào được đặt trên 5 lần';
+          }
+          
           return SliverFillRemaining(
             child: EmptyState(
               icon: state.searchQuery != null ? Icons.search_off : Icons.movie_outlined,
-              title: state.searchQuery != null 
-                  ? 'Không tìm thấy phim' 
-                  : 'Chưa có phim',
-              subtitle: state.searchQuery != null
-                  ? 'Thử tìm kiếm với từ khóa khác'
-                  : 'Hãy quay lại sau',
+              title: emptyTitle,
+              subtitle: emptySubtitle,
             ),
           );
         }
