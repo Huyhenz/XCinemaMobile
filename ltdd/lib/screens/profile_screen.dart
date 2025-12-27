@@ -321,8 +321,10 @@ class ProfileScreen extends StatelessWidget {
                   builder: (context) => const UserInfoScreen(),
                 ),
               ).then((_) {
-                final userId = FirebaseAuth.instance.currentUser!.uid;
-                context.read<ProfileBloc>().add(RefreshProfile(userId));
+                if (context.mounted) {
+                  final userId = FirebaseAuth.instance.currentUser!.uid;
+                  context.read<ProfileBloc>().add(RefreshProfile(userId));
+                }
               });
             },
           ),
