@@ -736,10 +736,17 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
 
   Future<void> _selectDateTime() async {
     // Select date
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Đảm bảo initialDate không nhỏ hơn firstDate
+    // Nếu showtime cũ trong quá khứ, dùng hôm nay làm initialDate
+    final initialDate = _startTime.isBefore(today) ? today : _startTime;
+    
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: _startTime,
-      firstDate: DateTime.now(),
+      initialDate: initialDate,
+      firstDate: today,
       lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
@@ -1333,11 +1340,31 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
   }
 
   Future<void> _selectDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Đảm bảo initialDate không nhỏ hơn firstDate
+    // Nếu showtime cũ trong quá khứ, dùng hôm nay làm initialDate
+    final initialDate = _startTime.isBefore(today) ? today : _startTime;
+    
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _startTime,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initialDate,
+      firstDate: today, // Cho phép chọn từ hôm nay trở đi
+      lastDate: today.add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFFE50914),
+              onPrimary: Colors.white,
+              surface: Color(0xFF1A1A1A),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {

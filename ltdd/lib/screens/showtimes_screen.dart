@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/showtime.dart';
+import '../models/cinema.dart';
 import '../services/database_services.dart';
 import 'booking_screen.dart';
 
@@ -14,15 +15,31 @@ class ShowtimesScreen extends StatefulWidget {
 }
 
 class _ShowtimesScreenState extends State<ShowtimesScreen> {
-  List<ShowtimeModel> _showtimes = [];
+  List<ShowtimeModel> _allShowtimes = []; // Tất cả showtimes
+  List<ShowtimeModel> _filteredShowtimes = []; // Showtimes đã filter theo ngày
   int _selectedDateIndex = 0;
   List<DateTime> _dates = [];
+  CinemaModel? _cinema;
 
   @override
   void initState() {
     super.initState();
     _generateDates();
+    _loadCinema();
     _loadShowtimes();
+  }
+
+  Future<void> _loadCinema() async {
+    if (widget.cinemaId != null && widget.cinemaId!.isNotEmpty) {
+      try {
+        final cinema = await DatabaseService().getCinema(widget.cinemaId!);
+        setState(() {
+          _cinema = cinema;
+        });
+      } catch (e) {
+        print('❌ Error loading cinema: $e');
+      }
+    }
   }
 
   void _generateDates() {
@@ -36,14 +53,15 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     try {
       if (widget.cinemaId != null && widget.cinemaId!.isNotEmpty) {
         // Load showtimes by movie and cinema
-        _showtimes = await DatabaseService().getShowtimesByMovieAndCinema(
+        _allShowtimes = await DatabaseService().getShowtimesByMovieAndCinema(
           widget.movieId,
           widget.cinemaId!,
         );
       } else {
         // Load all showtimes by movie
-        _showtimes = await DatabaseService().getShowtimesByMovie(widget.movieId);
+        _allShowtimes = await DatabaseService().getShowtimesByMovie(widget.movieId);
       }
+      _filterShowtimes();
       setState(() {});
     } catch (e) {
       print('❌ Error loading showtimes: $e');
@@ -57,9 +75,44 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
         );
       }
       setState(() {
-        _showtimes = [];
+        _allShowtimes = [];
+        _filteredShowtimes = [];
       });
     }
+  }
+
+  void _filterShowtimes() {
+    if (_allShowtimes.isEmpty) {
+      _filteredShowtimes = [];
+      return;
+    }
+
+    final selectedDate = _dates[_selectedDateIndex];
+    final selectedDateStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final selectedDateEnd = selectedDateStart.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+    final selectedDateStartMillis = selectedDateStart.millisecondsSinceEpoch;
+    final selectedDateEndMillis = selectedDateEnd.millisecondsSinceEpoch;
+
+    final now = DateTime.now();
+
+    // Filter showtimes theo ngày được chọn (chỉ showtimes của ngày đó, không hết hạn)
+    _filteredShowtimes = _allShowtimes.where((showtime) {
+      final showtimeDate = DateTime.fromMillisecondsSinceEpoch(showtime.startTime);
+      final showtimeDateStart = DateTime(showtimeDate.year, showtimeDate.month, showtimeDate.day);
+      
+      // Phải cùng ngày với ngày được chọn (so sánh year, month, day)
+      final isOnSelectedDate = showtimeDateStart.year == selectedDate.year &&
+                               showtimeDateStart.month == selectedDate.month &&
+                               showtimeDateStart.day == selectedDate.day;
+      
+      // Không hết hạn (chỉ áp dụng cho hôm nay và quá khứ)
+      final isNotExpired = showtime.startTime >= now.millisecondsSinceEpoch;
+      
+      return isOnSelectedDate && isNotExpired;
+    }).toList();
+
+    // Sort by time
+    _filteredShowtimes.sort((a, b) => a.startTime.compareTo(b.startTime));
   }
 
   @override
@@ -103,7 +156,10 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
           return GestureDetector(
             onTap: () {
-              setState(() => _selectedDateIndex = index);
+              setState(() {
+                _selectedDateIndex = index;
+                _filterShowtimes(); // Filter lại showtimes theo ngày được chọn
+              });
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -208,22 +264,22 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cinema Complex',
-                  style: TextStyle(
+                  _cinema?.name ?? 'Đang tải...',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Quận 1, TP. Hồ Chí Minh',
-                  style: TextStyle(
+                  _cinema?.address ?? '',
+                  style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 12,
                   ),
@@ -237,8 +293,9 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     );
   }
 
+
   Widget _buildShowtimesList() {
-    if (_showtimes.isEmpty) {
+    if (_filteredShowtimes.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -256,9 +313,9 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _showtimes.length,
+      itemCount: _filteredShowtimes.length,
       itemBuilder: (context, index) {
-        ShowtimeModel showtime = _showtimes[index];
+        ShowtimeModel showtime = _filteredShowtimes[index];
         DateTime time = DateTime.fromMillisecondsSinceEpoch(showtime.startTime);
 
         return Container(
