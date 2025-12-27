@@ -29,6 +29,24 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       }
     });
 
+    on<UpdateMovie>((event, emit) async {
+      try {
+        await _dbService.updateMovie(event.movie);
+        add(LoadAdminData()); // Reload sau khi update
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<DeleteMovie>((event, emit) async {
+      try {
+        await _dbService.deleteMovie(event.movieId);
+        add(LoadAdminData()); // Reload sau khi delete
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
     on<CreateShowtime>((event, emit) async {
       try {
         await _dbService.saveShowtime(event.showtime);

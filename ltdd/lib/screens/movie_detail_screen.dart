@@ -7,7 +7,8 @@ import 'showtimes_screen.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String movieId;
-  const MovieDetailScreen({super.key, required this.movieId});
+  final String? cinemaId; // ID của rạp đã chọn
+  const MovieDetailScreen({super.key, required this.movieId, this.cinemaId});
 
   @override
   State<MovieDetailScreen> createState() => _MovieDetailScreenState();
@@ -369,7 +370,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ShowtimesScreen(movieId: widget.movieId),
+              builder: (context) => ShowtimesScreen(
+                movieId: widget.movieId,
+                cinemaId: widget.cinemaId,
+              ),
             ),
           );
         },

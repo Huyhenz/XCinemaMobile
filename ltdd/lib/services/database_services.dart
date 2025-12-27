@@ -8,6 +8,7 @@ import '../models/movie.dart';
 import '../models/showtime.dart';
 import '../models/payment.dart';
 import '../models/theater.dart';
+import '../models/cinema.dart';
 import '../models/voucher.dart';
 import '../models/tempbooking.dart';
 import '../models/user.dart';
@@ -116,6 +117,14 @@ class DatabaseService {
     final ref = _db.child('movies').push();
     await ref.set(movie.toMap());
     return ref.key!;
+  }
+
+  Future<void> updateMovie(MovieModel movie) async {
+    await _db.child('movies').child(movie.id).update(movie.toMap());
+  }
+
+  Future<void> deleteMovie(String movieId) async {
+    await _db.child('movies').child(movieId).remove();
   }
 
   Future<MovieModel?> getMovie(String movieId) async {
@@ -590,6 +599,52 @@ class DatabaseService {
     }
   }
 
+  //CINEMA
+  Future<String> saveCinema(CinemaModel cinema) async {
+    final ref = _db.child('cinemas').push();
+    await ref.set(cinema.toMap());
+    return ref.key!;
+  }
+
+  Future<CinemaModel?> getCinema(String cinemaId) async {
+    try {
+      DataSnapshot snapshot = await _db.child('cinemas').child(cinemaId).get();
+      if (snapshot.exists && snapshot.value != null) {
+        final data = _convertMap(snapshot.value);
+        if (data.isNotEmpty) {
+          return CinemaModel.fromMap(data, cinemaId);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting cinema: $e');
+      return null;
+    }
+  }
+
+  Future<List<CinemaModel>> getAllCinemas() async {
+    try {
+      DataSnapshot snapshot = await _db.child('cinemas').get();
+      List<CinemaModel> cinemas = [];
+      if (snapshot.exists && snapshot.value != null) {
+        final data = _convertMap(snapshot.value);
+        data.forEach((key, value) {
+          try {
+            if (value is Map) {
+              cinemas.add(CinemaModel.fromMap(Map<dynamic, dynamic>.from(value), key.toString()));
+            }
+          } catch (e) {
+            print('Error parsing cinema $key: $e');
+          }
+        });
+      }
+      return cinemas;
+    } catch (e) {
+      print('Error getting all cinemas: $e');
+      return [];
+    }
+  }
+
   //THEATER
   Future<String> saveTheater(TheaterModel theater) async {
     final ref = _db.child('theaters').push();
@@ -638,6 +693,82 @@ class DatabaseService {
       return theaters;
     } catch (e) {
       print('Error getting all theaters: $e');
+      return [];
+    }
+  }
+
+  Future<List<TheaterModel>> getTheatersByCinema(String cinemaId) async {
+    try {
+      DataSnapshot snapshot = await _db.child('theaters').get();
+      List<TheaterModel> theaters = [];
+
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+
+        if (value is Map) {
+          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+          data.forEach((key, itemValue) {
+            try {
+              if (itemValue is Map) {
+                Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+                final theaterCinemaId = itemMap['cinemaId']?.toString() ?? '';
+                if (theaterCinemaId == cinemaId) {
+                  theaters.add(TheaterModel.fromMap(itemMap, key.toString()));
+                }
+              }
+            } catch (e) {
+              print('⚠️ Error parsing theater $key: $e');
+            }
+          });
+        }
+      }
+      return theaters;
+    } catch (e) {
+      print('Error getting theaters by cinema: $e');
+      return [];
+    }
+  }
+
+  // Get movies by cinemaId (movies belong to a specific cinema)
+  Future<List<MovieModel>> getMoviesByCinema(String cinemaId) async {
+    try {
+      DataSnapshot snapshot = await _db.child('movies').get();
+      List<MovieModel> movies = [];
+      if (snapshot.exists && snapshot.value != null) {
+        final data = _convertMap(snapshot.value);
+        data.forEach((key, value) {
+          try {
+            if (value is Map) {
+              Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(value);
+              final movieCinemaId = itemMap['cinemaId']?.toString() ?? '';
+              if (movieCinemaId == cinemaId) {
+                movies.add(MovieModel.fromMap(itemMap, key.toString()));
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing movie $key: $e');
+          }
+        });
+      }
+      return movies;
+    } catch (e) {
+      print('Error getting movies by cinema: $e');
+      return [];
+    }
+  }
+
+  // Get showtimes by movie and cinema
+  Future<List<ShowtimeModel>> getShowtimesByMovieAndCinema(String movieId, String cinemaId) async {
+    try {
+      // Get all theaters of this cinema
+      List<TheaterModel> theaters = await getTheatersByCinema(cinemaId);
+      List<String> theaterIds = theaters.map((t) => t.id).toList();
+
+      // Get showtimes
+      List<ShowtimeModel> showtimes = await getShowtimesByMovie(movieId);
+      return showtimes.where((showtime) => theaterIds.contains(showtime.theaterId)).toList();
+    } catch (e) {
+      print('Error getting showtimes by movie and cinema: $e');
       return [];
     }
   }

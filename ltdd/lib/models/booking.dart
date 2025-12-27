@@ -4,6 +4,7 @@ class BookingModel {
   final String id; // Key
   final String userId;
   final String showtimeId;
+  final String cinemaId; // ID của rạp chiếu
   final List<String> seats; // Ghế đã chọn
   final double totalPrice; // Giá gốc
   final double? finalPrice; // Sau áp voucher
@@ -15,6 +16,7 @@ class BookingModel {
     required this.id,
     required this.userId,
     required this.showtimeId,
+    required this.cinemaId,
     required this.seats,
     required this.totalPrice,
     this.finalPrice,
@@ -36,7 +38,7 @@ class BookingModel {
     } catch (e) {
       print('⚠️ Error parsing seats in booking $key: $e');
     }
-
+    
     // Safely convert totalPrice
     double totalPriceValue = 0.0;
     try {
@@ -50,7 +52,7 @@ class BookingModel {
     } catch (e) {
       print('⚠️ Error parsing totalPrice in booking $key: $e');
     }
-
+    
     // Safely convert finalPrice
     double? finalPriceValue;
     try {
@@ -64,7 +66,7 @@ class BookingModel {
     } catch (e) {
       print('⚠️ Error parsing finalPrice in booking $key: $e');
     }
-
+    
     // Safely convert bookedAt
     int? bookedAtValue;
     try {
@@ -78,11 +80,12 @@ class BookingModel {
     } catch (e) {
       print('⚠️ Error parsing bookedAt in booking $key: $e');
     }
-
+    
     return BookingModel(
       id: key,
       userId: data['userId']?.toString() ?? '',
       showtimeId: data['showtimeId']?.toString() ?? '',
+      cinemaId: data['cinemaId']?.toString() ?? '',
       seats: seatsList,
       totalPrice: totalPriceValue,
       finalPrice: finalPriceValue,
@@ -96,6 +99,7 @@ class BookingModel {
     return {
       'userId': userId,
       'showtimeId': showtimeId,
+      'cinemaId': cinemaId,
       'seats': seats,
       'totalPrice': totalPrice,
       'finalPrice': finalPrice,

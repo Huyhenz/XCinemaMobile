@@ -10,9 +10,11 @@ import '../models/movie.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 import 'movie_detail_screen.dart';
+import 'cinema_selection_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? selectedCinemaId; // ID của rạp đã chọn
+  const HomeScreen({super.key, this.selectedCinemaId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -28,8 +30,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
-    // Set initial category
+    // Load movies by cinema if selected
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.selectedCinemaId != null) {
+        context.read<MovieBloc>().add(LoadMovies(cinemaId: widget.selectedCinemaId));
+      } else {
+        context.read<MovieBloc>().add(LoadMovies());
+      }
       _onTabChanged();
     });
   }
@@ -95,30 +102,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
-                ),
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFE50914).withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+            Row(
+              children: [
+                // Nút quay lại chọn rạp
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF2A2A2A)),
                   ),
-                ],
-              ),
-              child: const Text(
-                'CINEMA',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 3,
-                  color: Colors.white,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    tooltip: 'Chọn lại rạp',
+                    onPressed: () {
+                      // Quay lại CinemaSelectionScreen (MainWrapper)
+                      Navigator.pop(context);
+                    },
+                  ),
                 ),
-              ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    'CINEMA',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 3,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
             Row(
               children: [
@@ -285,7 +313,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MovieDetailScreen(movieId: movie.id),
+            builder: (context) => MovieDetailScreen(
+              movieId: movie.id,
+              cinemaId: widget.selectedCinemaId,
+            ),
           ),
         );
       },

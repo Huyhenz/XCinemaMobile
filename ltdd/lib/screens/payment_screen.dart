@@ -9,6 +9,7 @@ import '../utils/booking_helper.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String showtimeId;
+  final String cinemaId; // ID của rạp chiếu
   final List<String> selectedSeats;
   final double totalPrice;
   final String? voucherId;
@@ -16,6 +17,7 @@ class PaymentScreen extends StatefulWidget {
   const PaymentScreen({
     super.key,
     required this.showtimeId,
+    required this.cinemaId,
     required this.selectedSeats,
     required this.totalPrice,
     this.voucherId,
@@ -92,6 +94,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             id: '',
             userId: temp.userId,
             showtimeId: temp.showtimeId,
+            cinemaId: widget.cinemaId,
             seats: temp.seats,
             totalPrice: widget.totalPrice,
             finalPrice: widget.totalPrice,
@@ -104,6 +107,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           PaymentModel payment = PaymentModel(
             id: '',
             bookingId: bookingId,
+            cinemaId: widget.cinemaId,
             amount: widget.totalPrice,
             status: 'success',
             transactionId: 'TXN${DateTime.now().millisecondsSinceEpoch}',

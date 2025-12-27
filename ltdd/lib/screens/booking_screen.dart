@@ -19,6 +19,7 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> with TickerProviderStateMixin {
   ShowtimeModel? _showtime;
   TheaterModel? _theater;
+  String? _cinemaId; // ID của rạp chiếu
   List<String> _selectedSeats = [];
   String? _voucherCode;
   double _totalPrice = 0.0;
@@ -92,6 +93,9 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
       _showtime = await DatabaseService().getShowtime(widget.showtimeId);
       if (_showtime != null) {
         _theater = await DatabaseService().getTheater(_showtime!.theaterId);
+        if (_theater != null) {
+          _cinemaId = _theater!.cinemaId;
+        }
       }
     } catch (e) {
       print('Error loading data: $e');
@@ -156,11 +160,21 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
   }
 
   void _proceedToPayment() {
+    if (_cinemaId == null || _cinemaId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lỗi: Không tìm thấy thông tin rạp chiếu'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PaymentScreen(
           showtimeId: widget.showtimeId,
+          cinemaId: _cinemaId!,
           selectedSeats: _selectedSeats,
           totalPrice: _totalPrice,
           voucherId: _voucherCode,

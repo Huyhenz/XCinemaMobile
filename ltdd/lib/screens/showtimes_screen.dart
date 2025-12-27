@@ -6,7 +6,8 @@ import 'booking_screen.dart';
 
 class ShowtimesScreen extends StatefulWidget {
   final String movieId;
-  const ShowtimesScreen({super.key, required this.movieId});
+  final String? cinemaId; // ID của rạp (để filter showtimes)
+  const ShowtimesScreen({super.key, required this.movieId, this.cinemaId});
 
   @override
   State<ShowtimesScreen> createState() => _ShowtimesScreenState();
@@ -33,7 +34,16 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
   Future<void> _loadShowtimes() async {
     try {
-      _showtimes = await DatabaseService().getShowtimesByMovie(widget.movieId);
+      if (widget.cinemaId != null && widget.cinemaId!.isNotEmpty) {
+        // Load showtimes by movie and cinema
+        _showtimes = await DatabaseService().getShowtimesByMovieAndCinema(
+          widget.movieId,
+          widget.cinemaId!,
+        );
+      } else {
+        // Load all showtimes by movie
+        _showtimes = await DatabaseService().getShowtimesByMovie(widget.movieId);
+      }
       setState(() {});
     } catch (e) {
       print('❌ Error loading showtimes: $e');

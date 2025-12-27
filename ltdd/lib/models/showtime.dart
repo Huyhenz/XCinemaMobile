@@ -31,7 +31,7 @@ class ShowtimeModel {
     } catch (e) {
       print('⚠️ Error parsing startTime in showtime $key: $e');
     }
-
+    
     // Safely convert price
     double priceValue = 0.0;
     try {
@@ -45,7 +45,7 @@ class ShowtimeModel {
     } catch (e) {
       print('⚠️ Error parsing price in showtime $key: $e');
     }
-
+    
     // Safely convert availableSeats
     List<String> seatsList = [];
     try {
@@ -57,7 +57,7 @@ class ShowtimeModel {
     } catch (e) {
       print('⚠️ Error parsing availableSeats in showtime $key: $e');
     }
-
+    
     return ShowtimeModel(
       id: key,
       movieId: data['movieId']?.toString() ?? '',

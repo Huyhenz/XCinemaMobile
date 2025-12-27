@@ -12,7 +12,14 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
   MovieBloc() : super(MovieState()) {
     on<LoadMovies>((event, emit) async {
       emit(state.copyWith(isLoading: true));
-      List<MovieModel> allMovies = await _dbService.getAllMovies();
+      List<MovieModel> allMovies;
+      if (event.cinemaId != null && event.cinemaId!.isNotEmpty) {
+        // Load movies by cinema
+        allMovies = await _dbService.getMoviesByCinema(event.cinemaId!);
+      } else {
+        // Load all movies
+        allMovies = await _dbService.getAllMovies();
+      }
       // Load booking counts for popular movies
       _movieBookingCounts = await _dbService.getBookingCountsByMovie();
       emit(state.copyWith(
