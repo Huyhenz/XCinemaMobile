@@ -13,7 +13,8 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<LoadAdminData>((event, emit) async {
       emit(AdminState(isLoading: true));
       try {
-        List<MovieModel> movies = await _dbService.getAllMovies();
+        // Use getAllMoviesForAdmin to show all movies including expired ones
+        List<MovieModel> movies = await _dbService.getAllMoviesForAdmin();
         List<TheaterModel> theaters = await _dbService.getAllTheaters();
         List<ShowtimeModel> showtimes = await _dbService.getAllShowtimes();
         emit(AdminState(movies: movies, theaters: theaters, showtimes: showtimes));

@@ -684,7 +684,8 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
       _movies = [];
     });
     try {
-      List<MovieModel> movies = await DatabaseService().getMoviesByCinema(cinemaId);
+      // Use getMoviesByCinemaForAdmin to show all movies including expired ones in admin dashboard
+      List<MovieModel> movies = await DatabaseService().getMoviesByCinemaForAdmin(cinemaId);
       setState(() {
         _movies = movies;
         _isLoadingMovies = false;

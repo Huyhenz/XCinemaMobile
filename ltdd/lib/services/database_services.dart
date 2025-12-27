@@ -167,9 +167,50 @@ class DatabaseService {
           });
         }
       }
+      
+      // Filter out expired movies (all showtimes have passed)
+      movies = await _filterExpiredMovies(movies, null);
+      
       return movies;
     } catch (e) {
       print('Error getting all movies: $e');
+      return [];
+    }
+  }
+
+  // Get all movies for admin (including expired movies)
+  // This method does NOT filter expired movies, so admin can see and manage all movies
+  Future<List<MovieModel>> getAllMoviesForAdmin() async {
+    try {
+      DataSnapshot snapshot = await _db.child('movies').get();
+      List<MovieModel> movies = [];
+
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+
+        if (value is Map) {
+          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+          data.forEach((key, itemValue) {
+            try {
+              if (itemValue is Map) {
+                final itemMap = Map<dynamic, dynamic>.from(itemValue);
+                movies.add(MovieModel.fromMap(itemMap, key.toString()));
+              } else {
+                print('⚠️ Skipping invalid movie: $key (${itemValue.runtimeType})');
+              }
+            } catch (e) {
+              print('⚠️ Error parsing movie $key: $e');
+            }
+          });
+        }
+      }
+      
+      // Do NOT filter expired movies for admin - show all movies
+      print('🎬 getAllMoviesForAdmin: Returning ${movies.length} movies (including expired)');
+      
+      return movies;
+    } catch (e) {
+      print('Error getting all movies for admin: $e');
       return [];
     }
   }
@@ -774,6 +815,44 @@ class DatabaseService {
     }
   }
 
+  // Get movies by cinemaId for admin (including expired movies)
+  // This method does NOT filter expired movies, so admin can see and manage all movies
+  Future<List<MovieModel>> getMoviesByCinemaForAdmin(String cinemaId) async {
+    try {
+      print('🎬 getMoviesByCinemaForAdmin: Loading movies for cinema $cinemaId (including expired)');
+      DataSnapshot snapshot = await _db.child('movies').get();
+      List<MovieModel> movies = [];
+      if (snapshot.exists && snapshot.value != null) {
+        final data = _convertMap(snapshot.value);
+        int totalMovies = 0;
+        data.forEach((key, value) {
+          try {
+            if (value is Map) {
+              totalMovies++;
+              Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(value);
+              final movieCinemaId = itemMap['cinemaId']?.toString() ?? '';
+              if (movieCinemaId == cinemaId) {
+                movies.add(MovieModel.fromMap(itemMap, key.toString()));
+                print('🎬   - Found movie: ${itemMap['title']} (ID: $key, cinemaId: $movieCinemaId)');
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing movie $key: $e');
+          }
+        });
+        print('🎬 getMoviesByCinemaForAdmin: Checked $totalMovies movies, found ${movies.length} for cinema $cinemaId (including expired)');
+      } else {
+        print('🎬 getMoviesByCinemaForAdmin: No movies found in database');
+      }
+      
+      // Do NOT filter expired movies for admin - show all movies
+      return movies;
+    } catch (e) {
+      print('Error getting movies by cinema for admin: $e');
+      return [];
+    }
+  }
+
   // Get movies by cinemaId (movies belong to a specific cinema)
   Future<List<MovieModel>> getMoviesByCinema(String cinemaId) async {
     try {
@@ -802,6 +881,10 @@ class DatabaseService {
       } else {
         print('🎬 getMoviesByCinema: No movies found in database');
       }
+      
+      // Filter out expired movies (all showtimes have passed)
+      movies = await _filterExpiredMovies(movies, cinemaId);
+      
       return movies;
     } catch (e) {
       print('Error getting movies by cinema: $e');
@@ -920,6 +1003,9 @@ class DatabaseService {
         }
       }
 
+      // Filter out expired movies (all showtimes have passed)
+      movies = await _filterExpiredMovies(movies, cinemaId);
+      
       print('🎬 getMoviesShowingToday: Returning ${movies.length} movies for cinema ${cinemaId ?? "all"}');
       
       // Only return movies with showtimes today - no fallback
@@ -1019,6 +1105,9 @@ class DatabaseService {
         }
       }
 
+      // Filter out expired movies (all showtimes have passed)
+      movies = await _filterExpiredMovies(movies, cinemaId);
+      
       print('🎬 getMoviesComingSoon: Returning ${movies.length} movies for cinema ${cinemaId ?? "all"}');
       print('🎬   - Movies with showtimes today: ${moviesWithShowtimesToday.length} (excluded)');
       print('🎬   - Movies with showtimes future: ${moviesWithShowtimesFuture.length}');
@@ -1028,6 +1117,100 @@ class DatabaseService {
     } catch (e) {
       print('Error getting movies coming soon: $e');
       return [];
+    }
+  }
+
+  // Helper method to filter out expired movies (all showtimes have passed)
+  // A movie is expired if it has showtimes but ALL of them are in the past
+  Future<List<MovieModel>> _filterExpiredMovies(List<MovieModel> movies, String? cinemaId) async {
+    if (movies.isEmpty) return movies;
+    
+    try {
+      final now = DateTime.now();
+      final nowMillis = now.millisecondsSinceEpoch;
+      
+      // Get theaters of this cinema if cinemaId is specified
+      Set<String> theaterIds = {};
+      if (cinemaId != null && cinemaId.isNotEmpty) {
+        List<TheaterModel> theaters = await getTheatersByCinema(cinemaId);
+        theaterIds = theaters.map((t) => t.id).toSet();
+      }
+      
+      // Get all showtimes
+      DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
+      Map<String, List<int>> movieShowtimes = {}; // movieId -> list of startTime
+      
+      if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
+        final showtimesData = _convertMap(showtimesSnapshot.value);
+        showtimesData.forEach((key, value) {
+          try {
+            if (value is Map) {
+              final showtimeMap = Map<dynamic, dynamic>.from(value);
+              final startTime = showtimeMap['startTime'];
+              final movieId = showtimeMap['movieId']?.toString();
+              final theaterId = showtimeMap['theaterId']?.toString();
+              
+              // If cinemaId is specified, only include showtimes from theaters of that cinema
+              if (cinemaId != null && cinemaId.isNotEmpty) {
+                if (theaterId == null || !theaterIds.contains(theaterId)) {
+                  return; // Skip this showtime
+                }
+              }
+              
+              if (movieId != null && startTime != null) {
+                int startTimeMillis = 0;
+                if (startTime is num) {
+                  startTimeMillis = startTime.toInt();
+                } else if (startTime is String) {
+                  startTimeMillis = int.tryParse(startTime) ?? 0;
+                }
+                
+                if (!movieShowtimes.containsKey(movieId)) {
+                  movieShowtimes[movieId] = [];
+                }
+                movieShowtimes[movieId]!.add(startTimeMillis);
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing showtime in _filterExpiredMovies: $e');
+          }
+        });
+      }
+      
+      // Filter movies: Remove movies that have showtimes but ALL are expired
+      List<MovieModel> filteredMovies = [];
+      int expiredCount = 0;
+      
+      for (var movie in movies) {
+        final movieShowtimesList = movieShowtimes[movie.id] ?? [];
+        
+        if (movieShowtimesList.isEmpty) {
+          // Movie has no showtimes - not expired, keep it
+          filteredMovies.add(movie);
+        } else {
+          // Movie has showtimes - check if ALL are expired
+          final hasFutureShowtime = movieShowtimesList.any((startTime) => startTime >= nowMillis);
+          
+          if (hasFutureShowtime) {
+            // Has at least one future showtime - not expired, keep it
+            filteredMovies.add(movie);
+          } else {
+            // All showtimes are expired - remove it
+            expiredCount++;
+            print('🗑️ Filtering out expired movie: ${movie.title} (all showtimes have passed)');
+          }
+        }
+      }
+      
+      if (expiredCount > 0) {
+        print('🎬 _filterExpiredMovies: Filtered out $expiredCount expired movies');
+      }
+      
+      return filteredMovies;
+    } catch (e) {
+      print('❌ Error in _filterExpiredMovies: $e');
+      // Return original list if error occurs
+      return movies;
     }
   }
 

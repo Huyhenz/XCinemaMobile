@@ -123,6 +123,7 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         // Reload booking counts
         _movieBookingCounts = await _dbService.getBookingCountsByMovie();
         // Filter by booking count >= 5
+        // Note: Expired movies are already filtered in getMoviesByCinema/getAllMovies
         filteredMovies = allMovies.where((movie) {
           final bookingCount = _movieBookingCounts[movie.id] ?? 0;
           return bookingCount >= 5;
