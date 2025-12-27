@@ -376,18 +376,20 @@ class PaymentService {
                   if (errorCode == 'Q0FOTk9UX1BBWV9TRUxG' || errorCode == 'CANNOT_PAY_SELF') {
                     print('❌ Cannot pay self - merchant and payer are the same account');
                     print('💡 Use a different PayPal sandbox account to test payment');
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop(); // Close WebView
-                      // Navigate to failure screen
-                      Navigator.of(dialogContext).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (context) => PaymentFailureScreen(
-                            message: 'Không thể thanh toán. Vui lòng sử dụng tài khoản PayPal khác.',
-                            isCancelled: false,
-                          ),
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop(); // Close WebView dialog
+                  }
+                  // Navigate to failure screen - payment error, no booking to process
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (ctx) => PaymentFailureScreen(
+                          message: 'Không thể thanh toán. Vui lòng sử dụng tài khoản PayPal khác.',
+                          isCancelled: false,
                         ),
-                      );
-                    }
+                      ),
+                    );
+                  }
                     completer.complete(null);
                     return NavigationDecision.prevent;
                   }
@@ -395,11 +397,13 @@ class PaymentService {
                   // Other errors - treat as cancel
                   print('❌ PayPal error, treating as cancel');
                   if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(); // Close WebView
-                    // Navigate to failure screen
-                    Navigator.of(dialogContext).pushReplacement(
+                    Navigator.of(dialogContext).pop(); // Close WebView dialog
+                  }
+                  // Navigate to failure screen - payment error, no booking to process
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (context) => PaymentFailureScreen(
+                        builder: (ctx) => PaymentFailureScreen(
                           message: 'Có lỗi xảy ra trong quá trình thanh toán.',
                           isCancelled: false,
                         ),
@@ -458,8 +462,9 @@ class PaymentService {
                             final captureId = captures[0]['id'] as String?;
                             print('✅ PayPal payment captured: $captureId');
                             if (dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
+                              Navigator.of(dialogContext).pop(); // Close WebView dialog
                             }
+                            // Don't navigate here - let payment_screen.dart handle navigation after processing booking
                             if (!completer.isCompleted) {
                               completer.complete(captureId ?? orderId);
                             }
@@ -469,17 +474,9 @@ class PaymentService {
                       }
                       // Fallback to orderId if capture ID not found
                       if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(); // Close WebView
-                        // Navigate to success screen
-                        Navigator.of(dialogContext).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => PaymentSuccessScreen(
-                              transactionId: orderId,
-                              message: 'Thanh toán PayPal thành công',
-                            ),
-                          ),
-                        );
+                        Navigator.of(dialogContext).pop(); // Close WebView dialog
                       }
+                      // Don't navigate here - let payment_screen.dart handle navigation after processing booking
                       if (!completer.isCompleted) {
                         completer.complete(orderId);
                       }
@@ -489,11 +486,13 @@ class PaymentService {
                         print('Error details: ${result['details']}');
                       }
                       if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(); // Close WebView
-                        // Navigate to failure screen
-                        Navigator.of(dialogContext).pushReplacement(
+                        Navigator.of(dialogContext).pop(); // Close WebView dialog
+                      }
+                      // Navigate to failure screen - payment failed, no booking to process
+                      if (context.mounted) {
+                        Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (context) => PaymentFailureScreen(
+                            builder: (ctx) => PaymentFailureScreen(
                               message: 'Thanh toán không thể được xử lý. Vui lòng thử lại.',
                               isCancelled: false,
                             ),
@@ -507,11 +506,13 @@ class PaymentService {
                   }).catchError((error) {
                     print('❌ Error capturing PayPal payment: $error');
                     if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop(); // Close WebView
-                      // Navigate to failure screen
-                      Navigator.of(dialogContext).pushReplacement(
+                      Navigator.of(dialogContext).pop(); // Close WebView dialog
+                    }
+                    // Navigate to failure screen - payment error, no booking to process
+                    if (context.mounted) {
+                      Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (context) => PaymentFailureScreen(
+                          builder: (ctx) => PaymentFailureScreen(
                             message: 'Lỗi xử lý thanh toán: $error',
                             isCancelled: false,
                           ),
@@ -536,11 +537,13 @@ class PaymentService {
                   print('❌ PayPal payment cancelled by user');
                   print('   Cancel URL: $url');
                   if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(); // Close WebView
-                    // Navigate to failure screen
-                    Navigator.of(dialogContext).pushReplacement(
+                    Navigator.of(dialogContext).pop(); // Close WebView dialog
+                  }
+                  // Navigate to failure screen - user cancelled, no booking to process
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (context) => PaymentFailureScreen(
+                        builder: (ctx) => PaymentFailureScreen(
                           message: 'Bạn đã hủy giao dịch thanh toán.',
                           isCancelled: true,
                         ),
@@ -596,17 +599,9 @@ class PaymentService {
                               final captureId = captures[0]['id'] as String?;
                               print('✅ PayPal payment captured: $captureId');
                               if (dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop(); // Close WebView
-                                // Navigate to success screen
-                                Navigator.of(dialogContext).pushReplacement(
-                                  MaterialPageRoute(
-                                    builder: (context) => PaymentSuccessScreen(
-                                      transactionId: captureId ?? orderId,
-                                      message: 'Thanh toán PayPal thành công',
-                                    ),
-                                  ),
-                                );
+                                Navigator.of(dialogContext).pop(); // Close WebView dialog
                               }
+                              // Don't navigate here - let payment_screen.dart handle navigation after processing booking
                               if (!completer.isCompleted) {
                                 completer.complete(captureId ?? orderId);
                               }
@@ -615,17 +610,9 @@ class PaymentService {
                           }
                         }
                         if (dialogContext.mounted) {
-                          Navigator.of(dialogContext).pop(); // Close WebView
-                          // Navigate to success screen
-                          Navigator.of(dialogContext).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => PaymentSuccessScreen(
-                                transactionId: orderId,
-                                message: 'Thanh toán PayPal thành công',
-                              ),
-                            ),
-                          );
+                          Navigator.of(dialogContext).pop(); // Close WebView dialog
                         }
+                        // Don't navigate here - let payment_screen.dart handle navigation after processing booking
                         if (!completer.isCompleted) {
                           completer.complete(orderId);
                         }
@@ -635,11 +622,13 @@ class PaymentService {
                           print('Error details: ${result['details']}');
                         }
                         if (dialogContext.mounted) {
-                          Navigator.of(dialogContext).pop(); // Close WebView
-                          // Navigate to failure screen
-                          Navigator.of(dialogContext).pushReplacement(
+                          Navigator.of(dialogContext).pop(); // Close WebView dialog
+                        }
+                        // Navigate to failure screen - payment failed, no booking to process
+                        if (context.mounted) {
+                          Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
-                              builder: (context) => PaymentFailureScreen(
+                              builder: (ctx) => PaymentFailureScreen(
                                 message: 'Thanh toán không thể được xử lý. Vui lòng thử lại.',
                                 isCancelled: false,
                               ),
@@ -653,11 +642,13 @@ class PaymentService {
                     }).catchError((error) {
                       print('❌ Error capturing PayPal payment: $error');
                       if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(); // Close WebView
-                        // Navigate to failure screen
-                        Navigator.of(dialogContext).pushReplacement(
+                        Navigator.of(dialogContext).pop(); // Close WebView dialog
+                      }
+                      // Navigate to failure screen - payment error, no booking to process
+                      if (context.mounted) {
+                        Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (context) => PaymentFailureScreen(
+                            builder: (ctx) => PaymentFailureScreen(
                               message: 'Lỗi xử lý thanh toán: $error',
                               isCancelled: false,
                             ),
@@ -748,11 +739,13 @@ class PaymentService {
                         icon: const Icon(Icons.close),
                         onPressed: () {
                           if (dialogContext.mounted) {
-                            Navigator.of(dialogContext).pop(); // Close WebView
-                            // Navigate to failure screen when user closes WebView
-                            Navigator.of(dialogContext).pushReplacement(
+                            Navigator.of(dialogContext).pop(); // Close WebView dialog
+                          }
+                          // Navigate to failure screen - user closed WebView, no booking to process
+                          if (context.mounted) {
+                            Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
-                                builder: (context) => PaymentFailureScreen(
+                                builder: (ctx) => PaymentFailureScreen(
                                   message: 'Bạn đã đóng cửa sổ thanh toán.',
                                   isCancelled: true,
                                 ),

@@ -25,7 +25,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
   }
 
   @override
@@ -64,6 +64,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               Tab(text: 'Manage Movies'),
               Tab(text: 'Create Showtime'),
               Tab(text: 'Manage Showtimes'),
+              Tab(text: 'Create Theater'),
               Tab(text: 'Manage Theaters'),
             ],
           ),
@@ -76,6 +77,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             _ManageMoviesTab(),
             _CreateShowtimeTab(),
             _ManageShowtimesTab(),
+            _CreateTheaterTab(),
             _ManageTheatersTab(),
           ],
         ),
@@ -1873,12 +1875,14 @@ class _CreateTheaterTab extends StatefulWidget {
 }
 
 class _CreateTheaterTabState extends State<_CreateTheaterTab> {
+  final _formKey = GlobalKey<FormState>();
   String? _selectedCinemaId;
   List<CinemaModel> _cinemas = [];
   final _nameController = TextEditingController();
   final _rowsController = TextEditingController();
   final _seatsPerRowController = TextEditingController();
   bool _isLoading = true;
+  bool _isCreating = false;
 
   @override
   void initState() {
@@ -1896,6 +1900,61 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
     } catch (e) {
       print('Error loading cinemas: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _createTheater() async {
+    setState(() => _isCreating = true);
+    try {
+      final rows = int.parse(_rowsController.text);
+      final seatsPerRow = int.parse(_seatsPerRowController.text);
+
+      List<String> seats = [];
+      for (int i = 0; i < rows; i++) {
+        String row = String.fromCharCode(65 + i); // A, B, C, ...
+        for (int j = 1; j <= seatsPerRow; j++) {
+          seats.add('$row$j');
+        }
+      }
+      final capacity = rows * seatsPerRow;
+      final theater = TheaterModel(
+        id: '',
+        name: _nameController.text.trim(),
+        cinemaId: _selectedCinemaId!,
+        capacity: capacity,
+        seats: seats,
+      );
+      context.read<AdminBloc>().add(CreateTheater(theater));
+
+      // Reset form
+      _nameController.clear();
+      _rowsController.clear();
+      _seatsPerRowController.clear();
+      setState(() {
+        _selectedCinemaId = null;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Đã tạo phòng chiếu thành công!'),
+            backgroundColor: Color(0xFF4CAF50),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: const Color(0xFFE50914),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCreating = false);
+      }
     }
   }
 
@@ -1919,6 +1978,8 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
       builder: (context, state) {
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1946,7 +2007,7 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
               const SizedBox(height: 16),
 
               // Theater Name
-              TextField(
+                TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: 'Tên Phòng Chiếu *',
@@ -1954,112 +2015,91 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
                   prefixIcon: Icon(Icons.meeting_room),
                   hintText: 'VD: Phòng 1, Phòng 2',
                 ),
+                  validator: (value) => value?.trim().isEmpty ?? true ? 'Vui lòng nhập tên phòng chiếu' : null,
               ),
               const SizedBox(height: 16),
 
               // Rows
-              TextField(
+                TextFormField(
                 controller: _rowsController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Số Hàng Ghế * (VD: 5 cho A-E)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.grid_view),
-                ),
+                    hintText: '5',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Vui lòng nhập số hàng ghế';
+                    }
+                    final rows = int.tryParse(value);
+                    if (rows == null || rows <= 0) {
+                      return 'Số hàng phải là số nguyên dương';
+                    }
+                    if (rows > 26) {
+                      return 'Số hàng không được vượt quá 26 (A-Z)';
+                    }
+                    return null;
+                  },
               ),
               const SizedBox(height: 16),
 
               // Seats per Row
-              TextField(
+                TextFormField(
                 controller: _seatsPerRowController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Số Ghế Mỗi Hàng * (VD: 10)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.event_seat),
-                ),
+                    hintText: '10',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Vui lòng nhập số ghế mỗi hàng';
+                    }
+                    final seatsPerRow = int.tryParse(value);
+                    if (seatsPerRow == null || seatsPerRow <= 0) {
+                      return 'Số ghế phải là số nguyên dương';
+                    }
+                    if (seatsPerRow > 50) {
+                      return 'Số ghế mỗi hàng không được vượt quá 50';
+                    }
+                    return null;
+                  },
               ),
               const SizedBox(height: 24),
 
               // Create Button
               ElevatedButton(
-                onPressed: () {
-                  if (_selectedCinemaId == null || _selectedCinemaId!.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng chọn rạp chiếu'),
-                        backgroundColor: Color(0xFFE50914),
-                      ),
-                    );
-                    return;
+                onPressed: _isCreating ? null : () {
+                  if (_formKey.currentState!.validate()) {
+                    _createTheater();
                   }
-                  if (_nameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng nhập tên phòng chiếu'),
-                        backgroundColor: Color(0xFFE50914),
-                      ),
-                    );
-                    return;
-                  }
-
-                  final rows = int.tryParse(_rowsController.text) ?? 5;
-                  final seatsPerRow = int.tryParse(_seatsPerRowController.text) ?? 10;
-                  
-                  if (rows <= 0 || seatsPerRow <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Số hàng và số ghế phải lớn hơn 0'),
-                        backgroundColor: Color(0xFFE50914),
-                      ),
-                    );
-                    return;
-                  }
-
-                  List<String> seats = [];
-                  for (int i = 0; i < rows; i++) {
-                    String row = String.fromCharCode(65 + i); // A, B, C, ...
-                    for (int j = 1; j <= seatsPerRow; j++) {
-                      seats.add('$row$j');
-                    }
-                  }
-                  final capacity = rows * seatsPerRow;
-                  final theater = TheaterModel(
-                    id: '',
-                    name: _nameController.text.trim(),
-                    cinemaId: _selectedCinemaId!,
-                    capacity: capacity,
-                    seats: seats,
-                  );
-                  context.read<AdminBloc>().add(CreateTheater(theater));
-
-                  // Reset form
-                  _nameController.clear();
-                  _rowsController.clear();
-                  _seatsPerRowController.clear();
-                  setState(() {
-                    _selectedCinemaId = null;
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Đã tạo phòng chiếu thành công!'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  disabledBackgroundColor: Colors.grey,
                 ),
-                child: const Text(
-                  'TẠO PHÒNG CHIẾU',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isCreating
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'TẠO PHÒNG CHIẾU',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ],
           ),
-        );
+        ));
       },
     );
   }

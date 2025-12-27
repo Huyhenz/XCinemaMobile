@@ -7,6 +7,8 @@ import '../models/tempbooking.dart';
 import '../services/database_services.dart';
 import '../services/payment_service.dart';
 import '../utils/booking_helper.dart';
+import 'payment_success_screen.dart';
+import 'payment_failure_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String showtimeId;
@@ -150,18 +152,28 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           // Sync seats để cập nhật trạng thái
           await DatabaseService().syncShowtimeSeats(booking.showtimeId);
 
+          // Navigate to success screen after processing booking
           if (mounted) {
-            _showSuccessDialog();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => PaymentSuccessScreen(
+                  transactionId: result.transactionId,
+                  message: 'Vé của bạn đã được đặt thành công',
+                ),
+              ),
+            );
           }
         }
       } else {
         setState(() => _isProcessing = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.message),
-              backgroundColor: const Color(0xFFE50914),
-              duration: const Duration(seconds: 3),
+          // Navigate to failure screen instead of showing SnackBar
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => PaymentFailureScreen(
+                message: result.message,
+                isCancelled: false,
+              ),
             ),
           );
         }
@@ -170,91 +182,20 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
       print('Error handling payment: $e');
       setState(() => _isProcessing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
+        // Navigate to failure screen instead of showing SnackBar
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => PaymentFailureScreen(
+              message: 'Lỗi: $e',
+              isCancelled: false,
+            ),
           ),
         );
       }
     }
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(30),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF4CAF50),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 60,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Thanh Toán Thành Công!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Vé của bạn đã được đặt thành công',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.popUntil(context, (route) => route.isFirst);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE50914),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Về Trang Chủ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // Removed _showSuccessDialog - now using PaymentSuccessScreen instead
 
   Future<void> _handleCancel() async {
     if (_tempBookingId != null) {
