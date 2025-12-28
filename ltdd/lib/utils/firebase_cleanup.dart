@@ -67,7 +67,6 @@ class FirebaseCleanup {
         'Action, Sci-Fi',
         148,
         'https://image.tmdb.org/t/p/w500/8c4a8kE7PizaGQQnditMmI1xbRp.jpg',
-        8.5,
       );
 
       String movie2Id = await _createMovie(
@@ -76,7 +75,6 @@ class FirebaseCleanup {
         'Action, Adventure',
         148,
         'https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg',
-        9.0,
       );
 
       String movie3Id = await _createMovie(
@@ -85,7 +83,6 @@ class FirebaseCleanup {
         'Sci-Fi, Adventure',
         155,
         'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
-        8.2,
       );
       print('✅ Created 3 movies');
 
@@ -183,7 +180,6 @@ class FirebaseCleanup {
       String genre,
       int duration,
       String posterUrl,
-      double rating,
       ) async {
     final ref = _db.child('movies').push();
 
@@ -194,7 +190,6 @@ class FirebaseCleanup {
       'genre': genre,
       'duration': duration,
       'posterUrl': posterUrl,
-      'rating': rating,
       'releaseDate': ServerValue.timestamp,
     });
 

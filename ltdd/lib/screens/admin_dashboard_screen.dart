@@ -290,7 +290,8 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
   final _descController = TextEditingController();
   final _genreController = TextEditingController();
   final _durationController = TextEditingController();
-  final _ratingController = TextEditingController();
+  final _trailerUrlController = TextEditingController();
+  final _ageRatingController = TextEditingController();
   final _posterUrlController = TextEditingController();
   DateTime? _releaseDate;
   bool _isCreating = false;
@@ -321,7 +322,7 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
     _descController.dispose();
     _genreController.dispose();
     _durationController.dispose();
-    _ratingController.dispose();
+    _trailerUrlController.dispose();
     _posterUrlController.dispose();
     super.dispose();
   }
@@ -357,7 +358,8 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
         duration: int.parse(_durationController.text.trim()),
         posterUrl: _posterUrlController.text.trim(),
         cinemaId: _selectedCinemaId!,
-        rating: double.parse(_ratingController.text.trim()),
+        trailerUrl: _trailerUrlController.text.trim().isEmpty ? null : _trailerUrlController.text.trim(),
+        ageRating: _ageRatingController.text.trim().isEmpty ? null : _ageRatingController.text.trim(),
         releaseDate: _releaseDate!.millisecondsSinceEpoch,
       );
 
@@ -482,22 +484,36 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
                 ),
                 const SizedBox(height: 16),
 
-                // Rating
+                // Trailer URL
                 TextFormField(
-                  controller: _ratingController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  controller: _trailerUrlController,
                   decoration: const InputDecoration(
-                    labelText: 'Đánh Giá (0-10) *',
+                    labelText: 'Link Trailer (URL)',
+                    hintText: 'https://youtube.com/watch?v=... hoặc link video khác',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.star),
+                    prefixIcon: Icon(Icons.play_circle_outline),
                   ),
                   validator: (value) {
-                    if (value?.isEmpty ?? true) return 'Vui lòng nhập điểm đánh giá';
-                    final rating = double.tryParse(value!);
-                    if (rating == null) return 'Vui lòng nhập số hợp lệ';
-                    if (rating < 0 || rating > 10) return 'Điểm đánh giá phải từ 0-10';
+                    if (value != null && value.isNotEmpty) {
+                      final uri = Uri.tryParse(value.trim());
+                      if (uri == null || !uri.hasScheme) {
+                        return 'Vui lòng nhập URL hợp lệ (bắt đầu bằng http:// hoặc https://)';
+                      }
+                    }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // Age Rating
+                TextFormField(
+                  controller: _ageRatingController,
+                  decoration: const InputDecoration(
+                    labelText: 'Độ Tuổi Xem (Tùy chọn)',
+                    hintText: 'VD: T13, T16, T18, P (Phổ thông). Để trống = Tất cả độ tuổi',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.child_care),
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -2219,7 +2235,7 @@ class _ManageMoviesTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${movie.duration} phút | ⭐ ${movie.rating.toStringAsFixed(1)}',
+                      '${movie.duration} phút',
                       style: TextStyle(color: Colors.grey[400], fontSize: 12),
                     ),
                     if (movie.releaseDate != null)
@@ -2326,7 +2342,8 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
   late final TextEditingController _descController;
   late final TextEditingController _genreController;
   late final TextEditingController _durationController;
-  late final TextEditingController _ratingController;
+  late final TextEditingController _trailerUrlController;
+  late final TextEditingController _ageRatingController;
   late final TextEditingController _posterUrlController;
   DateTime? _releaseDate;
   bool _isLoadingCinemas = true;
@@ -2340,7 +2357,8 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
     _descController = TextEditingController(text: widget.movie.description);
     _genreController = TextEditingController(text: widget.movie.genre);
     _durationController = TextEditingController(text: widget.movie.duration.toString());
-    _ratingController = TextEditingController(text: widget.movie.rating.toString());
+    _trailerUrlController = TextEditingController(text: widget.movie.trailerUrl ?? '');
+    _ageRatingController = TextEditingController(text: widget.movie.ageRating ?? '');
     _posterUrlController = TextEditingController(text: widget.movie.posterUrl);
     _releaseDate = widget.movie.releaseDate != null
         ? DateTime.fromMillisecondsSinceEpoch(widget.movie.releaseDate!)
@@ -2370,7 +2388,8 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
     _descController.dispose();
     _genreController.dispose();
     _durationController.dispose();
-    _ratingController.dispose();
+    _trailerUrlController.dispose();
+    _ageRatingController.dispose();
     _posterUrlController.dispose();
     super.dispose();
   }
@@ -2477,22 +2496,36 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _ratingController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    controller: _trailerUrlController,
                     style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
-                      labelText: 'Đánh Giá (0-10) *',
+                      labelText: 'Link Trailer (URL)',
+                      hintText: 'https://youtube.com/watch?v=... hoặc link video khác',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.star),
+                      prefixIcon: Icon(Icons.play_circle_outline),
                       labelStyle: TextStyle(color: Colors.white),
                     ),
                     validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Vui lòng nhập điểm đánh giá';
-                      final rating = double.tryParse(value!);
-                      if (rating == null) return 'Vui lòng nhập số hợp lệ';
-                      if (rating < 0 || rating > 10) return 'Điểm đánh giá phải từ 0-10';
+                      if (value != null && value.isNotEmpty) {
+                        final uri = Uri.tryParse(value.trim());
+                        if (uri == null || !uri.hasScheme) {
+                          return 'Vui lòng nhập URL hợp lệ';
+                        }
+                      }
                       return null;
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _ageRatingController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Độ Tuổi Xem (Tùy chọn)',
+                      hintText: 'VD: T13, T16, T18, P (Phổ thông). Để trống = Tất cả độ tuổi',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.child_care),
+                      labelStyle: TextStyle(color: Colors.white),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   InkWell(
@@ -2597,7 +2630,8 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
                     duration: int.parse(_durationController.text.trim()),
                     posterUrl: _posterUrlController.text.trim(),
                     cinemaId: _selectedCinemaId!,
-                    rating: double.parse(_ratingController.text.trim()),
+                    trailerUrl: _trailerUrlController.text.trim().isEmpty ? null : _trailerUrlController.text.trim(),
+                    ageRating: _ageRatingController.text.trim().isEmpty ? null : _ageRatingController.text.trim(),
                     releaseDate: _releaseDate!.millisecondsSinceEpoch,
                   );
 

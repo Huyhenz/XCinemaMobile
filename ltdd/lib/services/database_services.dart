@@ -12,6 +12,8 @@ import '../models/cinema.dart';
 import '../models/voucher.dart';
 import '../models/tempbooking.dart';
 import '../models/user.dart';
+import '../models/movie_rating.dart';
+import '../models/movie_comment.dart';
 
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -1585,5 +1587,354 @@ class DatabaseService {
       }
       return bookings;
     });
+  }
+
+  //MOVIE RATINGS
+  Future<String> saveMovieRating(MovieRating rating) async {
+    try {
+      // Check if user already rated this movie
+      final existingRatings = await getRatingsByMovieAndUser(rating.movieId, rating.userId);
+      if (existingRatings.isNotEmpty) {
+        // Update existing rating
+        final existingRating = existingRatings.first;
+        await _db.child('movie_ratings').child(existingRating.id).update(rating.toMap());
+        return existingRating.id;
+      } else {
+        // Create new rating
+        final ref = _db.child('movie_ratings').push();
+        await ref.set(rating.toMap());
+        return ref.key!;
+      }
+    } catch (e) {
+      print('Error saving movie rating: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<MovieRating>> getRatingsByMovie(String movieId) async {
+    List<MovieRating> ratings = [];
+
+    try {
+      Query query = _db.child('movie_ratings').orderByChild('movieId').equalTo(movieId);
+
+      DataSnapshot snapshot;
+      try {
+        snapshot = await query.get();
+      } catch (e, stackTrace) {
+        print('⚠️ Query snapshot error in getRatingsByMovie: $e');
+        print('Stack trace: $stackTrace');
+        // Fallback: Load all ratings and filter manually
+        print('🔄 Falling back to manual filter method...');
+        return await _getRatingsByMovieFallback(movieId);
+      }
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return ratings;
+      }
+
+      try {
+        final value = snapshot.value;
+
+        // Check if value is String (invalid data)
+        if (value is String) {
+          print('⚠️ Ratings query returned String instead of Map, skipping');
+          return await _getRatingsByMovieFallback(movieId);
+        }
+
+        if (value is! Map) {
+          print('⚠️ Ratings data is ${value.runtimeType}, expected Map. Skipping.');
+          return await _getRatingsByMovieFallback(movieId);
+        }
+
+        Map<dynamic, dynamic> data;
+        try {
+          data = Map<dynamic, dynamic>.from(value);
+        } catch (e) {
+          print('⚠️ Error converting ratings data to Map: $e');
+          return await _getRatingsByMovieFallback(movieId);
+        }
+
+        data.forEach((key, itemValue) {
+          try {
+            // Skip if itemValue is null or String
+            if (itemValue == null) {
+              print('⚠️ Skipping null rating: $key');
+              return;
+            }
+
+            if (itemValue is String) {
+              print('⚠️ Skipping invalid rating (String): $key');
+              return;
+            }
+
+            if (itemValue is Map) {
+              Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+              ratings.add(MovieRating.fromMap(itemMap, key.toString()));
+            } else {
+              print('⚠️ Skipping invalid rating type: $key (${itemValue.runtimeType})');
+            }
+          } catch (e) {
+            print('⚠️ Error parsing rating $key: $e');
+          }
+        });
+      } catch (e) {
+        print('⚠️ Error processing ratings snapshot value: $e');
+        return await _getRatingsByMovieFallback(movieId);
+      }
+
+    } catch (e) {
+      print('❌ Error getting ratings by movie: $e');
+    }
+
+    return ratings;
+  }
+
+  // ✅ FALLBACK: Load all ratings and filter manually when query fails
+  Future<List<MovieRating>> _getRatingsByMovieFallback(String movieId) async {
+    List<MovieRating> ratings = [];
+    
+    try {
+      print('🔄 Loading all ratings and filtering for movieId: $movieId');
+      DataSnapshot snapshot = await _db.child('movie_ratings').get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        print('ℹ️ No ratings found in database');
+        return ratings;
+      }
+
+      final value = snapshot.value;
+
+      if (value is String) {
+        print('⚠️ Ratings node contains String instead of Map');
+        return ratings;
+      }
+
+      if (value is! Map) {
+        print('⚠️ Ratings data is ${value.runtimeType}, expected Map');
+        return ratings;
+      }
+
+      Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+      print('📊 Found ${data.length} total ratings, filtering for movieId: $movieId');
+
+      data.forEach((key, itemValue) {
+        try {
+          if (itemValue == null || itemValue is String) {
+            return;
+          }
+
+          if (itemValue is! Map) {
+            return;
+          }
+
+          Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+          
+          // Filter by movieId
+          final itemMovieId = itemMap['movieId']?.toString() ?? '';
+          if (itemMovieId == movieId) {
+            try {
+              ratings.add(MovieRating.fromMap(itemMap, key.toString()));
+            } catch (e) {
+              print('⚠️ Error creating MovieRating for $key: $e');
+            }
+          }
+        } catch (e) {
+          print('⚠️ Error parsing rating $key: $e');
+        }
+      });
+
+      print('✅ Loaded ${ratings.length} ratings for movie: $movieId (using fallback)');
+    } catch (e) {
+      print('❌ Error in fallback method: $e');
+    }
+
+    return ratings;
+  }
+
+  Future<List<MovieRating>> getRatingsByMovieAndUser(String movieId, String userId) async {
+    try {
+      final allRatings = await getRatingsByMovie(movieId);
+      return allRatings.where((r) => r.userId == userId).toList();
+    } catch (e) {
+      print('Error getting ratings by movie and user: $e');
+      return [];
+    }
+  }
+
+  Future<double> getAverageRating(String movieId) async {
+    try {
+      final ratings = await getRatingsByMovie(movieId);
+      if (ratings.isEmpty) return 0.0;
+      final sum = ratings.fold(0.0, (sum, rating) => sum + rating.rating);
+      return sum / ratings.length;
+    } catch (e) {
+      print('Error getting average rating: $e');
+      return 0.0;
+    }
+  }
+
+  //MOVIE COMMENTS
+  Future<String> saveMovieComment(MovieComment comment) async {
+    try {
+      final ref = _db.child('movie_comments').push();
+      await ref.set(comment.toMap());
+      return ref.key!;
+    } catch (e) {
+      print('Error saving movie comment: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<MovieComment>> getCommentsByMovie(String movieId) async {
+    List<MovieComment> comments = [];
+
+    try {
+      Query query = _db.child('movie_comments').orderByChild('movieId').equalTo(movieId);
+
+      DataSnapshot snapshot;
+      try {
+        snapshot = await query.get();
+      } catch (e, stackTrace) {
+        print('⚠️ Query snapshot error in getCommentsByMovie: $e');
+        print('Stack trace: $stackTrace');
+        // Fallback: Load all comments and filter manually
+        print('🔄 Falling back to manual filter method...');
+        return await _getCommentsByMovieFallback(movieId);
+      }
+
+      if (!snapshot.exists || snapshot.value == null) {
+        return comments;
+      }
+
+      try {
+        final value = snapshot.value;
+        
+        // Check if value is String (invalid data)
+        if (value is String) {
+          print('⚠️ Comments query returned String instead of Map, skipping');
+          return await _getCommentsByMovieFallback(movieId);
+        }
+
+        if (value is! Map) {
+          print('⚠️ Comments data is ${value.runtimeType}, expected Map. Skipping.');
+          return await _getCommentsByMovieFallback(movieId);
+        }
+
+        Map<dynamic, dynamic> data;
+        try {
+          data = Map<dynamic, dynamic>.from(value);
+        } catch (e) {
+          print('⚠️ Error converting comments data to Map: $e');
+          return await _getCommentsByMovieFallback(movieId);
+        }
+
+        data.forEach((key, itemValue) {
+          try {
+            // Skip if itemValue is null or String
+            if (itemValue == null) {
+              print('⚠️ Skipping null comment: $key');
+              return;
+            }
+
+            if (itemValue is String) {
+              print('⚠️ Skipping invalid comment (String): $key');
+              return;
+            }
+
+            if (itemValue is Map) {
+              Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+              comments.add(MovieComment.fromMap(itemMap, key.toString()));
+            } else {
+              print('⚠️ Skipping invalid comment type: $key (${itemValue.runtimeType})');
+            }
+          } catch (e) {
+            print('⚠️ Error parsing comment $key: $e');
+          }
+        });
+      } catch (e) {
+        print('⚠️ Error processing comments snapshot value: $e');
+        return await _getCommentsByMovieFallback(movieId);
+      }
+    } catch (e) {
+      print('❌ Error getting comments by movie: $e');
+    }
+
+    // Sort by createdAt descending (newest first)
+    comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return comments;
+  }
+
+  // ✅ FALLBACK: Load all comments and filter manually when query fails
+  Future<List<MovieComment>> _getCommentsByMovieFallback(String movieId) async {
+    List<MovieComment> comments = [];
+    
+    try {
+      print('🔄 Loading all comments and filtering for movieId: $movieId');
+      DataSnapshot snapshot = await _db.child('movie_comments').get();
+      
+      if (!snapshot.exists || snapshot.value == null) {
+        print('ℹ️ No comments found in database');
+        return comments;
+      }
+
+      final value = snapshot.value;
+
+      if (value is String) {
+        print('⚠️ Comments node contains String instead of Map');
+        return comments;
+      }
+
+      if (value is! Map) {
+        print('⚠️ Comments data is ${value.runtimeType}, expected Map');
+        return comments;
+      }
+
+      Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+      print('📊 Found ${data.length} total comments, filtering for movieId: $movieId');
+
+      data.forEach((key, itemValue) {
+        try {
+          if (itemValue == null || itemValue is String) {
+            return;
+          }
+
+          if (itemValue is! Map) {
+            return;
+          }
+
+          Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+          
+          // Filter by movieId
+          final itemMovieId = itemMap['movieId']?.toString() ?? '';
+          if (itemMovieId == movieId) {
+            try {
+              comments.add(MovieComment.fromMap(itemMap, key.toString()));
+            } catch (e) {
+              print('⚠️ Error creating MovieComment for $key: $e');
+            }
+          }
+        } catch (e) {
+          print('⚠️ Error parsing comment $key: $e');
+        }
+      });
+
+      // Sort by createdAt descending (newest first)
+      comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      print('✅ Loaded ${comments.length} comments for movie: $movieId (using fallback)');
+    } catch (e) {
+      print('❌ Error in fallback method: $e');
+    }
+
+    return comments;
+  }
+
+  Future<void> deleteMovieComment(String commentId) async {
+    try {
+      await _db.child('movie_comments').child(commentId).remove();
+    } catch (e) {
+      print('Error deleting movie comment: $e');
+      rethrow;
+    }
   }
 }

@@ -175,7 +175,6 @@ class CompleteDatabaseFix {
           'genre': 'Action, Adventure, Fantasy',
           'duration': 192,
           'posterUrl': 'https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg',
-          'rating': 8.1,
         },
         {
           'title': 'The Batman',
@@ -183,7 +182,6 @@ class CompleteDatabaseFix {
           'genre': 'Action, Crime, Drama',
           'duration': 176,
           'posterUrl': 'https://image.tmdb.org/t/p/w500/74xTEgt7R36Fpooo50r9T25onhq.jpg',
-          'rating': 8.3,
         },
         {
           'title': 'Top Gun: Maverick',
@@ -191,7 +189,6 @@ class CompleteDatabaseFix {
           'genre': 'Action, Drama',
           'duration': 131,
           'posterUrl': 'https://image.tmdb.org/t/p/w500/62HCnUTziyWcpDaBO2i1DX17ljH.jpg',
-          'rating': 8.7,
         },
         {
           'title': 'Spider-Man: No Way Home',
@@ -199,7 +196,6 @@ class CompleteDatabaseFix {
           'genre': 'Action, Adventure',
           'duration': 148,
           'posterUrl': 'https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg',
-          'rating': 9.0,
         },
         {
           'title': 'Dune',
@@ -207,7 +203,6 @@ class CompleteDatabaseFix {
           'genre': 'Sci-Fi, Adventure',
           'duration': 155,
           'posterUrl': 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
-          'rating': 8.2,
         },
       ];
 
@@ -219,7 +214,6 @@ class CompleteDatabaseFix {
           movie['genre'],
           movie['duration'],
           movie['posterUrl'],
-          movie['rating'],
         );
         movieIds.add(id);
       }
@@ -300,7 +294,6 @@ class CompleteDatabaseFix {
       String genre,
       int duration,
       String posterUrl,
-      double rating,
       ) async {
     final ref = _db.child('movies').push();
 
@@ -310,7 +303,6 @@ class CompleteDatabaseFix {
       'genre': genre,
       'duration': duration,
       'posterUrl': posterUrl,
-      'rating': rating,
       'releaseDate': ServerValue.timestamp,
     });
 

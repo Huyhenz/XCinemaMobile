@@ -7,7 +7,8 @@ class MovieModel {
   final String genre; // Ví dụ: 'Action, Comedy'
   final int duration; // Phút
   final String posterUrl; // Từ Firebase Storage
-  final double rating; // 0-10
+  final String? trailerUrl; // URL của trailer (YouTube hoặc video khác)
+  final String? ageRating; // Độ tuổi xem (ví dụ: "T13", "T16", "T18", "P" - Phổ thông, null = Tất cả độ tuổi)
   final int? releaseDate; // Timestamp
   final String cinemaId; // ID của rạp chiếu (phim thuộc về rạp nào)
 
@@ -19,7 +20,8 @@ class MovieModel {
     required this.duration,
     required this.posterUrl,
     required this.cinemaId,
-    this.rating = 0.0,
+    this.trailerUrl,
+    this.ageRating,
     this.releaseDate,
   });
 
@@ -32,7 +34,8 @@ class MovieModel {
       duration: data['duration'] ?? 0,
       posterUrl: data['posterUrl'] ?? '',
       cinemaId: data['cinemaId']?.toString() ?? '',
-      rating: data['rating']?.toDouble() ?? 0.0,
+      trailerUrl: data['trailerUrl']?.toString(),
+      ageRating: data['ageRating']?.toString(),
       releaseDate: data['releaseDate'],
     );
   }
@@ -45,7 +48,8 @@ class MovieModel {
       'duration': duration,
       'posterUrl': posterUrl,
       'cinemaId': cinemaId,
-      'rating': rating,
+      'trailerUrl': trailerUrl,
+      'ageRating': ageRating,
       'releaseDate': releaseDate ?? ServerValue.timestamp,
     };
   }
