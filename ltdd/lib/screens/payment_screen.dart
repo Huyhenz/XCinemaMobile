@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import '../models/booking.dart';
 import '../models/payment.dart';
 import '../models/tempbooking.dart';
+import '../models/showtime.dart';
+import '../models/movie.dart';
+import '../models/voucher.dart';
 import '../services/database_services.dart';
 import '../services/payment_service.dart';
 import '../services/email_service.dart';
@@ -37,15 +40,69 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   bool _isProcessing = false;
   String _selectedPaymentMethod = 'paypal'; // Default to PayPal
   late AnimationController _pulseController;
+  
+  // Thông tin phim và lịch chiếu
+  ShowtimeModel? _showtime;
+  MovieModel? _movie;
+  bool _isLoadingData = true;
+  
+  // Thông tin ghế từ temp booking
+  List<String> _selectedSeats = [];
+  
+  // Voucher
+  String? _voucherCode;
+  VoucherModel? _selectedVoucher;
+  List<Map<String, dynamic>> _userVouchers = [];
+  double _discount = 0.0;
+  double _finalPrice = 0.0;
 
   @override
   void initState() {
     super.initState();
+    // Khởi tạo với ghế từ widget (fallback)
+    _selectedSeats = List.from(widget.selectedSeats);
+    _loadData();
     _createTempBooking();
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..repeat(reverse: true);
+    _finalPrice = widget.totalPrice;
+  }
+  
+  Future<void> _loadData() async {
+    setState(() => _isLoadingData = true);
+    try {
+      // Load showtime
+      _showtime = await DatabaseService().getShowtime(widget.showtimeId);
+      if (_showtime != null) {
+        // Load movie
+        _movie = await DatabaseService().getMovie(_showtime!.movieId);
+      }
+      
+      // Load ghế từ temp booking nếu có
+      if (_tempBookingId != null) {
+        await _loadTempBooking();
+      } else {
+        // Fallback to widget.selectedSeats
+        _selectedSeats = widget.selectedSeats;
+      }
+      
+      // Load voucher đã đổi của user
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        try {
+          _userVouchers = await PointsService().getUserRedeemedVouchers(userId);
+        } catch (e) {
+          print('⚠️ Error loading user vouchers (non-critical): $e');
+          _userVouchers = []; // Continue without vouchers
+        }
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+    } finally {
+      setState(() => _isLoadingData = false);
+    }
   }
 
   @override
@@ -57,15 +114,28 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   Future<void> _createTempBooking() async {
     try {
       int now = DateTime.now().millisecondsSinceEpoch;
+      
+      // Sử dụng _selectedSeats (đã được khởi tạo từ widget.selectedSeats)
+      // Nếu _selectedSeats rỗng, sử dụng widget.selectedSeats
+      final seatsToSave = _selectedSeats.isNotEmpty ? _selectedSeats : widget.selectedSeats;
+      
       TempBookingModel temp = TempBookingModel(
         id: '',
         userId: FirebaseAuth.instance.currentUser!.uid,
         showtimeId: widget.showtimeId,
-        seats: widget.selectedSeats,
+        seats: seatsToSave,
         createdAt: now,
         expiryTime: now + 600000, // 10 minutes
       );
       _tempBookingId = await DatabaseService().saveTempBooking(temp);
+      
+      print('🎫 Created temp booking $_tempBookingId with seats: $seatsToSave');
+      
+      // Load lại temp booking để đảm bảo có dữ liệu mới nhất
+      if (_tempBookingId != null) {
+        await _loadTempBooking();
+      }
+      
       setState(() {});
     } catch (e) {
       print('Error creating temp booking: $e');
@@ -79,6 +149,99 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         Navigator.pop(context);
       }
     }
+  }
+  
+  Future<void> _loadTempBooking() async {
+    if (_tempBookingId == null) return;
+    
+    try {
+      final tempBooking = await DatabaseService().getTempBooking(_tempBookingId!);
+      if (tempBooking != null && tempBooking.seats.isNotEmpty) {
+        setState(() {
+          _selectedSeats = tempBooking.seats;
+        });
+        print('🎫 Loaded seats from temp booking: $_selectedSeats (${_selectedSeats.length} seats)');
+      } else {
+        print('⚠️ Temp booking has no seats, using widget.selectedSeats');
+        // Fallback to widget.selectedSeats if temp booking has no seats
+        if (widget.selectedSeats.isNotEmpty) {
+          setState(() {
+            _selectedSeats = widget.selectedSeats;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading temp booking: $e');
+      // Fallback to widget.selectedSeats if temp booking load fails
+      if (widget.selectedSeats.isNotEmpty) {
+        setState(() {
+          _selectedSeats = widget.selectedSeats;
+        });
+      }
+    }
+  }
+
+  Future<void> _applyVoucher() async {
+    VoucherModel? voucher;
+
+    // Ưu tiên voucher đã chọn từ dropdown
+    if (_selectedVoucher != null) {
+      voucher = _selectedVoucher;
+    } else if (_voucherCode != null && _voucherCode!.isNotEmpty) {
+      // Nếu không có voucher từ dropdown, thử load từ mã
+      voucher = await DatabaseService().getVoucher(_voucherCode!);
+    }
+
+    if (voucher == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn voucher hoặc nhập mã voucher'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
+    // Kiểm tra voucher còn hạn không
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (voucher.expiryDate < now) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voucher đã hết hạn!'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
+    if (!voucher.isActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voucher không còn hoạt động!'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      double basePrice = widget.totalPrice;
+      if (voucher!.type == 'percent') {
+        _discount = basePrice * (voucher.discount / 100);
+      } else {
+        _discount = voucher.discount;
+      }
+      _voucherCode = voucher.id; // Lưu mã voucher
+      _finalPrice = basePrice - _discount;
+      if (_finalPrice < 0) _finalPrice = 0;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Áp dụng voucher thành công!'),
+        backgroundColor: Color(0xFF4CAF50),
+      ),
+    );
   }
 
   Future<void> _handlePayment() async {
@@ -101,11 +264,11 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           paymentMethod = PaymentMethod.paypal;
       }
 
-      // Process payment using PaymentService
+      // Process payment using PaymentService với giá đã áp dụng voucher
       PaymentResult result = await PaymentService.processPayment(
         method: paymentMethod,
-        amount: widget.totalPrice,
-        description: 'Đặt vé xem phim - ${widget.selectedSeats.length} ghế',
+        amount: _finalPrice,
+        description: 'Đặt vé xem phim - ${_selectedSeats.length} ghế',
         currency: 'VND',
         context: context,
       );
@@ -121,10 +284,10 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             userId: temp.userId,
             showtimeId: temp.showtimeId,
             cinemaId: widget.cinemaId,
-            seats: temp.seats,
+            seats: _selectedSeats.isNotEmpty ? _selectedSeats : temp.seats,
             totalPrice: widget.totalPrice,
-            finalPrice: widget.totalPrice,
-            voucherId: widget.voucherId,
+            finalPrice: _finalPrice,
+            voucherId: _voucherCode,
             status: 'confirmed',
           );
           String bookingId = await DatabaseService().saveBooking(booking);
@@ -134,7 +297,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             id: '',
             bookingId: bookingId,
             cinemaId: widget.cinemaId,
-            amount: widget.totalPrice,
+            amount: _finalPrice,
             status: 'success',
             transactionId: result.transactionId,
             paymentMethod: _selectedPaymentMethod,
@@ -142,9 +305,9 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           await DatabaseService().savePayment(payment);
 
           // Đánh dấu voucher đã sử dụng nếu có
-          if (widget.voucherId != null && widget.voucherId!.isNotEmpty) {
+          if (_voucherCode != null && _voucherCode!.isNotEmpty) {
             try {
-              await PointsService().markVoucherAsUsed(userId, widget.voucherId!);
+              await PointsService().markVoucherAsUsed(userId, _voucherCode!);
             } catch (e) {
               print('⚠️ Error marking voucher as used: $e');
             }
@@ -279,7 +442,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    if (_tempBookingId == null) {
+    if (_tempBookingId == null || _isLoadingData) {
       return const Scaffold(
         backgroundColor: Color(0xFF0F0F0F),
         body: Center(
@@ -312,7 +475,9 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         body: SingleChildScrollView(
           child: Column(
             children: [
+              _buildMovieInfo(),
               _buildOrderSummary(),
+              _buildVoucherSection(),
               _buildPaymentMethods(),
               _buildTimer(),
             ],
@@ -323,7 +488,19 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildOrderSummary() {
+  Widget _buildMovieInfo() {
+    if (_movie == null || _showtime == null) {
+      return const SizedBox.shrink();
+    }
+    
+    final showtimeDate = DateTime.fromMillisecondsSinceEpoch(_showtime!.startTime);
+    final formattedDate = DateFormat('dd/MM/yyyy').format(showtimeDate);
+    final formattedTime = DateFormat('HH:mm').format(showtimeDate);
+    
+    // Debug: Kiểm tra selectedSeats
+    print('🎫 PaymentScreen - _selectedSeats: $_selectedSeats');
+    print('🎫 PaymentScreen - _selectedSeats.length: ${_selectedSeats.length}');
+    
     return Container(
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(20),
@@ -336,7 +513,42 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Chi Tiết Đơn Hàng',
+            'Thông Tin Phim',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSummaryRow('Tên phim', _movie!.title),
+          _buildSummaryRow('Lịch chiếu', '$formattedDate - $formattedTime'),
+          _buildSummaryRow('Số ghế', _selectedSeats.isEmpty 
+            ? 'Chưa chọn ghế' 
+            : '${_selectedSeats.length} ghế'),
+          if (_selectedSeats.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            _buildSummaryRow('Ghế đã chọn', _selectedSeats.join(', ')),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderSummary() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Chi Tiết Thanh Toán',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -344,14 +556,16 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             ),
           ),
           const SizedBox(height: 20),
-          _buildSummaryRow('Số ghế', '${widget.selectedSeats.length}'),
-          _buildSummaryRow('Ghế đã chọn', widget.selectedSeats.join(', ')),
+          _buildSummaryRow('Tổng tiền', '${NumberFormat('#,###', 'vi_VN').format(widget.totalPrice)}đ'),
+          if (_discount > 0) ...[
+            _buildSummaryRow('Giảm giá', '-${NumberFormat('#,###', 'vi_VN').format(_discount)}đ'),
+          ],
           const Divider(color: Color(0xFF2A2A2A), height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Tổng cộng',
+                'Thành tiền',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -359,7 +573,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 ),
               ),
               Text(
-                '${NumberFormat('#,###', 'vi_VN').format(widget.totalPrice)}đ',
+                '${NumberFormat('#,###', 'vi_VN').format(_finalPrice)}đ',
                 style: const TextStyle(
                   color: Color(0xFFE50914),
                   fontSize: 24,
@@ -372,21 +586,147 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
       ),
     );
   }
+  
+  Widget _buildVoucherSection() {
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Voucher',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Dropdown chọn voucher đã đổi
+          if (_userVouchers.isNotEmpty) ...[
+            DropdownButtonFormField<VoucherModel>(
+              value: _selectedVoucher,
+              decoration: const InputDecoration(
+                labelText: 'Chọn voucher đã đổi',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.card_giftcard, color: Color(0xFFE50914)),
+                labelStyle: TextStyle(color: Colors.white),
+              ),
+              dropdownColor: const Color(0xFF2A2A2A),
+              style: const TextStyle(color: Colors.white),
+              items: _userVouchers.map((item) {
+                final voucher = item['voucher'] as VoucherModel;
+                return DropdownMenuItem<VoucherModel>(
+                  value: voucher,
+                  child: Text(
+                    '${voucher.id} - ${voucher.type == 'percent' ? 'Giảm ${voucher.discount}%' : 'Giảm ${voucher.discount.toStringAsFixed(0)}đ'}',
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedVoucher = value;
+                  if (value != null) {
+                    _voucherCode = value.id;
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.grey),
+            const SizedBox(height: 12),
+            const Text(
+              'Hoặc nhập mã voucher',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          // Text field nhập mã voucher
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (value) {
+                    _voucherCode = value;
+                    _selectedVoucher = null; // Clear selection khi nhập mã
+                  },
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Nhập mã voucher',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.local_offer, color: Color(0xFFE50914)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _applyVoucher,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Áp dụng'),
+              ),
+            ],
+          ),
+          // Hiển thị discount nếu đã áp dụng
+          if (_discount > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Color(0xFF4CAF50)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Đã giảm: ${NumberFormat('#,###', 'vi_VN').format(_discount)}đ',
+                    style: const TextStyle(
+                      color: Color(0xFF4CAF50),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _buildSummaryRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 14,
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 14,
+              ),
             ),
           ),
-          Flexible(
+          Expanded(
             child: Text(
               value,
               style: const TextStyle(
@@ -395,6 +735,8 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.right,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

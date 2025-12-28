@@ -162,12 +162,35 @@ class PointsService {
 
       if (snapshot.exists && snapshot.value != null) {
         final value = snapshot.value;
+        
+        // Kiểm tra nếu value là String (invalid data)
+        if (value is String) {
+          print('⚠️ user_vouchers value is String instead of Map, skipping');
+          return [];
+        }
+        
         if (value is Map) {
           value.forEach((voucherId, voucherData) {
+            // Bỏ qua nếu voucherData là String
+            if (voucherData is String) {
+              print('⚠️ Skipping invalid voucher data (String): $voucherId');
+              return;
+            }
+            
+            // Nếu voucherData là Map, xử lý bình thường
             if (voucherData is Map) {
               final data = Map<String, dynamic>.from(voucherData);
               data['voucherId'] = voucherId;
               redeemedVouchers.add(data);
+            } else if (voucherData is List) {
+              // Nếu voucherData là List (nested structure), xử lý từng item
+              for (var item in voucherData) {
+                if (item is Map) {
+                  final data = Map<String, dynamic>.from(item);
+                  data['voucherId'] = voucherId;
+                  redeemedVouchers.add(data);
+                }
+              }
             }
           });
         }
@@ -177,14 +200,19 @@ class PointsService {
       List<Map<String, dynamic>> result = [];
       for (var redeemed in redeemedVouchers) {
         final voucherId = redeemed['voucherId']?.toString();
-        if (voucherId != null) {
-          final voucher = await _dbService.getVoucher(voucherId);
-          if (voucher != null && !(redeemed['isUsed'] ?? false)) {
-            result.add({
-              'voucher': voucher,
-              'redeemedAt': redeemed['redeemedAt'],
-              'isUsed': redeemed['isUsed'] ?? false,
-            });
+        if (voucherId != null && voucherId.isNotEmpty) {
+          try {
+            final voucher = await _dbService.getVoucher(voucherId);
+            if (voucher != null && !(redeemed['isUsed'] ?? false)) {
+              result.add({
+                'voucher': voucher,
+                'redeemedAt': redeemed['redeemedAt'],
+                'isUsed': redeemed['isUsed'] ?? false,
+              });
+            }
+          } catch (e) {
+            print('⚠️ Error loading voucher $voucherId: $e');
+            // Continue with next voucher
           }
         }
       }

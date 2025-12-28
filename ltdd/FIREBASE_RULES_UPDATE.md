@@ -40,6 +40,12 @@ Cập nhật Firebase Realtime Database Rules trong Firebase Console:
       ".read": true,
       ".write": "auth != null"
     },
+    "user_vouchers": {
+      "$userId": {
+        ".read": "auth != null && $userId == auth.uid",
+        ".write": "auth != null && $userId == auth.uid"
+      }
+    },
     // Dữ liệu cá nhân - yêu cầu authentication
     "users": {
       ".read": "auth != null",

@@ -4,10 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import '../models/showtime.dart';
-import '../models/voucher.dart';
 import '../models/theater.dart';
 import '../services/database_services.dart';
-import '../services/points_service.dart';
 import '../widgets/auth_guard.dart';
 import 'payment_screen.dart';
 
@@ -24,13 +22,9 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
   TheaterModel? _theater;
   String? _cinemaId; // ID của rạp chiếu
   List<String> _selectedSeats = [];
-  String? _voucherCode;
   double _totalPrice = 0.0;
-  double _discount = 0.0;
   late AnimationController _animationController;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _userVouchers = []; // Voucher đã đổi của user
-  VoucherModel? _selectedVoucher; // Voucher đã chọn từ dropdown
 
   // ✅ Stream subscription cho realtime updates
   StreamSubscription? _showtimeSubscription;
@@ -103,11 +97,6 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
         }
       }
 
-      // Load voucher đã đổi của user
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId != null) {
-        _userVouchers = await PointsService().getUserRedeemedVouchers(userId);
-      }
     } catch (e) {
       print('Error loading data: $e');
       if (mounted) {
@@ -136,70 +125,7 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
   }
 
   void _calculateTotal() {
-    double basePrice = _selectedSeats.length * _showtime!.price;
-    _totalPrice = basePrice - _discount;
-  }
-
-  Future<void> _applyVoucher() async {
-    VoucherModel? voucher;
-
-    // Ưu tiên voucher đã chọn từ dropdown
-    if (_selectedVoucher != null) {
-      voucher = _selectedVoucher;
-    } else if (_voucherCode != null && _voucherCode!.isNotEmpty) {
-      // Nếu không có voucher từ dropdown, thử load từ mã
-      voucher = await DatabaseService().getVoucher(_voucherCode!);
-    }
-
-    if (voucher == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn voucher hoặc nhập mã voucher'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
-      return;
-    }
-
-    // Kiểm tra voucher còn hạn không
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (voucher.expiryDate < now) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher đã hết hạn!'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
-      return;
-    }
-
-    if (!voucher.isActive) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher không còn hoạt động!'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      double basePrice = _selectedSeats.length * _showtime!.price;
-      if (voucher!.type == 'percent') {
-        _discount = basePrice * (voucher.discount / 100);
-      } else {
-        _discount = voucher.discount;
-      }
-      _voucherCode = voucher.id; // Lưu mã voucher để truyền sang payment screen
-      _calculateTotal();
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Áp dụng voucher thành công!'),
-        backgroundColor: Color(0xFF4CAF50),
-      ),
-    );
+    _totalPrice = _selectedSeats.length * _showtime!.price;
   }
 
   void _proceedToPayment() async {
@@ -233,7 +159,7 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
           cinemaId: _cinemaId!,
           selectedSeats: _selectedSeats,
           totalPrice: _totalPrice,
-          voucherId: _voucherCode,
+          voucherId: null, // Voucher sẽ được áp dụng ở payment screen
         ),
       ),
     ).then((_) {
@@ -309,7 +235,6 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
               child: _buildSeatMap(),
             ),
           ),
-          _buildVoucherSection(),
           _buildBottomBar(),
         ],
       ),
@@ -473,128 +398,6 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildVoucherSection() {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Voucher',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Dropdown chọn voucher đã đổi
-          if (_userVouchers.isNotEmpty) ...[
-            DropdownButtonFormField<VoucherModel>(
-              value: _selectedVoucher,
-              decoration: const InputDecoration(
-                labelText: 'Chọn voucher đã đổi',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.card_giftcard, color: Color(0xFFE50914)),
-                labelStyle: TextStyle(color: Colors.white),
-              ),
-              dropdownColor: const Color(0xFF2A2A2A),
-              style: const TextStyle(color: Colors.white),
-              items: _userVouchers.map((item) {
-                final voucher = item['voucher'] as VoucherModel;
-                return DropdownMenuItem<VoucherModel>(
-                  value: voucher,
-                  child: Text(
-                    '${voucher.id} - ${voucher.type == 'percent' ? 'Giảm ${voucher.discount}%' : 'Giảm ${voucher.discount.toStringAsFixed(0)}đ'}',
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedVoucher = value;
-                  if (value != null) {
-                    _voucherCode = value.id;
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-            const Divider(color: Colors.grey),
-            const SizedBox(height: 12),
-            const Text(
-              'Hoặc nhập mã voucher',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          // Text field nhập mã voucher
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  onChanged: (value) {
-                    _voucherCode = value;
-                    _selectedVoucher = null; // Clear selection khi nhập mã
-                  },
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Nhập mã voucher',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.local_offer, color: Color(0xFFE50914)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: _applyVoucher,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE50914),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Áp dụng'),
-              ),
-            ],
-          ),
-          // Hiển thị discount nếu đã áp dụng
-          if (_discount > 0) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Color(0xFF4CAF50)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Đã giảm: ${NumberFormat('#,###', 'vi_VN').format(_discount)}đ',
-                    style: const TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildBottomBar() {
     return Container(
