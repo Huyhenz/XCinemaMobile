@@ -8,6 +8,8 @@ import '../models/user.dart';
 import '../services/database_services.dart';
 import '../utils/validators.dart';
 import 'booking_screen.dart';
+import 'showtimes_screen.dart';
+import 'movie_detail_screen.dart';
 
 // Không cần import EmailVerificationScreen nữa vì AuthChecker tự lo
 
@@ -286,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   }
 
   void _handleReturnPath(BuildContext context, String returnPath) {
-    // Parse return path: "booking:showtimeId" hoặc các format khác
+    // Parse return path: "booking:showtimeId", "showtimes:movieId:cinemaId", hoặc "movie:movieId:cinemaId"
     if (returnPath.startsWith('booking:')) {
       final showtimeId = returnPath.substring(8); // Bỏ "booking:"
       // Pop login screen trước, sau đó navigate đến booking screen
@@ -298,6 +300,50 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             context,
             MaterialPageRoute(
               builder: (context) => BookingScreen(showtimeId: showtimeId),
+            ),
+          );
+        }
+      });
+    } else if (returnPath.startsWith('showtimes:')) {
+      // Format: "showtimes:movieId:cinemaId" hoặc "showtimes:movieId"
+      final parts = returnPath.substring(10).split(':'); // Bỏ "showtimes:"
+      final movieId = parts[0];
+      final cinemaId = parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null;
+      
+      // Pop login screen trước, sau đó navigate đến showtimes screen
+      Navigator.pop(context); // Đóng login screen
+      // Sử dụng Future.microtask để đảm bảo pop hoàn tất trước khi push
+      Future.microtask(() {
+        if (context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ShowtimesScreen(
+                movieId: movieId,
+                cinemaId: cinemaId,
+              ),
+            ),
+          );
+        }
+      });
+    } else if (returnPath.startsWith('movie:')) {
+      // Format: "movie:movieId" hoặc "movie:movieId:cinemaId"
+      final parts = returnPath.substring(6).split(':'); // Bỏ "movie:"
+      final movieId = parts[0];
+      final cinemaId = parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null;
+      
+      // Pop login screen trước, sau đó navigate đến movie detail screen
+      Navigator.pop(context); // Đóng login screen
+      // Sử dụng Future.microtask để đảm bảo pop hoàn tất trước khi push
+      Future.microtask(() {
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MovieDetailScreen(
+                movieId: movieId,
+                cinemaId: cinemaId,
+              ),
             ),
           );
         }

@@ -9,6 +9,7 @@ import '../models/movie_comment.dart';
 import '../models/user.dart';
 import '../models/cinema.dart';
 import '../services/database_services.dart';
+import '../services/points_service.dart';
 import '../utils/age_utils.dart';
 import '../widgets/age_restriction_dialog.dart';
 import '../widgets/auth_guard.dart';
@@ -40,6 +41,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     super.initState();
     _userId = FirebaseAuth.instance.currentUser?.uid;
     _loadData();
+    _loadUserData();
+  }
+  
+  Future<void> _loadUserData() async {
+    if (_userId != null) {
+      try {
+        _user = await DatabaseService().getUser(_userId!);
+        setState(() {});
+      } catch (e) {
+        print('Error loading user data: $e');
+      }
+    }
   }
 
   @override
@@ -402,6 +415,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               onRatingUpdate: (rating) async {
                 if (_userId != null) {
                   try {
+                    // Kiểm tra xem đã đánh giá chưa
+                    final existingRatings = await DatabaseService().getRatingsByMovieAndUser(widget.movieId, _userId!);
+                    final isNewRating = existingRatings.isEmpty;
+                    
                     final movieRating = MovieRating(
                       id: '',
                       movieId: widget.movieId,
@@ -410,12 +427,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       createdAt: DateTime.now().millisecondsSinceEpoch,
                     );
                     await DatabaseService().saveMovieRating(movieRating);
+                    
+                    // Tích điểm khi đánh giá phim lần đầu (1-2 điểm ngẫu nhiên)
+                    if (isNewRating) {
+                      try {
+                        await PointsService().addPointsForRating(_userId!);
+                      } catch (e) {
+                        print('⚠️ Error adding points for rating: $e');
+                      }
+                    }
+                    
                     await _loadData();
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Đã lưu đánh giá của bạn'),
-                          backgroundColor: Color(0xFF4CAF50),
+                        SnackBar(
+                          content: Text(isNewRating ? 'Đã lưu đánh giá và nhận điểm thưởng!' : 'Đã cập nhật đánh giá của bạn'),
+                          backgroundColor: const Color(0xFF4CAF50),
                         ),
                       );
                     }
@@ -772,10 +799,48 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Future<void> _handleBookButton() async {
     // Kiểm tra authentication trước
-    final isAuthenticated = await AuthGuard.requireAuth(context);
-    if (!isAuthenticated || !mounted) return;
-
-    // Kiểm tra độ tuổi nếu phim có age rating
+    final user = FirebaseAuth.instance.currentUser;
+    
+    // Nếu chưa đăng nhập, yêu cầu đăng nhập và quay lại trang phim này
+    if (user == null) {
+      // Tạo returnPath để quay lại MovieDetailScreen sau khi đăng nhập
+      String returnPath = 'movie:${widget.movieId}';
+      if (widget.cinemaId != null && widget.cinemaId!.isNotEmpty) {
+        returnPath += ':${widget.cinemaId}';
+      }
+      
+      final isAuthenticated = await AuthGuard.requireAuth(
+        context,
+        returnPath: returnPath,
+      );
+      if (!isAuthenticated || !mounted) return;
+      
+      // Sau khi đăng nhập, reload user data và tiếp tục
+      _userId = FirebaseAuth.instance.currentUser?.uid;
+      if (_userId != null) {
+        try {
+          _user = await DatabaseService().getUser(_userId!);
+        } catch (e) {
+          print('Error loading user after login: $e');
+        }
+      }
+    }
+    
+    // Từ đây, user đã đăng nhập, tiếp tục logic đặt vé
+    
+    // Bước 1: Kiểm tra xem đã chọn rạp chưa
+    String? selectedCinemaId = widget.cinemaId;
+    
+    // Nếu chưa chọn rạp, hiển thị dialog chọn rạp
+    if (selectedCinemaId == null || selectedCinemaId.isEmpty) {
+      selectedCinemaId = await _showCinemaSelectionDialog();
+      if (selectedCinemaId == null || !mounted) {
+        // User đã hủy chọn rạp
+        return;
+      }
+    }
+    
+    // Bước 2: Kiểm tra độ tuổi nếu phim có age rating (sau khi đã chọn rạp)
     if (_movie?.ageRating != null && _movie!.ageRating!.isNotEmpty) {
       final requiredAge = AgeUtils.parseAgeRating(_movie!.ageRating);
       
@@ -789,16 +854,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         
         // Kiểm tra nếu user không đủ tuổi
         if (userAge == null) {
-          // User chưa có ngày sinh, hiển thị thông báo yêu cầu cập nhật thông tin
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Vui lòng cập nhật ngày sinh trong thông tin cá nhân để đặt vé phim có độ tuổi xem'),
-                backgroundColor: Color(0xFFE50914),
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
+          // User chưa có ngày sinh, không cho đặt vé nhưng không hiển thị thông báo ở đây
+          // Thông báo sẽ hiển thị ở profile screen
           return;
         }
         
@@ -819,19 +876,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
     }
     
-    // Kiểm tra xem đã chọn rạp chưa
-    String? selectedCinemaId = widget.cinemaId;
-    
-    // Nếu chưa chọn rạp, hiển thị dialog chọn rạp
-    if (selectedCinemaId == null || selectedCinemaId.isEmpty) {
-      selectedCinemaId = await _showCinemaSelectionDialog();
-      if (selectedCinemaId == null || !mounted) {
-        // User đã hủy chọn rạp
-        return;
-      }
-    }
-    
-    // Điều hướng đến màn hình chọn lịch chiếu
+    // Bước 3: Điều hướng đến màn hình chọn lịch chiếu
     if (mounted) {
       Navigator.push(
         context,

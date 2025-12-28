@@ -17,6 +17,8 @@ import 'user_info_screen.dart';
 import 'notification_screen.dart';
 import 'chatbot_screen.dart';
 import 'login_screen.dart';
+import 'redeem_voucher_screen.dart';
+import 'random_voucher_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -36,7 +38,7 @@ class ProfileScreen extends StatelessWidget {
         body: SafeArea(
           child: CustomScrollView(
             slivers: [
-              _buildHeader(),
+              ProfileScreen._buildHeaderStatic(),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -85,9 +87,9 @@ class ProfileScreen extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 40),
-                      _buildLoginButton(context),
+                      ProfileScreen._buildLoginButtonStatic(context),
                       const SizedBox(height: 16),
-                      _buildRegisterButton(context),
+                      ProfileScreen._buildRegisterButtonStatic(context),
                     ],
                   ),
                 ),
@@ -100,65 +102,50 @@ class ProfileScreen extends StatelessWidget {
 
         // Nếu đã đăng nhập, hiển thị profile bình thường
         final userId = user.uid;
-        return BlocProvider(
-          create: (context) => ProfileBloc()..add(LoadProfile(userId)),
-          child: Scaffold(
-            backgroundColor: const Color(0xFF0F0F0F),
-            body: BlocBuilder<ProfileBloc, ProfileState>(
-              builder: (context, state) {
-                if (state.isLoading && state.user == null) {
-                  return const AppLoadingIndicator(message: 'Đang tải thông tin...');
-                }
-
-                if (state.error != null) {
-                  return EmptyState(
-                    icon: Icons.error_outline,
-                    title: 'Có lỗi xảy ra',
-                    subtitle: state.error,
-                    action: ElevatedButton(
-                      onPressed: () {
-                        final userId = FirebaseAuth.instance.currentUser!.uid;
-                        context.read<ProfileBloc>().add(RefreshProfile(userId));
-                      },
-                      child: const Text('Thử lại'),
-                    ),
-                  );
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    context.read<ProfileBloc>().add(RefreshProfile(userId));
-                  },
-                  color: const Color(0xFFE50914),
-                  backgroundColor: const Color(0xFF1A1A1A),
-                  child: SafeArea(
-                    child: CustomScrollView(
-                      slivers: [
-                        _buildHeader(),
-                        SliverToBoxAdapter(
-                          child: Column(
-                            children: [
-                              _buildProfileHeader(state),
-                              _buildStatsCards(state),
-                              _buildMenuSection(context),
-                              _buildBookingHistory(state, context),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+    return BlocProvider(
+      create: (context) => ProfileBloc()..add(LoadProfile(userId)),
+          child: _ProfileContent(userId: userId),
         );
       },
     );
   }
 
-  Widget _buildLoginButton(BuildContext context) {
+  // Static methods để có thể gọi từ _ProfileContentState và từ chính ProfileScreen
+  static Widget _buildHeaderStatic() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Hồ Sơ',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
+              ),
+              child: const Icon(
+                Icons.settings,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildLoginButtonStatic(BuildContext context) {
     return Container(
       width: double.infinity,
       height: 56,
@@ -204,7 +191,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRegisterButton(BuildContext context) {
+  static Widget _buildRegisterButtonStatic(BuildContext context) {
     return Container(
       width: double.infinity,
       height: 56,
@@ -245,41 +232,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Hồ Sơ',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
-              ),
-              child: const Icon(
-                Icons.settings,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader(ProfileState state) {
+  // ========== TẤT CẢ CÁC STATIC METHODS ==========
+  static Widget _buildProfileHeaderStatic(ProfileState state) {
     if (state.user == null) return const SizedBox();
 
     return Container(
@@ -392,18 +346,21 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsCards(ProfileState state) {
+  static Widget _buildStatsCardsStatic(BuildContext context, ProfileState state) {
     final confirmedBookings = state.bookings.where((b) => b.booking.status == 'confirmed').length;
     final totalSpent = state.bookings
         .where((b) => b.booking.status == 'confirmed')
         .fold<double>(0, (sum, b) => sum + (b.booking.finalPrice ?? b.booking.totalPrice));
+    final userPoints = state.user?.points ?? 0;
 
     return Container(
       margin: const EdgeInsets.all(20),
-      child: Row(
+      child: Column(
+        children: [
+          Row(
         children: [
           Expanded(
-            child: _buildStatCard(
+                child: _buildStatCardStatic(
               'Phim Đã Xem',
               confirmedBookings.toString(),
               Icons.movie_outlined,
@@ -412,19 +369,121 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _buildStatCard(
+                child: _buildStatCardStatic(
               'Tổng Chi Tiêu',
               '${NumberFormat('#,###', 'vi_VN').format(totalSpent)}đ',
               Icons.payments_outlined,
               const Color(0xFF4CAF50),
             ),
           ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Points card
+          _buildPointsCardStatic(context, userPoints),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  static Widget _buildPointsCardStatic(BuildContext context, int points) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A1A1A), Color(0xFF2A2A2A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE50914).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.stars,
+              color: Color(0xFFE50914),
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Điểm Tích Lũy',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$points điểm',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RedeemVoucherScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.card_giftcard, size: 18),
+                label: const Text('Đổi Voucher'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RandomVoucherScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.shuffle, size: 18),
+                label: const Text('Nhận Voucher'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFE50914),
+                  side: const BorderSide(color: Color(0xFFE50914)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildStatCardStatic(String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -467,7 +526,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuSection(BuildContext context) {
+  static Widget _buildMenuSectionStatic(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -477,7 +536,7 @@ class ProfileScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildMenuItem(
+          _buildMenuItemStatic(
             Icons.person_outline,
             'Thông Tin Cá Nhân',
                 () {
@@ -494,8 +553,8 @@ class ProfileScreen extends StatelessWidget {
               });
             },
           ),
-          _buildDivider(),
-          _buildMenuItem(
+          _buildDividerStatic(),
+          _buildMenuItemStatic(
             Icons.notifications_outlined,
             'Thông Báo',
                 () {
@@ -507,8 +566,8 @@ class ProfileScreen extends StatelessWidget {
               );
             },
           ),
-          _buildDivider(),
-          _buildMenuItem(
+          _buildDividerStatic(),
+          _buildMenuItemStatic(
             Icons.smart_toy,
             'Chatbot Hỗ Trợ',
             () {
@@ -520,10 +579,10 @@ class ProfileScreen extends StatelessWidget {
               );
             },
           ),
-          _buildDivider(),
-          _buildMenuItem(Icons.help_outline, 'Trợ Giúp', () {}),
-          _buildDivider(),
-          _buildMenuItem(
+          _buildDividerStatic(),
+          _buildMenuItemStatic(Icons.help_outline, 'Trợ Giúp', () {}),
+          _buildDividerStatic(),
+          _buildMenuItemStatic(
             Icons.logout,
             'Đăng Xuất',
                 () => FirebaseAuth.instance.signOut(),
@@ -534,7 +593,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap,
+  static Widget _buildMenuItemStatic(IconData icon, String title, VoidCallback onTap,
       {bool isDestructive = false}) {
     return Material(
       color: Colors.transparent,
@@ -582,7 +641,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDivider() {
+  static Widget _buildDividerStatic() {
     return Divider(
       color: const Color(0xFF2A2A2A),
       height: 1,
@@ -590,7 +649,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBookingHistory(ProfileState state, BuildContext context) {
+  static Widget _buildBookingHistoryStatic(ProfileState state, BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(20),
       child: Column(
@@ -624,18 +683,18 @@ class ProfileScreen extends StatelessWidget {
               subtitle: 'Các vé bạn đặt sẽ hiển thị ở đây',
             )
           else
-            ...state.bookings.map((detail) => _buildBookingCard(detail, context)),
+            ...state.bookings.map((detail) => _buildBookingCardStatic(detail, context)),
         ],
       ),
     );
   }
 
-  Widget _buildBookingCard(BookingDetailModel detail, BuildContext context) {
+  static Widget _buildBookingCardStatic(BookingDetailModel detail, BuildContext context) {
     final booking = detail.booking;
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm', 'vi_VN');
 
     return GestureDetector(
-      onTap: () => _showBookingDetail(context, detail),
+      onTap: () => _showBookingDetailStatic(context, detail),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -687,17 +746,17 @@ class ProfileScreen extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
-                        _buildInfoRow(
+                        _buildInfoRowStatic(
                           Icons.location_on_outlined,
                           detail.theaterName,
                         ),
                         const SizedBox(height: 4),
-                        _buildInfoRow(
+                        _buildInfoRowStatic(
                           Icons.access_time,
                           dateFormat.format(detail.showtime),
                         ),
                         const SizedBox(height: 4),
-                        _buildInfoRow(
+                        _buildInfoRowStatic(
                           Icons.event_seat,
                           booking.seats.join(', '),
                         ),
@@ -749,7 +808,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
+  static Widget _buildInfoRowStatic(IconData icon, String text) {
     return Row(
       children: [
         Icon(icon, color: Colors.grey[600], size: 16),
@@ -769,7 +828,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showBookingDetail(BuildContext context, BookingDetailModel detail) {
+  static void _showBookingDetailStatic(BuildContext context, BookingDetailModel detail) {
     final booking = detail.booking;
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm', 'vi_VN');
 
@@ -831,15 +890,15 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildDetailRow('Phim', detail.movieTitle),
+                  _buildDetailRowStatic('Phim', detail.movieTitle),
                   const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRow('Rạp', detail.theaterName),
+                  _buildDetailRowStatic('Rạp', detail.theaterName),
                   const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRow('Suất chiếu', dateFormat.format(detail.showtime)),
+                  _buildDetailRowStatic('Suất chiếu', dateFormat.format(detail.showtime)),
                   const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRow('Ghế', booking.seats.join(', ')),
+                  _buildDetailRowStatic('Ghế', booking.seats.join(', ')),
                   const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRow(
+                  _buildDetailRowStatic(
                     'Tổng tiền',
                     '${NumberFormat('#,###', 'vi_VN').format(booking.finalPrice ?? booking.totalPrice)}đ',
                     isHighlight: true,
@@ -851,7 +910,7 @@ class ProfileScreen extends StatelessWidget {
             // ✅ Nút Xóa Booking (chỉ hiện nếu status = confirmed)
             if (booking.status == 'confirmed') ...[
               ElevatedButton(
-                onPressed: () => _confirmDeleteBooking(context, booking.id, detail.movieTitle),
+                onPressed: () => _confirmDeleteBookingStatic(context, booking.id, detail.movieTitle),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                   minimumSize: const Size(double.infinity, 50),
@@ -900,8 +959,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // ✅ Confirm Dialog trước khi xóa
-  void _confirmDeleteBooking(BuildContext context, String bookingId, String movieTitle) {
+  static void _confirmDeleteBookingStatic(BuildContext context, String bookingId, String movieTitle) {
     ConfirmationDialog.show(
       context: context,
       title: 'Xác Nhận Hủy Vé',
@@ -912,13 +970,12 @@ class ProfileScreen extends StatelessWidget {
       icon: Icons.warning_amber_rounded,
       onConfirm: () async {
         Navigator.pop(context); // Đóng bottom sheet nếu đang mở
-        await _deleteBooking(context, bookingId, movieTitle);
+        await _deleteBookingStatic(context, bookingId, movieTitle);
       },
     );
   }
 
-  // ✅ Xóa booking và sync ghế
-  Future<void> _deleteBooking(BuildContext context, String bookingId, String movieTitle) async {
+  static Future<void> _deleteBookingStatic(BuildContext context, String bookingId, String movieTitle) async {
     try {
       // Show loading
       showDialog(
@@ -973,7 +1030,7 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isHighlight = false}) {
+  static Widget _buildDetailRowStatic(String label, String value, {bool isHighlight = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -995,6 +1052,161 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
               ),
               textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Widget riêng để xử lý logic kiểm tra ngày sinh
+class _ProfileContent extends StatefulWidget {
+  final String userId;
+  const _ProfileContent({required this.userId});
+
+  @override
+  State<_ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends State<_ProfileContent> {
+  bool _hasCheckedDateOfBirth = false;
+
+  // Delegate các methods đến ProfileScreen static methods
+  Widget _buildHeader() => ProfileScreen._buildHeaderStatic();
+  Widget _buildProfileHeader(ProfileState state) => ProfileScreen._buildProfileHeaderStatic(state);
+  Widget _buildStatsCards(BuildContext context, ProfileState state) => ProfileScreen._buildStatsCardsStatic(context, state);
+  Widget _buildMenuSection(BuildContext context) => ProfileScreen._buildMenuSectionStatic(context);
+  Widget _buildBookingHistory(ProfileState state, BuildContext context) => ProfileScreen._buildBookingHistoryStatic(state, context);
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<ProfileBloc, ProfileState>(
+      listener: (context, state) {
+        // Chỉ kiểm tra một lần khi user data đã load xong
+        if (!_hasCheckedDateOfBirth && 
+            !state.isLoading && 
+            state.user != null && 
+            state.user!.dateOfBirth == null) {
+          _hasCheckedDateOfBirth = true;
+          // Hiển thị dialog yêu cầu cập nhật ngày sinh
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showDateOfBirthDialog(context);
+          });
+        }
+      },
+      child: BlocBuilder<ProfileBloc, ProfileState>(
+          builder: (context, state) {
+            if (state.isLoading && state.user == null) {
+              return const AppLoadingIndicator(message: 'Đang tải thông tin...');
+            }
+
+            if (state.error != null) {
+              return EmptyState(
+                icon: Icons.error_outline,
+                title: 'Có lỗi xảy ra',
+                subtitle: state.error,
+                action: ElevatedButton(
+                  onPressed: () {
+                    final userId = FirebaseAuth.instance.currentUser!.uid;
+                    context.read<ProfileBloc>().add(RefreshProfile(userId));
+                  },
+                  child: const Text('Thử lại'),
+                ),
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                    context.read<ProfileBloc>().add(RefreshProfile(widget.userId));
+              },
+              color: const Color(0xFFE50914),
+              backgroundColor: const Color(0xFF1A1A1A),
+              child: SafeArea(
+                child: CustomScrollView(
+                  slivers: [
+                    _buildHeader(),
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          _buildProfileHeader(state),
+                              _buildStatsCards(context, state),
+                          _buildMenuSection(context),
+                          _buildBookingHistory(state, context),
+                          const SizedBox(height: 100),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+    );
+  }
+
+  void _showDateOfBirthDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFFE50914), size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Cập nhật thông tin',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Vui lòng cập nhật ngày sinh trong thông tin cá nhân để có thể đặt vé phim có độ tuổi xem.',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 16,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Để sau',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UserInfoScreen(),
+                ),
+              ).then((_) {
+                // Refresh profile sau khi cập nhật
+                if (context.mounted) {
+                  context.read<ProfileBloc>().add(RefreshProfile(widget.userId));
+                }
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE50914),
+            ),
+            child: const Text(
+              'Cập nhật ngay',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],

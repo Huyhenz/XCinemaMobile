@@ -1,4 +1,5 @@
 // File: lib/screens/admin_dashboard_screen.dart
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -3177,15 +3178,31 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
   final _discountController = TextEditingController();
+  final _pointsController = TextEditingController();
   String _selectedType = 'percent';
   DateTime? _expiryDate;
   bool _isCreating = false;
+  bool _requiresPoints = false;
 
   @override
   void dispose() {
     _codeController.dispose();
     _discountController.dispose();
+    _pointsController.dispose();
     super.dispose();
+  }
+
+  // Generate voucher code ngẫu nhiên
+  void _generateVoucherCode() {
+    final random = Random();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    
+    // Tạo mã 8 ký tự ngẫu nhiên
+    final code = List.generate(8, (index) => chars[random.nextInt(chars.length)]).join();
+    
+    setState(() {
+      _codeController.text = code;
+    });
   }
 
   Future<void> _createVoucher() async {
@@ -3208,6 +3225,9 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
         type: _selectedType,
         expiryDate: _expiryDate!.millisecondsSinceEpoch,
         isActive: true,
+        points: _requiresPoints && _pointsController.text.trim().isNotEmpty
+            ? int.tryParse(_pointsController.text.trim())
+            : null,
       );
 
       context.read<AdminBloc>().add(CreateVoucher(voucher));
@@ -3217,6 +3237,7 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
       setState(() {
         _selectedType = 'percent';
         _expiryDate = null;
+        _requiresPoints = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3247,16 +3268,33 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Voucher Code
-            TextFormField(
-              controller: _codeController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Mã Voucher *',
-                hintText: 'VD: SALE50, NEWYEAR2024',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.local_offer),
-              ),
-              validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập mã voucher' : null,
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _codeController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Mã Voucher *',
+                      hintText: 'VD: SALE50, NEWYEAR2024',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.local_offer),
+                    ),
+                    validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập mã voucher' : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: _generateVoucherCode,
+                  icon: const Icon(Icons.autorenew, size: 20),
+                  label: const Text('Tự động'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2A2A2A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
@@ -3301,6 +3339,54 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
                 return null;
               },
             ),
+            const SizedBox(height: 16),
+
+            // Requires Points Checkbox
+            CheckboxListTile(
+              title: const Text(
+                'Yêu cầu điểm để đổi voucher',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Nếu bật, user cần đủ điểm mới đổi được voucher này',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              value: _requiresPoints,
+              onChanged: (value) {
+                setState(() {
+                  _requiresPoints = value ?? false;
+                  if (!_requiresPoints) {
+                    _pointsController.clear();
+                  }
+                });
+              },
+              activeColor: const Color(0xFFE50914),
+            ),
+            if (_requiresPoints) ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _pointsController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Điểm cần để đổi *',
+                  hintText: 'VD: 100, 200, 500',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.stars),
+                ),
+                validator: (value) {
+                  if (_requiresPoints && (value?.isEmpty ?? true)) {
+                    return 'Vui lòng nhập điểm cần để đổi';
+                  }
+                  if (_requiresPoints && value != null && value.isNotEmpty) {
+                    final points = int.tryParse(value);
+                    if (points == null || points <= 0) {
+                      return 'Điểm phải là số nguyên dương';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 16),
 
             // Expiry Date
@@ -3577,10 +3663,12 @@ class _EditVoucherDialog extends StatefulWidget {
 class _EditVoucherDialogState extends State<_EditVoucherDialog> {
   final _formKey = GlobalKey<FormState>();
   final _discountController = TextEditingController();
+  final _pointsController = TextEditingController();
   String _selectedType = 'percent';
   DateTime? _expiryDate;
   bool _isActive = true;
   bool _isSaving = false;
+  bool _requiresPoints = false;
 
   @override
   void initState() {
@@ -3589,11 +3677,16 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
     _selectedType = widget.voucher.type;
     _expiryDate = DateTime.fromMillisecondsSinceEpoch(widget.voucher.expiryDate);
     _isActive = widget.voucher.isActive;
+    _requiresPoints = widget.voucher.points != null;
+    if (_requiresPoints) {
+      _pointsController.text = widget.voucher.points.toString();
+    }
   }
 
   @override
   void dispose() {
     _discountController.dispose();
+    _pointsController.dispose();
     super.dispose();
   }
 
@@ -3709,6 +3802,55 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
                 ),
               ),
               const SizedBox(height: 16),
+              // Requires Points Checkbox
+              CheckboxListTile(
+                title: const Text(
+                  'Yêu cầu điểm để đổi voucher',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: const Text(
+                  'Nếu bật, user cần đủ điểm mới đổi được voucher này',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                value: _requiresPoints,
+                onChanged: (value) {
+                  setState(() {
+                    _requiresPoints = value ?? false;
+                    if (!_requiresPoints) {
+                      _pointsController.clear();
+                    }
+                  });
+                },
+                activeColor: const Color(0xFFE50914),
+              ),
+              if (_requiresPoints) ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _pointsController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Điểm cần để đổi *',
+                    hintText: 'VD: 100, 200, 500',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.stars),
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  validator: (value) {
+                    if (_requiresPoints && (value?.isEmpty ?? true)) {
+                      return 'Vui lòng nhập điểm cần để đổi';
+                    }
+                    if (_requiresPoints && value != null && value.isNotEmpty) {
+                      final points = int.tryParse(value);
+                      if (points == null || points <= 0) {
+                        return 'Điểm phải là số nguyên dương';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+              ],
+              const SizedBox(height: 16),
               // Active Status
               SwitchListTile(
                 title: const Text(
@@ -3755,6 +3897,9 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
                 type: _selectedType,
                 expiryDate: _expiryDate!.millisecondsSinceEpoch,
                 isActive: _isActive,
+                points: _requiresPoints && _pointsController.text.trim().isNotEmpty
+                    ? int.tryParse(_pointsController.text.trim())
+                    : null,
               );
 
               context.read<AdminBloc>().add(UpdateVoucher(updatedVoucher));

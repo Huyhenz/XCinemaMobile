@@ -6,6 +6,7 @@ class VoucherModel {
   final String type; // 'percent' hoặc 'fixed'
   final int expiryDate; // Timestamp hết hạn
   final bool isActive;
+  final int? points; // Điểm cần để đổi voucher (null nếu không cần điểm)
 
   VoucherModel({
     required this.id,
@@ -13,6 +14,7 @@ class VoucherModel {
     required this.type,
     required this.expiryDate,
     this.isActive = true,
+    this.points,
   });
 
   factory VoucherModel.fromMap(Map<dynamic, dynamic> data, String key) {
@@ -22,6 +24,7 @@ class VoucherModel {
       type: data['type'] ?? 'percent',
       expiryDate: data['expiryDate'] ?? 0,
       isActive: data['isActive'] ?? true,
+      points: data['points'] != null ? ((data['points'] is num) ? (data['points'] as num).toInt() : int.tryParse(data['points'].toString())) : null,
     );
   }
 
@@ -31,6 +34,7 @@ class VoucherModel {
       'type': type,
       'expiryDate': expiryDate,
       'isActive': isActive,
+      'points': points,
     };
   }
 }

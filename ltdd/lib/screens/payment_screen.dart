@@ -7,6 +7,7 @@ import '../models/tempbooking.dart';
 import '../services/database_services.dart';
 import '../services/payment_service.dart';
 import '../services/email_service.dart';
+import '../services/points_service.dart';
 import '../utils/booking_helper.dart';
 import 'payment_success_screen.dart';
 import 'payment_failure_screen.dart';
@@ -139,6 +140,22 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             paymentMethod: _selectedPaymentMethod,
           );
           await DatabaseService().savePayment(payment);
+
+          // Đánh dấu voucher đã sử dụng nếu có
+          if (widget.voucherId != null && widget.voucherId!.isNotEmpty) {
+            try {
+              await PointsService().markVoucherAsUsed(userId, widget.voucherId!);
+            } catch (e) {
+              print('⚠️ Error marking voucher as used: $e');
+            }
+          }
+
+          // Tích điểm khi đặt vé thành công (3-4 điểm ngẫu nhiên)
+          try {
+            await PointsService().addPointsForBooking(userId);
+          } catch (e) {
+            print('⚠️ Error adding points for booking: $e');
+          }
 
           // Delete temp booking (không add seats back vì đã confirm)
           await DatabaseService().deleteTempBooking(_tempBookingId!, addBackSeats: false);
