@@ -62,8 +62,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         }
       }
 
-      // Sắp xếp theo thời gian mới nhất
-      bookingDetails.sort((a, b) => b.showtime.compareTo(a.showtime));
+      // Sắp xếp theo thời gian đặt vé (bookedAt) - mới nhất trước
+      bookingDetails.sort((a, b) {
+        final bookedAtA = a.booking.bookedAt ?? 0;
+        final bookedAtB = b.booking.bookedAt ?? 0;
+        // Sắp xếp giảm dần: mới nhất (timestamp lớn hơn) sẽ đứng trước
+        return bookedAtB.compareTo(bookedAtA);
+      });
 
       emit(state.copyWith(
         user: user,
