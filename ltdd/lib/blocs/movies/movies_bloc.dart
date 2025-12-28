@@ -31,63 +31,74 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
     });
 
     on<SearchMovies>((event, emit) async {
-      // Search on current filtered movies
-      // If there's a category filter active, we need to reload from DB first
-      if (state.category != null && state.category!.isNotEmpty) {
-        // Reload filtered movies first, then apply search
-        List<MovieModel> filteredMovies = [];
-        final cinemaId = state.cinemaId;
-        
-        if (state.category == 'nowShowing') {
-          filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
-        } else if (state.category == 'comingSoon') {
-          filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
-        } else if (state.category == 'popular') {
-          List<MovieModel> allMovies;
-          if (cinemaId != null && cinemaId.isNotEmpty) {
-            allMovies = await _dbService.getMoviesByCinema(cinemaId);
-          } else {
-            allMovies = await _dbService.getAllMovies();
-          }
-          _movieBookingCounts = await _dbService.getBookingCountsByMovie();
-          filteredMovies = allMovies.where((movie) {
-            final bookingCount = _movieBookingCounts[movie.id] ?? 0;
-            return bookingCount >= 5;
-          }).toList();
-        } else {
-          if (cinemaId != null && cinemaId.isNotEmpty) {
-            filteredMovies = await _dbService.getMoviesByCinema(cinemaId);
-          } else {
-            filteredMovies = await _dbService.getAllMovies();
-          }
-        }
-        
-        // Apply search query
-        if (event.query.isNotEmpty && event.query.trim().isNotEmpty) {
-          final lowerQuery = event.query.toLowerCase().trim();
-          filteredMovies = filteredMovies.where((movie) {
-            return movie.title.toLowerCase().contains(lowerQuery) ||
-                   movie.genre.toLowerCase().contains(lowerQuery);
-          }).toList();
-        }
-        
+      // Nếu query rỗng, clear search
+      if (event.query.isEmpty || event.query.trim().isEmpty) {
         emit(state.copyWith(
-          movies: filteredMovies,
-          searchQuery: event.query.isEmpty ? null : event.query,
+          searchQuery: null,
+          clearSearchQuery: true,
         ));
-      } else {
-        // No category filter, search on current movies
-        final lowerQuery = event.query.toLowerCase().trim();
-        final filtered = state.movies.where((movie) {
-          return movie.title.toLowerCase().contains(lowerQuery) ||
-                 movie.genre.toLowerCase().contains(lowerQuery);
-        }).toList();
-        
-        emit(state.copyWith(
-          movies: filtered,
-          searchQuery: event.query.isEmpty ? null : event.query,
-        ));
+        return;
       }
+
+      emit(state.copyWith(isLoading: true));
+
+      final cinemaId = state.cinemaId;
+      final lowerQuery = event.query.toLowerCase().trim();
+      
+      // Tìm trong cả phim đang chiếu và sắp chiếu
+      List<MovieModel> nowShowingMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
+      List<MovieModel> comingSoonMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
+      
+      // Filter theo search query
+      final nowShowingFiltered = nowShowingMovies.where((movie) {
+        return movie.title.toLowerCase().contains(lowerQuery) ||
+               movie.genre.toLowerCase().contains(lowerQuery);
+      }).toList();
+      
+      final comingSoonFiltered = comingSoonMovies.where((movie) {
+        return movie.title.toLowerCase().contains(lowerQuery) ||
+               movie.genre.toLowerCase().contains(lowerQuery);
+      }).toList();
+      
+      // Xác định category dựa trên kết quả tìm được
+      // Ưu tiên: nếu tìm thấy ở cả 2, ưu tiên category hiện tại
+      // Nếu chỉ tìm thấy ở 1 category, chuyển sang category đó
+      String? newCategory = state.category;
+      List<MovieModel> resultMovies = [];
+      
+      if (nowShowingFiltered.isNotEmpty && comingSoonFiltered.isNotEmpty) {
+        // Tìm thấy ở cả 2 category
+        // Nếu đang ở "đang chiếu", ưu tiên "đang chiếu"
+        // Nếu đang ở "sắp chiếu", ưu tiên "sắp chiếu"
+        if (state.category == 'comingSoon') {
+          newCategory = 'comingSoon';
+          resultMovies = comingSoonFiltered;
+        } else {
+          // Mặc định ưu tiên "đang chiếu"
+          newCategory = 'nowShowing';
+          resultMovies = nowShowingFiltered;
+        }
+      } else if (nowShowingFiltered.isNotEmpty) {
+        // Chỉ tìm thấy trong "đang chiếu"
+        newCategory = 'nowShowing';
+        resultMovies = nowShowingFiltered;
+      } else if (comingSoonFiltered.isNotEmpty) {
+        // Chỉ tìm thấy trong "sắp chiếu"
+        newCategory = 'comingSoon';
+        resultMovies = comingSoonFiltered;
+      } else {
+        // Không tìm thấy, giữ category hiện tại và hiển thị empty
+        resultMovies = [];
+      }
+      
+      emit(state.copyWith(
+        movies: resultMovies,
+        category: newCategory,
+        searchQuery: event.query,
+        isLoading: false,
+      ));
+      
+      print('🔍 SearchMovies: Query="${event.query}", Found ${nowShowingFiltered.length} in nowShowing, ${comingSoonFiltered.length} in comingSoon, CurrentCategory=${state.category}, NewCategory=$newCategory');
     });
 
     on<FilterMoviesByCategory>((event, emit) async {

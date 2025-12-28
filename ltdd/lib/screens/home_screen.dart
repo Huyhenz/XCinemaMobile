@@ -258,19 +258,44 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       }
     });
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            _buildHeader(),
-            _buildSearchBar(),
-            _buildPromoBanner(),
-            _buildMovieCarousel(),
-            _buildTabBar(),
-            _buildMovieGrid(),
-            _buildBottomPromoBanner(),
-          ],
+    return BlocListener<MovieBloc, MovieState>(
+      listener: (context, state) {
+        // Tự động chuyển tab khi category thay đổi do search
+        if (state.category != null && 
+            state.searchQuery != null && 
+            state.searchQuery!.isNotEmpty &&
+            mounted &&
+            !state.isLoading) {
+          int targetIndex = 0;
+          if (state.category == 'nowShowing') {
+            targetIndex = 0;
+          } else if (state.category == 'comingSoon') {
+            targetIndex = 1;
+          } else if (state.category == 'popular') {
+            targetIndex = 2;
+          }
+          
+          // Chỉ chuyển tab nếu index khác với index hiện tại và không đang trong quá trình chuyển tab
+          if (_tabController.index != targetIndex && !_tabController.indexIsChanging) {
+            print('🔄 Auto-switching tab: ${_tabController.index} -> $targetIndex (category: ${state.category})');
+            _tabController.animateTo(targetIndex);
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F0F0F),
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              _buildHeader(),
+              _buildSearchBar(),
+              _buildPromoBanner(),
+              _buildMovieCarousel(),
+              _buildTabBar(),
+              _buildMovieGrid(),
+              _buildBottomPromoBanner(),
+            ],
+          ),
         ),
       ),
     );
