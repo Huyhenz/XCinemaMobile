@@ -48,12 +48,12 @@ Cập nhật Firebase Realtime Database Rules trong Firebase Console:
     },
     "bookings": {
       ".read": "auth != null",
-      ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid) && (!newData.exists() || newData.child('userId').val() == auth.uid)",
+      ".write": "auth != null",
       ".indexOn": ["userId", "showtimeId", "status"]
     },
     "notifications": {
       ".read": "auth != null",
-      ".write": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid)",
+      ".write": "auth != null",
       ".indexOn": ["userId", "isRead"]
     },
     "temp_registrations": {

@@ -513,14 +513,35 @@ class DatabaseService {
   //BOOKING
   Future<String> saveBooking(BookingModel booking) async {
     try {
+      // Log để debug
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      print('📝 Saving booking:');
+      print('   - Booking userId: ${booking.userId}');
+      print('   - Current auth userId: $currentUserId');
+      print('   - Match: ${booking.userId == currentUserId}');
+      
+      if (currentUserId == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      if (booking.userId != currentUserId) {
+        throw Exception('Booking userId (${booking.userId}) does not match current user ($currentUserId)');
+      }
+      
       final ref = _db.child('bookings').push();
-      await ref.set(booking.toMap());
+      final bookingData = booking.toMap();
+      print('   - Booking data keys: ${bookingData.keys.toList()}');
+      print('   - Booking userId in data: ${bookingData['userId']}');
+      
+      await ref.set(bookingData);
+      print('✅ Booking saved successfully: ${ref.key}');
       return ref.key!;
     } on FirebaseException catch (e) {
       print('❌ Firebase error saving booking: ${e.code} - ${e.message}');
-      if (e.code == 'PERMISSION_DENIED') {
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('Permission denied') == true) {
         print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép ghi bookings');
         print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+        print('📝 Rule cần: auth != null && (!data.exists() ? newData.child(\'userId\').val() == auth.uid : data.child(\'userId\').val() == auth.uid)');
       }
       rethrow;
     } catch (e) {
@@ -1455,8 +1476,19 @@ class DatabaseService {
     String? bookingId,
   }) async {
     try {
+      // Log để debug
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      print('📝 Creating notification:');
+      print('   - Notification userId: $userId');
+      print('   - Current auth userId: $currentUserId');
+      print('   - Match: ${userId == currentUserId}');
+      
+      if (currentUserId == null) {
+        throw Exception('User not authenticated');
+      }
+      
       final ref = _db.child('notifications').push();
-      await ref.set({
+      final notificationData = {
         'userId': userId,
         'title': title,
         'message': message,
@@ -1464,10 +1496,23 @@ class DatabaseService {
         'bookingId': bookingId,
         'isRead': false,
         'createdAt': ServerValue.timestamp,
-      });
+      };
+      print('   - Notification data keys: ${notificationData.keys.toList()}');
+      print('   - Notification userId in data: ${notificationData['userId']}');
+      
+      await ref.set(notificationData);
+      print('✅ Notification created successfully: ${ref.key}');
       return ref.key!;
+    } on FirebaseException catch (e) {
+      print('❌ Firebase error creating notification: ${e.code} - ${e.message}');
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('Permission denied') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép ghi notifications');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+        print('📝 Rule cần: auth != null');
+      }
+      rethrow;
     } catch (e) {
-      print('Error creating notification: $e');
+      print('❌ Error creating notification: $e');
       rethrow;
     }
   }
