@@ -1,11 +1,13 @@
 // File: lib/screens/booking_screen.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import '../models/showtime.dart';
 import '../models/voucher.dart';
 import '../models/theater.dart';
 import '../services/database_services.dart';
+import '../widgets/auth_guard.dart';
 import 'payment_screen.dart';
 
 class BookingScreen extends StatefulWidget {
@@ -159,7 +161,20 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     }
   }
 
-  void _proceedToPayment() {
+  void _proceedToPayment() async {
+    // Kiểm tra đăng nhập trước khi thanh toán
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Yêu cầu đăng nhập với return path
+      final isAuthenticated = await AuthGuard.requireAuth(
+        context,
+        returnPath: 'booking:${widget.showtimeId}',
+      );
+      if (!isAuthenticated) {
+        return; // Người dùng hủy đăng nhập
+      }
+    }
+
     if (_cinemaId == null || _cinemaId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

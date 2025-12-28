@@ -7,6 +7,7 @@ import 'package:ltdd/widgets/main_wrapper.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/email_verification_screen.dart';
+import 'screens/cinema_selection_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -103,18 +104,9 @@ class AuthChecker extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
-          User? user = snapshot.data;
-          
-          // Kiểm tra nếu chưa verify email thì hiển thị màn hình chờ verify
-          if (user != null && !user.emailVerified) {
-             return EmailVerificationScreen(email: user.email ?? '');
-          }
-          
-          return const MainWrapper();
-        }
-
-        return const LoginScreen();
+        // Cho phép vào app không cần login - luôn hiển thị MainWrapper với bottom navigation
+        // Chỉ yêu cầu login khi đặt vé
+        return const MainWrapper();
       },
     );
   }

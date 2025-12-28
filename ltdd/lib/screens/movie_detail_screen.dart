@@ -10,6 +10,7 @@ import '../models/user.dart';
 import '../services/database_services.dart';
 import '../utils/age_utils.dart';
 import '../widgets/age_restriction_dialog.dart';
+import '../widgets/auth_guard.dart';
 import 'showtimes_screen.dart';
 
 class MovieDetailScreen extends StatefulWidget {
@@ -769,6 +770,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Future<void> _handleBookButton() async {
+    // Kiểm tra authentication trước
+    final isAuthenticated = await AuthGuard.requireAuth(context);
+    if (!isAuthenticated || !mounted) return;
+
     // Kiểm tra độ tuổi nếu phim có age rating
     if (_movie?.ageRating != null && _movie!.ageRating!.isNotEmpty) {
       final requiredAge = AgeUtils.parseAgeRating(_movie!.ageRating);

@@ -7,11 +7,15 @@ import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
 import '../utils/validators.dart';
+import 'booking_screen.dart';
 
 // Không cần import EmailVerificationScreen nữa vì AuthChecker tự lo
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final bool? isLoginMode; // null = tự động, true = đăng nhập, false = đăng ký
+  final String? returnPath; // Đường dẫn quay lại sau khi đăng nhập thành công (ví dụ: 'booking:showtimeId')
+  
+  const LoginScreen({super.key, this.isLoginMode, this.returnPath});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -23,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   DateTime? _selectedDateOfBirth;
-  bool _isRegister = false;
+  late bool _isRegister;
   bool _isLoading = false;
   bool _obscurePassword = true;
   late AnimationController _animationController;
@@ -32,6 +36,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+    // Nếu có isLoginMode từ widget, sử dụng nó, nếu không thì mặc định là false (đăng nhập)
+    _isRegister = widget.isLoginMode == false;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -136,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           await cred.user!.reload();
           final user = FirebaseAuth.instance.currentUser; // Lấy lại instance mới nhất
 
-          if (user != null && user.emailVerified) {
+            if (user != null && user.emailVerified) {
             // --- TRƯỜNG HỢP 1: ĐÃ XÁC THỰC EMAIL ---
             
             // Kiểm tra xem đã có trong DB chưa (Lần đầu verify xong sẽ chưa có)
@@ -183,7 +189,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               print('✅ Đã khởi tạo user trong DB sau khi verify');
             }
             
-            // AuthChecker sẽ tự chuyển vào MainWrapper
+            // Xử lý return path nếu có
+            if (mounted && widget.returnPath != null) {
+              _handleReturnPath(context, widget.returnPath!);
+            } else if (mounted) {
+              // Quay lại màn hình trước
+              Navigator.pop(context, true);
+            }
           } else {
             // --- TRƯỜNG HỢP 2: CHƯA XÁC THỰC ---
             
@@ -258,10 +270,41 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         );
         await DatabaseService().saveUser(user);
       }
+      
+      // Xử lý return path nếu có
+      if (mounted && widget.returnPath != null) {
+        _handleReturnPath(context, widget.returnPath!);
+      } else if (mounted) {
+        // Quay lại màn hình trước
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       _showSnackBar('Lỗi đăng nhập Google: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  void _handleReturnPath(BuildContext context, String returnPath) {
+    // Parse return path: "booking:showtimeId" hoặc các format khác
+    if (returnPath.startsWith('booking:')) {
+      final showtimeId = returnPath.substring(8); // Bỏ "booking:"
+      // Pop login screen trước, sau đó navigate đến booking screen
+      Navigator.pop(context); // Đóng login screen
+      // Sử dụng Future.microtask để đảm bảo pop hoàn tất trước khi push
+      Future.microtask(() {
+        if (context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BookingScreen(showtimeId: showtimeId),
+            ),
+          );
+        }
+      });
+    } else {
+      // Mặc định quay lại
+      Navigator.pop(context, true);
     }
   }
 

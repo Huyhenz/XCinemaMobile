@@ -16,65 +16,230 @@ import '../widgets/loading_widgets.dart';
 import 'user_info_screen.dart';
 import 'notification_screen.dart';
 import 'chatbot_screen.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final userId = FirebaseAuth.instance.currentUser!.uid;
+    // Sử dụng StreamBuilder để lắng nghe thay đổi auth state
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
 
-    return BlocProvider(
-      create: (context) => ProfileBloc()..add(LoadProfile(userId)),
-      child: Scaffold(
+        // Nếu chưa đăng nhập, hiển thị màn hình đăng nhập/đăng ký
+        if (user == null) {
+      return Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
-        body: BlocBuilder<ProfileBloc, ProfileState>(
-          builder: (context, state) {
-            if (state.isLoading && state.user == null) {
-              return const AppLoadingIndicator(message: 'Đang tải thông tin...');
-            }
-
-            if (state.error != null) {
-              return EmptyState(
-                icon: Icons.error_outline,
-                title: 'Có lỗi xảy ra',
-                subtitle: state.error,
-                action: ElevatedButton(
-                  onPressed: () {
-                    final userId = FirebaseAuth.instance.currentUser!.uid;
-                    context.read<ProfileBloc>().add(RefreshProfile(userId));
-                  },
-                  child: const Text('Thử lại'),
-                ),
-              );
-            }
-
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<ProfileBloc>().add(RefreshProfile(userId));
-              },
-              color: const Color(0xFFE50914),
-              backgroundColor: const Color(0xFF1A1A1A),
-              child: SafeArea(
-                child: CustomScrollView(
-                  slivers: [
-                    _buildHeader(),
-                    SliverToBoxAdapter(
-                      child: Column(
-                        children: [
-                          _buildProfileHeader(state),
-                          _buildStatsCards(state),
-                          _buildMenuSection(context),
-                          _buildBookingHistory(state, context),
-                          const SizedBox(height: 100),
-                        ],
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              _buildHeader(),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 40),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE50914).withOpacity(0.5),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.person_outline,
+                          size: 60,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Chào mừng bạn đến với Cinema',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Đăng nhập hoặc đăng ký để xem thông tin cá nhân và lịch sử đặt vé',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 40),
+                      _buildLoginButton(context),
+                      const SizedBox(height: 16),
+                      _buildRegisterButton(context),
+                    ],
+                  ),
                 ),
               ),
-            );
-          },
+            ],
+          ),
+        ),
+      );
+        }
+
+        // Nếu đã đăng nhập, hiển thị profile bình thường
+        final userId = user.uid;
+        return BlocProvider(
+          create: (context) => ProfileBloc()..add(LoadProfile(userId)),
+          child: Scaffold(
+            backgroundColor: const Color(0xFF0F0F0F),
+            body: BlocBuilder<ProfileBloc, ProfileState>(
+              builder: (context, state) {
+                if (state.isLoading && state.user == null) {
+                  return const AppLoadingIndicator(message: 'Đang tải thông tin...');
+                }
+
+                if (state.error != null) {
+                  return EmptyState(
+                    icon: Icons.error_outline,
+                    title: 'Có lỗi xảy ra',
+                    subtitle: state.error,
+                    action: ElevatedButton(
+                      onPressed: () {
+                        final userId = FirebaseAuth.instance.currentUser!.uid;
+                        context.read<ProfileBloc>().add(RefreshProfile(userId));
+                      },
+                      child: const Text('Thử lại'),
+                    ),
+                  );
+                }
+
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    context.read<ProfileBloc>().add(RefreshProfile(userId));
+                  },
+                  color: const Color(0xFFE50914),
+                  backgroundColor: const Color(0xFF1A1A1A),
+                  child: SafeArea(
+                    child: CustomScrollView(
+                      slivers: [
+                        _buildHeader(),
+                        SliverToBoxAdapter(
+                          child: Column(
+                            children: [
+                              _buildProfileHeader(state),
+                              _buildStatsCards(state),
+                              _buildMenuSection(context),
+                              _buildBookingHistory(state, context),
+                              const SizedBox(height: 100),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoginButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE50914), Color(0xFFB20710)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.5),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoginScreen(isLoginMode: true),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text(
+          'ĐĂNG NHẬP',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegisterButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF3A3A3A),
+          width: 1,
+        ),
+      ),
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LoginScreen(isLoginMode: false),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text(
+          'ĐĂNG KÝ',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 2,
+          ),
         ),
       ),
     );

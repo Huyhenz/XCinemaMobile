@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ltdd/models/user.dart';
 import 'package:ltdd/screens/admin_dashboard_screen.dart';
 import 'package:ltdd/screens/profile_screen.dart';
-import 'package:ltdd/screens/cinema_selection_screen.dart';
+import 'package:ltdd/screens/home_screen.dart';
+import 'package:ltdd/blocs/movies/movies_bloc.dart';
 import 'package:ltdd/services/database_services.dart';
 
 
@@ -20,12 +22,18 @@ class _MainWrapperState extends State<MainWrapper> {
   bool _isLoading = true;
 
   final List<Widget> _screens = [
-    const CinemaSelectionScreen(), // Bắt đầu từ màn hình chọn rạp
+    BlocProvider(
+      create: (context) => MovieBloc(),
+      child: const HomeScreen(),
+    ),
     const ProfileScreen(),
   ];
 
   final List<Widget> _adminScreens = [
-    const CinemaSelectionScreen(), // Bắt đầu từ màn hình chọn rạp
+    BlocProvider(
+      create: (context) => MovieBloc(),
+      child: const HomeScreen(),
+    ),
     const AdminDashboardScreen(),
     const ProfileScreen(),
   ];
@@ -34,18 +42,35 @@ class _MainWrapperState extends State<MainWrapper> {
   void initState() {
     super.initState();
     _checkUserRole();
+    // Lắng nghe thay đổi auth state để update admin role
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      _checkUserRole();
+    });
   }
 
   Future<void> _checkUserRole() async {
     try {
-      String userId = FirebaseAuth.instance.currentUser!.uid;
-      UserModel? user = await DatabaseService().getUser(userId);
-      setState(() {
-        _isAdmin = user?.role == 'admin';
-        _isLoading = false;
-      });
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        UserModel? userModel = await DatabaseService().getUser(user.uid);
+        if (mounted) {
+          setState(() {
+            _isAdmin = userModel?.role == 'admin';
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isAdmin = false;
+            _isLoading = false;
+          });
+        }
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

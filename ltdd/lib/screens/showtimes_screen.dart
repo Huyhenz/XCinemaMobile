@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/showtime.dart';
 import '../models/cinema.dart';
 import '../services/database_services.dart';
+import '../widgets/auth_guard.dart';
 import 'booking_screen.dart';
 
 class ShowtimesScreen extends StatefulWidget {
@@ -329,13 +330,20 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                // Check authentication before booking, truyền return path
+                final isAuthenticated = await AuthGuard.requireAuth(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => BookingScreen(showtimeId: showtime.id),
-                  ),
+                  returnPath: 'booking:${showtime.id}',
                 );
+                if (isAuthenticated && mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BookingScreen(showtimeId: showtime.id),
+                    ),
+                  );
+                }
               },
               child: Padding(
                 padding: const EdgeInsets.all(16),

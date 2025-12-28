@@ -11,10 +11,11 @@ import '../models/movie.dart';
 import '../services/database_services.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
+import '../models/cinema.dart';
 import 'movie_detail_screen.dart';
-import 'cinema_selection_screen.dart';
 import 'chatbot_screen.dart';
 import 'notification_screen.dart';
+import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? selectedCinemaId; // ID của rạp đã chọn
@@ -30,24 +31,104 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Timer? _searchDebounce;
   int _unreadNotificationCount = 0;
   Timer? _notificationRefreshTimer;
+  PageController? _carouselController;
+  Timer? _carouselTimer;
+  int _currentCarouselIndex = 0;
+  CinemaModel? _selectedCinema;
+  List<CinemaModel> _allCinemas = [];
+  bool _moviesLoaded = false;
+  bool _cinemasLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
-    // Load movies with filter directly (only 1 load)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Load with default filter (nowShowing - tab 0)
-      context.read<MovieBloc>().add(
-        FilterMoviesByCategory('nowShowing', cinemaId: widget.selectedCinemaId),
-      );
-      // Load notification count
+    _loadAllCinemas();
+    if (widget.selectedCinemaId != null) {
+      _loadSelectedCinema();
+    }
+    // Load notification count
+    _loadNotificationCount();
+    // Refresh notification count every 30 seconds
+    _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadNotificationCount();
-      // Refresh notification count every 30 seconds
-      _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        _loadNotificationCount();
-      });
+    });
+  }
+
+  Future<void> _loadAllCinemas() async {
+    try {
+      final cinemas = await DatabaseService().getAllCinemas();
+      if (mounted) {
+        setState(() {
+          _allCinemas = cinemas;
+          _cinemasLoaded = true;
+          // Nếu có selectedCinemaId từ widget, tìm và set
+          if (widget.selectedCinemaId != null && _selectedCinema == null) {
+            _selectedCinema = cinemas.firstWhere(
+              (c) => c.id == widget.selectedCinemaId,
+              orElse: () => cinemas.isNotEmpty ? cinemas.first : null!,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading cinemas: $e');
+      if (mounted) {
+        setState(() {
+          _cinemasLoaded = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSelectedCinema() async {
+    if (widget.selectedCinemaId != null) {
+      try {
+        final cinema = await DatabaseService().getCinema(widget.selectedCinemaId!);
+        if (mounted) {
+          setState(() {
+            _selectedCinema = cinema;
+          });
+        }
+      } catch (e) {
+        print('Error loading cinema: $e');
+      }
+    }
+  }
+
+  void _onCinemaChanged(CinemaModel? cinema) {
+    setState(() {
+      _selectedCinema = cinema;
+      // Không reset _moviesLoaded - vẫn giữ danh sách phim hiện tại
+      // Chỉ lưu rạp đã chọn để dùng khi đặt vé
+    });
+    
+    // Không reload movies khi chọn rạp - vẫn hiển thị tất cả phim
+    // Rạp chỉ dùng để filter khi đặt vé
+  }
+
+  // Carousel initialization is now handled in _buildMovieCarousel()
+
+  void _startCarouselAutoScroll() {
+    _carouselTimer?.cancel();
+    _carouselTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_carouselController != null && _carouselController!.hasClients && mounted) {
+        try {
+          final state = context.read<MovieBloc>().state;
+          if (state.movies.isNotEmpty) {
+            final nextPage = (_currentCarouselIndex + 1) % state.movies.length;
+            _carouselController!.animateToPage(
+              nextPage,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+          }
+        } catch (e) {
+          // MovieBloc not available, stop timer
+          timer.cancel();
+        }
+      }
     });
   }
 
@@ -83,11 +164,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           category = 'popular';
           break;
       }
-      // Always use cinemaId from widget (current cinema selection)
-      // This ensures we always filter by the correct cinema
-      context.read<MovieBloc>().add(
-        FilterMoviesByCategory(category, cinemaId: widget.selectedCinemaId),
-      );
+      // Load tất cả phim, không filter theo rạp
+      try {
+        context.read<MovieBloc>().add(
+          FilterMoviesByCategory(category, cinemaId: null), // Luôn null để load tất cả phim
+        );
+      } catch (e) {
+        print('Error accessing MovieBloc in _onTabChanged: $e');
+      }
+      // Carousel will auto-update via BlocBuilder when movies change
     }
   }
 
@@ -98,6 +183,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _searchController.dispose();
     _searchDebounce?.cancel();
     _notificationRefreshTimer?.cancel();
+    _carouselTimer?.cancel();
+    _carouselController?.dispose();
     super.dispose();
   }
 
@@ -113,6 +200,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    // Load movies when build is called (MovieBloc is guaranteed to be available)
+    // Only load once
+    if (!_moviesLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          try {
+            // Load with default filter (nowShowing - tab 0), không filter theo rạp
+            context.read<MovieBloc>().add(
+              FilterMoviesByCategory('nowShowing', cinemaId: null), // Luôn null để load tất cả phim
+            );
+            _moviesLoaded = true;
+          } catch (e) {
+            print('Error accessing MovieBloc: $e');
+          }
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       body: SafeArea(
@@ -120,8 +225,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           slivers: [
             _buildHeader(),
             _buildSearchBar(),
+            _buildPromoBanner(),
+            _buildMovieCarousel(),
             _buildTabBar(),
             _buildMovieGrid(),
+            _buildBottomPromoBanner(),
           ],
         ),
       ),
@@ -132,28 +240,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Nút quay lại chọn rạp
-                Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF2A2A2A)),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    tooltip: 'Chọn lại rạp',
-                    onPressed: () {
-                      // Quay lại CinemaSelectionScreen (MainWrapper)
-                      Navigator.pop(context);
-                    },
-                  ),
-                ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
@@ -179,10 +270,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
-              ],
-            ),
-            Row(
-              children: [
+                Row(
+                  children: [
                 // Chatbot button
                 GestureDetector(
                   onTap: () {
@@ -206,57 +295,155 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
-                // Notification button
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                    ).then((_) {
-                      // Reload notification count when returning from notification screen
-                      _loadNotificationCount();
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF2A2A2A)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.notifications_outlined,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        if (_unreadNotificationCount > 0) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE50914),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                // Notification button - chỉ hiển thị nếu đã đăng nhập
+                if (FirebaseAuth.instance.currentUser != null)
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                      ).then((_) {
+                        _loadNotificationCount();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.notifications_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          if (_unreadNotificationCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE50914),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
+                  ],
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            // Cinema selector dropdown
+            _buildCinemaSelector(),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCinemaSelector() {
+    if (!_cinemasLoaded) {
+      return const SizedBox.shrink();
+    }
+
+    if (_allCinemas.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.theaters_outlined, color: Colors.grey, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Chưa có rạp chiếu',
+                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<CinemaModel?>(
+          value: _selectedCinema,
+          isExpanded: true,
+          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFFE50914)),
+          dropdownColor: const Color(0xFF1A1A1A),
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          hint: Row(
+            children: [
+              const Icon(Icons.location_on, color: Color(0xFFE50914), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Tất cả rạp',
+                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              ),
+            ],
+          ),
+          items: [
+            // Option "Tất cả rạp"
+            DropdownMenuItem<CinemaModel?>(
+              value: null,
+              child: Row(
+                children: [
+                  const Icon(Icons.theaters, color: Color(0xFFE50914), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tất cả rạp',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+            // Các rạp
+            ..._allCinemas.map((cinema) {
+              return DropdownMenuItem<CinemaModel?>(
+                value: cinema,
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Color(0xFFE50914), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        cinema.name,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+          onChanged: _onCinemaChanged,
         ),
       ),
     );
@@ -419,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           MaterialPageRoute(
             builder: (context) => MovieDetailScreen(
               movieId: movie.id,
-              cinemaId: widget.selectedCinemaId,
+              cinemaId: _selectedCinema?.id,
             ),
           ),
         );
@@ -535,5 +722,325 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
+
+  Widget _buildPromoBanner() {
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        height: 120,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF6B9D), Color(0xFFC44569)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF6B9D).withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFFF6B9D).withOpacity(0.8),
+                        const Color(0xFFC44569).withOpacity(0.9),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'ƯU ĐÃI ĐẶC BIỆT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Giá vé chỉ từ 50.000₫',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Áp dụng cho tất cả phim',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.local_offer,
+                    color: Colors.white,
+                    size: 60,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMovieCarousel() {
+    return BlocBuilder<MovieBloc, MovieState>(
+      builder: (context, state) {
+        // Initialize carousel controller if needed
+        if (state.movies.isNotEmpty && _carouselController == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _carouselController = PageController(initialPage: 0);
+              });
+              _startCarouselAutoScroll();
+            }
+          });
+        }
+
+        if (state.movies.isEmpty || _carouselController == null) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        // Filter movies for carousel (top 5 movies)
+        final carouselMovies = state.movies.take(5).toList();
+        if (carouselMovies.isEmpty) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        return SliverToBoxAdapter(
+          child: Column(
+            children: [
+              SizedBox(
+                height: 350,
+                child: PageView.builder(
+                  controller: _carouselController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentCarouselIndex = index;
+                    });
+                  },
+                  itemCount: carouselMovies.length,
+                  itemBuilder: (context, index) {
+                    final movie = carouselMovies[index];
+                    return _buildCarouselItem(movie);
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              SmoothPageIndicator(
+                controller: _carouselController!,
+                count: carouselMovies.length,
+                effect: const WormEffect(
+                  activeDotColor: Color(0xFFE50914),
+                  dotColor: Color(0xFF2A2A2A),
+                  dotHeight: 8,
+                  dotWidth: 8,
+                  spacing: 8,
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCarouselItem(MovieModel movie) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MovieDetailScreen(
+              movieId: movie.id,
+              cinemaId: _selectedCinema?.id,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: movie.posterUrl,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.grey[800],
+                  child: const Icon(Icons.movie, size: 50, color: Colors.grey),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.9),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        movie.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (movie.ageRating != null && movie.ageRating!.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE50914),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                movie.ageRating!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          if (movie.ageRating != null && movie.ageRating!.isNotEmpty)
+                            const SizedBox(width: 12),
+                          const Icon(Icons.access_time, color: Colors.white70, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${movie.duration} phút',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomPromoBanner() {
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4A90E2).withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TẶNG NGAY 30.000₫',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Khi mua combo bắp nước',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.card_giftcard,
+              color: Colors.white,
+              size: 50,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
 }
