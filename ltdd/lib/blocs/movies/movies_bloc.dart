@@ -137,21 +137,31 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         }
       }
       
-      // Apply search query if exists
-      if (state.searchQuery != null && state.searchQuery!.isNotEmpty) {
-        final lowerQuery = state.searchQuery!.toLowerCase().trim();
+      // Apply search query if exists (chỉ khi searchQuery không rỗng sau khi trim)
+      // Lưu searchQuery hiện tại để check
+      final currentSearchQuery = state.searchQuery;
+      if (currentSearchQuery != null && 
+          currentSearchQuery.isNotEmpty && 
+          currentSearchQuery.trim().isNotEmpty) {
+        final lowerQuery = currentSearchQuery.toLowerCase().trim();
         filteredMovies = filteredMovies.where((movie) {
           return movie.title.toLowerCase().contains(lowerQuery) ||
                  movie.genre.toLowerCase().contains(lowerQuery);
         }).toList();
+        print('🎬 FilterMoviesByCategory: Applied search query "$currentSearchQuery", filtered to ${filteredMovies.length} movies');
+      } else {
+        print('🎬 FilterMoviesByCategory: No search query, showing all ${filteredMovies.length} movies');
       }
       
+      // Khi FilterMoviesByCategory được gọi, clear searchQuery để đảm bảo reload đúng
+      // (trừ khi đang trong quá trình search)
       emit(state.copyWith(
         movies: filteredMovies,
         category: event.category,
         isLoading: false,
         cinemaId: cinemaId, // Update cinemaId in state if provided in event
         allMovies: filteredMovies, // Also update allMovies for consistency
+        clearSearchQuery: true, // Clear searchQuery khi reload phim
       ));
       
       print('🎬 FilterMoviesByCategory: Emitted ${filteredMovies.length} movies for cinema $cinemaId');

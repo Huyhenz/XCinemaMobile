@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<CinemaModel> _allCinemas = [];
   bool _moviesLoaded = false;
   bool _cinemasLoaded = false;
+  List<MovieModel> _carouselMovies = []; // Danh sách phim cho carousel (đang chiếu + sắp chiếu)
   
   @override
   bool get wantKeepAlive => false; // Không giữ state, rebuild mỗi lần vào tab
@@ -118,9 +119,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _carouselTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_carouselController != null && _carouselController!.hasClients && mounted) {
         try {
-          final state = context.read<MovieBloc>().state;
-          if (state.movies.isNotEmpty) {
-            final nextPage = (_currentCarouselIndex + 1) % state.movies.length;
+          if (_carouselMovies.isNotEmpty) {
+            final nextPage = (_currentCarouselIndex + 1) % _carouselMovies.length;
             _carouselController!.animateToPage(
               nextPage,
               duration: const Duration(milliseconds: 500),
@@ -128,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             );
           }
         } catch (e) {
-          // MovieBloc not available, stop timer
+          // Error, stop timer
           timer.cancel();
         }
       }
@@ -196,7 +196,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
       if (mounted) {
-        context.read<MovieBloc>().add(SearchMovies(value));
+        if (value.isEmpty || value.trim().isEmpty) {
+          // Nếu xóa từ khóa, reload lại phim theo tab hiện tại
+          // Không cần gọi SearchMovies('') trước, chỉ cần gọi FilterMoviesByCategory
+          // FilterMoviesByCategory sẽ tự động clear searchQuery
+          String category = 'nowShowing';
+          switch (_tabController.index) {
+            case 0:
+              category = 'nowShowing';
+              break;
+            case 1:
+              category = 'comingSoon';
+              break;
+            case 2:
+              category = 'popular';
+              break;
+          }
+          // Reload carousel movies khi xóa search
+          _carouselMovies = [];
+          // Gọi FilterMoviesByCategory để reload lại tất cả phim
+          // Bloc sẽ tự động clear searchQuery và reload phim theo category
+          context.read<MovieBloc>().add(
+            FilterMoviesByCategory(category, cinemaId: null),
+          );
+        } else {
+          context.read<MovieBloc>().add(SearchMovies(value));
+        }
       }
     });
   }
@@ -497,7 +522,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         setState(() {
                           _searchController.clear();
                         });
-                        context.read<MovieBloc>().add(SearchMovies(''));
+                        // Reload lại phim theo tab hiện tại khi xóa search
+                        // Không cần gọi SearchMovies('') trước, chỉ cần gọi FilterMoviesByCategory
+                        // FilterMoviesByCategory sẽ tự động clear searchQuery
+                        String category = 'nowShowing';
+                        switch (_tabController.index) {
+                          case 0:
+                            category = 'nowShowing';
+                            break;
+                          case 1:
+                            category = 'comingSoon';
+                            break;
+                          case 2:
+                            category = 'popular';
+                            break;
+                        }
+                        // Reload carousel movies khi xóa search
+                        _carouselMovies = [];
+                        // Gọi FilterMoviesByCategory để reload lại tất cả phim
+                        // Bloc sẽ tự động clear searchQuery và reload phim theo category
+                        context.read<MovieBloc>().add(
+                          FilterMoviesByCategory(category, cinemaId: null),
+                        );
                       },
                     )
                   : null,
@@ -828,8 +874,61 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildMovieCarousel() {
     return BlocBuilder<MovieBloc, MovieState>(
       builder: (context, state) {
-        // Initialize carousel controller if needed
-        if (state.movies.isNotEmpty && _carouselController == null) {
+        // Chỉ hiển thị carousel khi không có search query
+        if (state.searchQuery != null && state.searchQuery!.isNotEmpty) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        // Load carousel movies (đang chiếu + sắp chiếu) nếu chưa có
+        if (_carouselMovies.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (mounted) {
+              try {
+                // Load cả phim đang chiếu và sắp chiếu
+                final nowShowing = await DatabaseService().getMoviesShowingToday(cinemaId: null);
+                final comingSoon = await DatabaseService().getMoviesComingSoon(cinemaId: null);
+                
+                // Kết hợp và loại bỏ trùng lặp
+                final allCarouselMovies = <MovieModel>[];
+                final seenIds = <String>{};
+                
+                for (var movie in nowShowing) {
+                  if (!seenIds.contains(movie.id)) {
+                    allCarouselMovies.add(movie);
+                    seenIds.add(movie.id);
+                  }
+                }
+                
+                for (var movie in comingSoon) {
+                  if (!seenIds.contains(movie.id)) {
+                    allCarouselMovies.add(movie);
+                    seenIds.add(movie.id);
+                  }
+                }
+                
+                // Lấy top 5 phim đầu tiên
+                if (mounted) {
+                  setState(() {
+                    _carouselMovies = allCarouselMovies.take(5).toList();
+                  });
+                  
+                  // Initialize carousel controller nếu chưa có
+                  if (_carouselMovies.isNotEmpty && _carouselController == null) {
+                    setState(() {
+                      _carouselController = PageController(initialPage: 0);
+                    });
+                    _startCarouselAutoScroll();
+                  }
+                }
+              } catch (e) {
+                print('Error loading carousel movies: $e');
+              }
+            }
+          });
+        }
+
+        // Initialize carousel controller nếu chưa có
+        if (_carouselMovies.isNotEmpty && _carouselController == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               setState(() {
@@ -840,13 +939,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           });
         }
 
-        if (state.movies.isEmpty || _carouselController == null) {
-          return const SliverToBoxAdapter(child: SizedBox.shrink());
-        }
-
-        // Filter movies for carousel (top 5 movies)
-        final carouselMovies = state.movies.take(5).toList();
-        if (carouselMovies.isEmpty) {
+        if (_carouselMovies.isEmpty || _carouselController == null) {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
         }
 
@@ -862,9 +955,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       _currentCarouselIndex = index;
                     });
                   },
-                  itemCount: carouselMovies.length,
+                  itemCount: _carouselMovies.length,
                   itemBuilder: (context, index) {
-                    final movie = carouselMovies[index];
+                    final movie = _carouselMovies[index];
                     return _buildCarouselItem(movie);
                   },
                 ),
@@ -872,7 +965,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               const SizedBox(height: 12),
               SmoothPageIndicator(
                 controller: _carouselController!,
-                count: carouselMovies.length,
+                count: _carouselMovies.length,
                 effect: const WormEffect(
                   activeDotColor: Color(0xFFE50914),
                   dotColor: Color(0xFF2A2A2A),

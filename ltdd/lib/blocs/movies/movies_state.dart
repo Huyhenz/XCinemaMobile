@@ -24,6 +24,7 @@ class MovieState {
     List<MovieModel>? allMovies,
     List<MovieModel>? movies,
     String? searchQuery,
+    bool clearSearchQuery = false, // Flag để clear searchQuery
     String? category,
     bool? isLoading,
     String? cinemaId,
@@ -31,7 +32,7 @@ class MovieState {
     return MovieState(
       allMovies: allMovies ?? this.allMovies,
       movies: movies ?? this.movies,
-      searchQuery: searchQuery ?? this.searchQuery,
+      searchQuery: clearSearchQuery ? null : (searchQuery ?? this.searchQuery),
       category: category ?? this.category,
       isLoading: isLoading ?? this.isLoading,
       cinemaId: cinemaId ?? this.cinemaId,
