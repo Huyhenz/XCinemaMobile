@@ -18,7 +18,7 @@ import 'notification_screen.dart';
 import 'chatbot_screen.dart';
 import 'login_screen.dart';
 import 'redeem_voucher_screen.dart';
-import 'random_voucher_screen.dart';
+import 'get_voucher_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -464,11 +464,11 @@ class ProfileScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const RandomVoucherScreen(),
+                      builder: (context) => const GetVoucherScreen(),
                     ),
                   );
                 },
-                icon: const Icon(Icons.shuffle, size: 18),
+                icon: const Icon(Icons.card_giftcard, size: 18),
                 label: const Text('Nhận Voucher'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFFE50914),

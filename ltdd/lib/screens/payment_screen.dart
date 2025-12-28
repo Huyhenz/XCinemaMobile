@@ -55,6 +55,8 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   List<Map<String, dynamic>> _userVouchers = [];
   double _discount = 0.0;
   double _finalPrice = 0.0;
+  String? _appliedVoucherName; // Tên voucher đã áp dụng
+  String? _discountType; // 'percent' hoặc 'fixed' để hiển thị
 
   @override
   void initState() {
@@ -190,6 +192,10 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     } else if (_voucherCode != null && _voucherCode!.isNotEmpty) {
       // Nếu không có voucher từ dropdown, thử load từ mã
       voucher = await DatabaseService().getVoucher(_voucherCode!);
+      // Lưu voucher đã load để hiển thị sau này
+      if (voucher != null) {
+        _selectedVoucher = voucher;
+      }
     }
 
     if (voucher == null) {
@@ -227,13 +233,19 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     setState(() {
       double basePrice = widget.totalPrice;
       if (voucher!.type == 'percent') {
+        // Giảm theo phần trăm
         _discount = basePrice * (voucher.discount / 100);
+        _discountType = 'percent';
       } else {
+        // Giảm theo số tiền cố định
         _discount = voucher.discount;
+        _discountType = 'fixed';
       }
       _voucherCode = voucher.id; // Lưu mã voucher
+      _appliedVoucherName = voucher.id; // Lưu tên voucher để hiển thị
+      _selectedVoucher = voucher; // Lưu voucher đã chọn để hiển thị thông tin
       _finalPrice = basePrice - _discount;
-      if (_finalPrice < 0) _finalPrice = 0;
+      if (_finalPrice < 0) _finalPrice = 0; // Đảm bảo giá không âm
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -557,8 +569,61 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           ),
           const SizedBox(height: 20),
           _buildSummaryRow('Tổng tiền', '${NumberFormat('#,###', 'vi_VN').format(widget.totalPrice)}đ'),
-          if (_discount > 0) ...[
-            _buildSummaryRow('Giảm giá', '-${NumberFormat('#,###', 'vi_VN').format(_discount)}đ'),
+          if (_discount > 0 && _appliedVoucherName != null) ...[
+            // Hiển thị thông tin giảm giá với voucher
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF4CAF50).withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.card_giftcard,
+                        color: Color(0xFF4CAF50),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Giảm giá (Voucher: $_appliedVoucherName)',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _discountType == 'percent'
+                            ? '-${_selectedVoucher?.discount.toStringAsFixed(0) ?? (_discount / widget.totalPrice * 100).toStringAsFixed(0)}%'
+                            : '-${NumberFormat('#,###', 'vi_VN').format(_discount)}đ',
+                        style: const TextStyle(
+                          color: Color(0xFF4CAF50),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tiết kiệm: ${NumberFormat('#,###', 'vi_VN').format(_discount)}đ',
+                    style: const TextStyle(
+                      color: Color(0xFF4CAF50),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
           const Divider(color: Color(0xFF2A2A2A), height: 32),
           Row(
@@ -634,6 +699,15 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                   _selectedVoucher = value;
                   if (value != null) {
                     _voucherCode = value.id;
+                    // Tự động áp dụng voucher khi chọn từ dropdown
+                    _applyVoucher();
+                  } else {
+                    // Reset voucher khi bỏ chọn
+                    _discount = 0.0;
+                    _finalPrice = widget.totalPrice;
+                    _appliedVoucherName = null;
+                    _discountType = null;
+                    _voucherCode = null;
                   }
                 });
               },
@@ -656,8 +730,17 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               Expanded(
                 child: TextField(
                   onChanged: (value) {
-                    _voucherCode = value;
-                    _selectedVoucher = null; // Clear selection khi nhập mã
+                    setState(() {
+                      _voucherCode = value;
+                      _selectedVoucher = null; // Clear selection khi nhập mã
+                      // Reset discount khi thay đổi mã
+                      if (value.isEmpty) {
+                        _discount = 0.0;
+                        _finalPrice = widget.totalPrice;
+                        _appliedVoucherName = null;
+                        _discountType = null;
+                      }
+                    });
                   },
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
@@ -681,24 +764,71 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               ),
             ],
           ),
-          // Hiển thị discount nếu đã áp dụng
-          if (_discount > 0) ...[
+          // Hiển thị thông báo voucher đã áp dụng
+          if (_discount > 0 && _appliedVoucherName != null) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFF4CAF50).withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF4CAF50).withOpacity(0.5),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle, color: Color(0xFF4CAF50)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Đã giảm: ${NumberFormat('#,###', 'vi_VN').format(_discount)}đ',
-                    style: const TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontWeight: FontWeight.bold,
+                  const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đã áp dụng voucher: $_appliedVoucherName',
+                          style: const TextStyle(
+                            color: Color(0xFF4CAF50),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _discountType == 'percent'
+                              ? 'Giảm ${_selectedVoucher?.discount.toStringAsFixed(0) ?? (_discount / widget.totalPrice * 100).toStringAsFixed(0)}% - Tiết kiệm: ${NumberFormat('#,###', 'vi_VN').format(_discount)}đ'
+                              : 'Giảm ${NumberFormat('#,###', 'vi_VN').format(_discount)}đ',
+                          style: TextStyle(
+                            color: Colors.grey[300],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // Xóa voucher đã áp dụng
+                      setState(() {
+                        _discount = 0.0;
+                        _finalPrice = widget.totalPrice;
+                        _appliedVoucherName = null;
+                        _discountType = null;
+                        _voucherCode = null;
+                        _selectedVoucher = null;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã xóa voucher'),
+                          backgroundColor: Color(0xFF4CAF50),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Xóa',
+                      style: TextStyle(
+                        color: Color(0xFFE50914),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],

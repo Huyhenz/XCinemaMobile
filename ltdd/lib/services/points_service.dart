@@ -61,6 +61,11 @@ class PointsService {
     }
   }
 
+  // Public method to add points (for tasks, minigames, etc.)
+  Future<void> addPoints(String userId, int points, String reason) async {
+    await _addPoints(userId, points, reason);
+  }
+
   // Trừ điểm khi đổi voucher
   Future<void> deductPoints(String userId, int points) async {
     try {
