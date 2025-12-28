@@ -25,7 +25,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -38,6 +38,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<CinemaModel> _allCinemas = [];
   bool _moviesLoaded = false;
   bool _cinemasLoaded = false;
+  
+  @override
+  bool get wantKeepAlive => false; // Không giữ state, rebuild mỗi lần vào tab
 
   @override
   void initState() {
@@ -200,23 +203,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    // Load movies when build is called (MovieBloc is guaranteed to be available)
-    // Only load once
-    if (!_moviesLoaded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          try {
-            // Load with default filter (nowShowing - tab 0), không filter theo rạp
-            context.read<MovieBloc>().add(
-              FilterMoviesByCategory('nowShowing', cinemaId: null), // Luôn null để load tất cả phim
-            );
-            _moviesLoaded = true;
-          } catch (e) {
-            print('Error accessing MovieBloc: $e');
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
+    // Load movies mỗi khi vào trang chủ (MovieBloc is guaranteed to be available)
+    // Reset flag để load lại mỗi lần widget được rebuild
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        try {
+          // Load với tab hiện tại, không filter theo rạp
+          String category = 'nowShowing';
+          switch (_tabController.index) {
+            case 0:
+              category = 'nowShowing';
+              break;
+            case 1:
+              category = 'comingSoon';
+              break;
+            case 2:
+              category = 'popular';
+              break;
           }
+          context.read<MovieBloc>().add(
+            FilterMoviesByCategory(category, cinemaId: null), // Luôn null để load tất cả phim
+          );
+          // Không set _moviesLoaded = true để luôn load lại mỗi lần vào tab
+        } catch (e) {
+          print('Error accessing MovieBloc: $e');
         }
-      });
-    }
+      }
+    });
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),

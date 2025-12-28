@@ -51,12 +51,18 @@ class _MainWrapperState extends State<MainWrapper> {
   Future<void> _checkUserRole() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
+      final bool wasAdmin = _isAdmin;
+      
       if (user != null) {
         UserModel? userModel = await DatabaseService().getUser(user.uid);
         if (mounted) {
           setState(() {
             _isAdmin = userModel?.role == 'admin';
             _isLoading = false;
+            // Nếu admin status thay đổi, reset về tab đầu tiên để tránh lỗi index out of range
+            if (wasAdmin != _isAdmin) {
+              _currentIndex = 0;
+            }
           });
         }
       } else {
@@ -64,12 +70,21 @@ class _MainWrapperState extends State<MainWrapper> {
           setState(() {
             _isAdmin = false;
             _isLoading = false;
+            // Khi đăng xuất, reset về tab đầu tiên
+            _currentIndex = 0;
           });
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          // Đảm bảo index luôn hợp lệ
+          final maxIndex = (_isAdmin ? _adminScreens : _screens).length - 1;
+          if (_currentIndex > maxIndex) {
+            _currentIndex = 0;
+          }
+        });
       }
     }
   }
@@ -85,10 +100,15 @@ class _MainWrapperState extends State<MainWrapper> {
       );
     }
 
+    // Đảm bảo _currentIndex luôn hợp lệ
+    final currentScreens = _isAdmin ? _adminScreens : _screens;
+    final maxIndex = currentScreens.length - 1;
+    final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
+
     return Scaffold(
       body: IndexedStack(
-        index: _currentIndex,
-        children: _isAdmin ? _adminScreens : _screens,
+        index: safeIndex,
+        children: currentScreens,
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );

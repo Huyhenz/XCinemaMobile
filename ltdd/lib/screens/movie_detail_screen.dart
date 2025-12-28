@@ -7,6 +7,7 @@ import '../models/movie.dart';
 import '../models/movie_rating.dart';
 import '../models/movie_comment.dart';
 import '../models/user.dart';
+import '../models/cinema.dart';
 import '../services/database_services.dart';
 import '../utils/age_utils.dart';
 import '../widgets/age_restriction_dialog.dart';
@@ -818,6 +819,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
     }
     
+    // Kiểm tra xem đã chọn rạp chưa
+    String? selectedCinemaId = widget.cinemaId;
+    
+    // Nếu chưa chọn rạp, hiển thị dialog chọn rạp
+    if (selectedCinemaId == null || selectedCinemaId.isEmpty) {
+      selectedCinemaId = await _showCinemaSelectionDialog();
+      if (selectedCinemaId == null || !mounted) {
+        // User đã hủy chọn rạp
+        return;
+      }
+    }
+    
     // Điều hướng đến màn hình chọn lịch chiếu
     if (mounted) {
       Navigator.push(
@@ -825,10 +838,50 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         MaterialPageRoute(
           builder: (context) => ShowtimesScreen(
             movieId: widget.movieId,
-            cinemaId: widget.cinemaId,
+            cinemaId: selectedCinemaId,
           ),
         ),
       );
+    }
+  }
+
+  Future<String?> _showCinemaSelectionDialog() async {
+    try {
+      // Load danh sách rạp
+      final cinemas = await DatabaseService().getAllCinemas();
+      
+      if (cinemas.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Hiện chưa có rạp chiếu nào. Vui lòng thử lại sau.'),
+              backgroundColor: Color(0xFFE50914),
+            ),
+          );
+        }
+        return null;
+      }
+
+      // Hiển thị bottom sheet để chọn rạp
+      return await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) => _CinemaSelectionBottomSheet(cinemas: cinemas),
+      );
+    } catch (e) {
+      print('Error loading cinemas: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải danh sách rạp: ${e.toString()}'),
+            backgroundColor: const Color(0xFFE50914),
+          ),
+        );
+      }
+      return null;
     }
   }
 
@@ -874,6 +927,134 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Widget bottom sheet để chọn rạp
+class _CinemaSelectionBottomSheet extends StatelessWidget {
+  final List<CinemaModel> cinemas;
+
+  const _CinemaSelectionBottomSheet({required this.cinemas});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Chọn Rạp Chiếu',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.grey, height: 1),
+          // List cinemas
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(16),
+              itemCount: cinemas.length,
+              itemBuilder: (context, index) {
+                final cinema = cinemas[index];
+                return _buildCinemaItem(context, cinema);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCinemaItem(BuildContext context, CinemaModel cinema) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.pop(context, cinema.id),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Cinema icon/image
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE50914).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.theaters,
+                    color: Color(0xFFE50914),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Cinema info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        cinema.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (cinema.address != null && cinema.address!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          cinema.address!,
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

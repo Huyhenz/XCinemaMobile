@@ -154,28 +154,48 @@ class DatabaseService {
         final value = snapshot.value;
 
         if (value is Map) {
-          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
-          data.forEach((key, itemValue) {
-            try {
-              if (itemValue is Map) {
-                final itemMap = Map<dynamic, dynamic>.from(itemValue);
-                movies.add(MovieModel.fromMap(itemMap, key.toString()));
-              } else {
-                print('⚠️ Skipping invalid movie: $key (${itemValue.runtimeType})');
+          try {
+            Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+            data.forEach((key, itemValue) {
+              try {
+                if (itemValue is Map) {
+                  final itemMap = Map<dynamic, dynamic>.from(itemValue);
+                  movies.add(MovieModel.fromMap(itemMap, key.toString()));
+                } else {
+                  print('⚠️ Skipping invalid movie: $key (${itemValue.runtimeType})');
+                }
+              } catch (e) {
+                print('⚠️ Error parsing movie $key: $e');
               }
-            } catch (e) {
-              print('⚠️ Error parsing movie $key: $e');
-            }
-          });
+            });
+          } catch (e) {
+            print('⚠️ Error converting snapshot.value to Map: $e');
+          }
+        } else {
+          print('⚠️ getAllMovies: snapshot.value is not a Map, got ${value.runtimeType}');
         }
       }
       
       // Filter out expired movies (all showtimes have passed)
-      movies = await _filterExpiredMovies(movies, null);
+      try {
+        movies = await _filterExpiredMovies(movies, null);
+      } catch (e) {
+        print('⚠️ Error filtering expired movies: $e');
+        // Return movies without filtering if filter fails
+      }
       
       return movies;
-    } catch (e) {
-      print('Error getting all movies: $e');
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai movies');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error getting all movies: ${e.code} - ${e.message}');
+      return [];
+    } catch (e, stackTrace) {
+      print('❌ Error getting all movies: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }
@@ -492,9 +512,21 @@ class DatabaseService {
 
   //BOOKING
   Future<String> saveBooking(BookingModel booking) async {
-    final ref = _db.child('bookings').push();
-    await ref.set(booking.toMap());
-    return ref.key!;
+    try {
+      final ref = _db.child('bookings').push();
+      await ref.set(booking.toMap());
+      return ref.key!;
+    } on FirebaseException catch (e) {
+      print('❌ Firebase error saving booking: ${e.code} - ${e.message}');
+      if (e.code == 'PERMISSION_DENIED') {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép ghi bookings');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      rethrow;
+    } catch (e) {
+      print('❌ Error saving booking: $e');
+      rethrow;
+    }
   }
 
   // ✅ FINAL FIX: Safe query for bookings with fallback
@@ -507,6 +539,16 @@ class DatabaseService {
       DataSnapshot snapshot;
       try {
         snapshot = await query.get();
+      } on FirebaseException catch (e) {
+        // Xử lý lỗi permission denied
+        if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+          print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc bookings');
+          print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+          // Vẫn thử fallback method
+          return await _getBookingsByUserFallback(userId);
+        }
+        print('⚠️ Firebase error in query: ${e.code} - ${e.message}');
+        return await _getBookingsByUserFallback(userId);
       } catch (e, stackTrace) {
         print('⚠️ Query snapshot error in getBookingsByUser: $e');
         print('Stack trace: $stackTrace');
@@ -618,38 +660,50 @@ class DatabaseService {
         return bookings;
       }
 
-      Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
-      print('📊 Found ${data.length} total bookings, filtering for userId: $userId');
+      try {
+        Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+        print('📊 Found ${data.length} total bookings, filtering for userId: $userId');
 
-      data.forEach((key, itemValue) {
-        try {
-          if (itemValue == null || itemValue is String) {
-            return;
-          }
-
-          if (itemValue is! Map) {
-            return;
-          }
-
-          Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
-          
-          // Filter by userId
-          final itemUserId = itemMap['userId']?.toString() ?? '';
-          if (itemUserId == userId) {
-            try {
-              bookings.add(BookingModel.fromMap(itemMap, key.toString()));
-            } catch (e) {
-              print('⚠️ Error creating BookingModel for $key: $e');
+        data.forEach((key, itemValue) {
+          try {
+            if (itemValue == null || itemValue is String) {
+              return;
             }
-          }
-        } catch (e) {
-          print('⚠️ Error parsing booking $key: $e');
-        }
-      });
 
-      print('✅ Loaded ${bookings.length} bookings for user: $userId (using fallback)');
-    } catch (e) {
+            if (itemValue is! Map) {
+              return;
+            }
+
+            Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+            
+            // Filter by userId
+            final itemUserId = itemMap['userId']?.toString() ?? '';
+            if (itemUserId == userId) {
+              try {
+                bookings.add(BookingModel.fromMap(itemMap, key.toString()));
+              } catch (e) {
+                print('⚠️ Error creating BookingModel for $key: $e');
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing booking $key: $e');
+          }
+        });
+
+        print('✅ Loaded ${bookings.length} bookings for user: $userId (using fallback)');
+      } catch (e) {
+        print('⚠️ Error converting bookings data to Map: $e');
+      }
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc bookings');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error in fallback method: ${e.code} - ${e.message}');
+    } catch (e, stackTrace) {
       print('❌ Error in fallback method: $e');
+      print('Stack trace: $stackTrace');
     }
 
     return bookings;
@@ -657,9 +711,21 @@ class DatabaseService {
 
   //PAYMENT
   Future<String> savePayment(PaymentModel payment) async {
-    final ref = _db.child('payments').push();
-    await ref.set(payment.toMap());
-    return ref.key!;
+    try {
+      final ref = _db.child('payments').push();
+      await ref.set(payment.toMap());
+      return ref.key!;
+    } on FirebaseException catch (e) {
+      print('❌ Firebase error saving payment: ${e.code} - ${e.message}');
+      if (e.code == 'PERMISSION_DENIED') {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép ghi payments');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      rethrow;
+    } catch (e) {
+      print('❌ Error saving payment: $e');
+      rethrow;
+    }
   }
 
   //VOUCHER
@@ -781,20 +847,43 @@ class DatabaseService {
       DataSnapshot snapshot = await _db.child('cinemas').get();
       List<CinemaModel> cinemas = [];
       if (snapshot.exists && snapshot.value != null) {
-        final data = _convertMap(snapshot.value);
-        data.forEach((key, value) {
+        final value = snapshot.value;
+        
+        // Kiểm tra nếu value là Map
+        if (value is Map) {
           try {
-            if (value is Map) {
-              cinemas.add(CinemaModel.fromMap(Map<dynamic, dynamic>.from(value), key.toString()));
-            }
+            Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+            data.forEach((key, itemValue) {
+              try {
+                // Chỉ parse nếu itemValue là Map, bỏ qua nếu là String hoặc type khác
+                if (itemValue is Map) {
+                  cinemas.add(CinemaModel.fromMap(Map<dynamic, dynamic>.from(itemValue), key.toString()));
+                } else {
+                  print('⚠️ Skipping invalid cinema: $key (${itemValue.runtimeType})');
+                }
+              } catch (e) {
+                print('⚠️ Error parsing cinema $key: $e');
+              }
+            });
           } catch (e) {
-            print('Error parsing cinema $key: $e');
+            print('⚠️ Error converting snapshot.value to Map: $e');
           }
-        });
+        } else {
+          print('⚠️ getAllCinemas: snapshot.value is not a Map, got ${value.runtimeType}');
+        }
       }
       return cinemas;
-    } catch (e) {
-      print('Error getting all cinemas: $e');
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai cinemas');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error getting all cinemas: ${e.code} - ${e.message}');
+      return [];
+    } catch (e, stackTrace) {
+      print('❌ Error getting all cinemas: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }
@@ -936,18 +1025,29 @@ class DatabaseService {
       DataSnapshot snapshot = await _db.child('movies').get();
       List<MovieModel> movies = [];
       if (snapshot.exists && snapshot.value != null) {
-        final data = _convertMap(snapshot.value);
+        final value = snapshot.value;
+        Map<dynamic, dynamic> data = {};
+        
+        // Kiểm tra nếu value là Map
+        if (value is Map) {
+          data = Map<dynamic, dynamic>.from(value);
+        } else {
+          print('⚠️ getMoviesByCinema: snapshot.value is not a Map, got ${value.runtimeType}');
+        }
+        
         int totalMovies = 0;
-        data.forEach((key, value) {
+        data.forEach((key, itemValue) {
           try {
-            if (value is Map) {
+            if (itemValue is Map) {
               totalMovies++;
-              Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(value);
+              Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
               final movieCinemaId = itemMap['cinemaId']?.toString() ?? '';
               if (movieCinemaId == cinemaId) {
                 movies.add(MovieModel.fromMap(itemMap, key.toString()));
                 print('🎬   - Found movie: ${itemMap['title']} (ID: $key, cinemaId: $movieCinemaId)');
               }
+            } else {
+              print('⚠️ Skipping invalid movie: $key (${itemValue.runtimeType})');
             }
           } catch (e) {
             print('⚠️ Error parsing movie $key: $e');
@@ -1012,7 +1112,16 @@ class DatabaseService {
       Set<String> movieIds = {};
 
       if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
-        final showtimesData = _convertMap(showtimesSnapshot.value);
+        final showtimesValue = showtimesSnapshot.value;
+        Map<dynamic, dynamic> showtimesData = {};
+        
+        // Kiểm tra nếu value là Map
+        if (showtimesValue is Map) {
+          showtimesData = Map<dynamic, dynamic>.from(showtimesValue);
+        } else {
+          print('⚠️ getMoviesShowingToday: showtimesSnapshot.value is not a Map, got ${showtimesValue.runtimeType}');
+        }
+        
         int showtimesChecked = 0;
         int showtimesMatched = 0;
         
@@ -1063,7 +1172,16 @@ class DatabaseService {
       if (movieIds.isNotEmpty) {
         DataSnapshot moviesSnapshot = await _db.child('movies').get();
         if (moviesSnapshot.exists && moviesSnapshot.value != null) {
-          final moviesData = _convertMap(moviesSnapshot.value);
+          final moviesValue = moviesSnapshot.value;
+          Map<dynamic, dynamic> moviesData = {};
+          
+          // Kiểm tra nếu value là Map
+          if (moviesValue is Map) {
+            moviesData = Map<dynamic, dynamic>.from(moviesValue);
+          } else {
+            print('⚠️ getMoviesShowingToday: moviesSnapshot.value is not a Map, got ${moviesValue.runtimeType}');
+          }
+          
           moviesData.forEach((key, value) {
             try {
               if (value is Map && movieIds.contains(key.toString())) {
@@ -1071,6 +1189,8 @@ class DatabaseService {
                 // If cinemaId is specified, we already filtered by theaterId, so just add the movie
                 // If cinemaId is null, add all movies that have showtimes today
                 movies.add(MovieModel.fromMap(movieMap, key.toString()));
+              } else if (value is! Map) {
+                print('⚠️ Skipping invalid movie: $key (${value.runtimeType})');
               }
             } catch (e) {
               print('⚠️ Error parsing movie $key: $e');
@@ -1087,8 +1207,17 @@ class DatabaseService {
       // Only return movies with showtimes today - no fallback
       // Movies without showtimes or with showtimes not today will be in "coming soon"
       return movies;
-    } catch (e) {
-      print('Error getting movies showing today: $e');
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai showtimes');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error getting movies showing today: ${e.code} - ${e.message}');
+      return [];
+    } catch (e, stackTrace) {
+      print('❌ Error getting movies showing today: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }
@@ -1126,7 +1255,16 @@ class DatabaseService {
       Set<String> allMoviesWithShowtimes = {}; // All movies that have any showtimes
 
       if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
-        final showtimesData = _convertMap(showtimesSnapshot.value);
+        final showtimesValue = showtimesSnapshot.value;
+        Map<dynamic, dynamic> showtimesData = {};
+        
+        // Kiểm tra nếu value là Map
+        if (showtimesValue is Map) {
+          showtimesData = Map<dynamic, dynamic>.from(showtimesValue);
+        } else {
+          print('⚠️ getMoviesComingSoon: showtimesSnapshot.value is not a Map, got ${showtimesValue.runtimeType}');
+        }
+        
         showtimesData.forEach((key, value) {
           try {
             if (value is Map) {
@@ -1190,8 +1328,17 @@ class DatabaseService {
       print('🎬   - Movies with no showtimes: ${allCinemaMovies.length - allMoviesWithShowtimes.length}');
 
       return movies;
-    } catch (e) {
-      print('Error getting movies coming soon: $e');
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error getting movies coming soon: ${e.code} - ${e.message}');
+      return [];
+    } catch (e, stackTrace) {
+      print('❌ Error getting movies coming soon: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }
@@ -1217,7 +1364,16 @@ class DatabaseService {
       Map<String, List<int>> movieShowtimes = {}; // movieId -> list of startTime
       
       if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
-        final showtimesData = _convertMap(showtimesSnapshot.value);
+        final showtimesValue = showtimesSnapshot.value;
+        Map<dynamic, dynamic> showtimesData = {};
+        
+        // Kiểm tra nếu value là Map
+        if (showtimesValue is Map) {
+          showtimesData = Map<dynamic, dynamic>.from(showtimesValue);
+        } else {
+          print('⚠️ _filterExpiredMovies: showtimesSnapshot.value is not a Map, got ${showtimesValue.runtimeType}');
+        }
+        
         showtimesData.forEach((key, value) {
           try {
             if (value is Map) {
@@ -1326,6 +1482,14 @@ class DatabaseService {
       DataSnapshot snapshot;
       try {
         snapshot = await query.get();
+      } on FirebaseException catch (e) {
+        // Xử lý lỗi permission denied
+        if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+          print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc notifications');
+          print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+        }
+        print('⚠️ Firebase error in query: ${e.code} - ${e.message}');
+        return notifications;
       } catch (e, stackTrace) {
         print('⚠️ Query snapshot error in getNotificationsByUser: $e');
         print('Stack trace: $stackTrace');
@@ -1694,6 +1858,16 @@ class DatabaseService {
       DataSnapshot snapshot;
       try {
         snapshot = await query.get();
+      } on FirebaseException catch (e) {
+        // Xử lý lỗi permission denied
+        if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+          print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai movieRatings');
+          print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+          // Vẫn thử fallback method
+          return await _getRatingsByMovieFallback(movieId);
+        }
+        print('⚠️ Firebase error in query: ${e.code} - ${e.message}');
+        return await _getRatingsByMovieFallback(movieId);
       } catch (e, stackTrace) {
         print('⚠️ Query snapshot error in getRatingsByMovie: $e');
         print('Stack trace: $stackTrace');
@@ -1788,38 +1962,50 @@ class DatabaseService {
         return ratings;
       }
 
-      Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
-      print('📊 Found ${data.length} total ratings, filtering for movieId: $movieId');
+      try {
+        Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+        print('📊 Found ${data.length} total ratings, filtering for movieId: $movieId');
 
-      data.forEach((key, itemValue) {
-        try {
-          if (itemValue == null || itemValue is String) {
-            return;
-          }
-
-          if (itemValue is! Map) {
-            return;
-          }
-
-          Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
-          
-          // Filter by movieId
-          final itemMovieId = itemMap['movieId']?.toString() ?? '';
-          if (itemMovieId == movieId) {
-            try {
-              ratings.add(MovieRating.fromMap(itemMap, key.toString()));
-            } catch (e) {
-              print('⚠️ Error creating MovieRating for $key: $e');
+        data.forEach((key, itemValue) {
+          try {
+            if (itemValue == null || itemValue is String) {
+              return;
             }
-          }
-        } catch (e) {
-          print('⚠️ Error parsing rating $key: $e');
-        }
-      });
 
-      print('✅ Loaded ${ratings.length} ratings for movie: $movieId (using fallback)');
-    } catch (e) {
+            if (itemValue is! Map) {
+              return;
+            }
+
+            Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+            
+            // Filter by movieId
+            final itemMovieId = itemMap['movieId']?.toString() ?? '';
+            if (itemMovieId == movieId) {
+              try {
+                ratings.add(MovieRating.fromMap(itemMap, key.toString()));
+              } catch (e) {
+                print('⚠️ Error creating MovieRating for $key: $e');
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing rating $key: $e');
+          }
+        });
+
+        print('✅ Loaded ${ratings.length} ratings for movie: $movieId (using fallback)');
+      } catch (e) {
+        print('⚠️ Error converting ratings data to Map: $e');
+      }
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai movieRatings');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error in fallback method: ${e.code} - ${e.message}');
+    } catch (e, stackTrace) {
       print('❌ Error in fallback method: $e');
+      print('Stack trace: $stackTrace');
     }
 
     return ratings;
@@ -1868,6 +2054,16 @@ class DatabaseService {
       DataSnapshot snapshot;
       try {
         snapshot = await query.get();
+      } on FirebaseException catch (e) {
+        // Xử lý lỗi permission denied
+        if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+          print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai movieComments');
+          print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+          // Vẫn thử fallback method
+          return await _getCommentsByMovieFallback(movieId);
+        }
+        print('⚠️ Firebase error in query: ${e.code} - ${e.message}');
+        return await _getCommentsByMovieFallback(movieId);
       } catch (e, stackTrace) {
         print('⚠️ Query snapshot error in getCommentsByMovie: $e');
         print('Stack trace: $stackTrace');
@@ -1963,41 +2159,53 @@ class DatabaseService {
         return comments;
       }
 
-      Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
-      print('📊 Found ${data.length} total comments, filtering for movieId: $movieId');
+      try {
+        Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+        print('📊 Found ${data.length} total comments, filtering for movieId: $movieId');
 
-      data.forEach((key, itemValue) {
-        try {
-          if (itemValue == null || itemValue is String) {
-            return;
-          }
-
-          if (itemValue is! Map) {
-            return;
-          }
-
-          Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
-          
-          // Filter by movieId
-          final itemMovieId = itemMap['movieId']?.toString() ?? '';
-          if (itemMovieId == movieId) {
-            try {
-              comments.add(MovieComment.fromMap(itemMap, key.toString()));
-            } catch (e) {
-              print('⚠️ Error creating MovieComment for $key: $e');
+        data.forEach((key, itemValue) {
+          try {
+            if (itemValue == null || itemValue is String) {
+              return;
             }
+
+            if (itemValue is! Map) {
+              return;
+            }
+
+            Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+            
+            // Filter by movieId
+            final itemMovieId = itemMap['movieId']?.toString() ?? '';
+            if (itemMovieId == movieId) {
+              try {
+                comments.add(MovieComment.fromMap(itemMap, key.toString()));
+              } catch (e) {
+                print('⚠️ Error creating MovieComment for $key: $e');
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error parsing comment $key: $e');
           }
-        } catch (e) {
-          print('⚠️ Error parsing comment $key: $e');
-        }
-      });
+        });
 
-      // Sort by createdAt descending (newest first)
-      comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        // Sort by createdAt descending (newest first)
+        comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      print('✅ Loaded ${comments.length} comments for movie: $movieId (using fallback)');
-    } catch (e) {
+        print('✅ Loaded ${comments.length} comments for movie: $movieId (using fallback)');
+      } catch (e) {
+        print('⚠️ Error converting comments data to Map: $e');
+      }
+    } on FirebaseException catch (e) {
+      // Xử lý lỗi permission denied
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('permission') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép đọc công khai movieComments');
+        print('📝 Xem file FIREBASE_RULES_UPDATE.md để biết cách cập nhật rules');
+      }
+      print('❌ Firebase error in fallback method: ${e.code} - ${e.message}');
+    } catch (e, stackTrace) {
       print('❌ Error in fallback method: $e');
+      print('Stack trace: $stackTrace');
     }
 
     return comments;
