@@ -679,11 +679,85 @@ class DatabaseService {
     }
   }
 
+  Future<List<VoucherModel>> getAllVouchers() async {
+    try {
+      DataSnapshot snapshot = await _db.child('vouchers').get();
+      List<VoucherModel> vouchers = [];
+
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+
+        if (value is Map) {
+          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+          data.forEach((key, itemValue) {
+            try {
+              if (itemValue is Map) {
+                Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+                vouchers.add(VoucherModel.fromMap(itemMap, key.toString()));
+              }
+            } catch (e) {
+              print('⚠️ Error parsing voucher $key: $e');
+            }
+          });
+        }
+      }
+      return vouchers;
+    } catch (e) {
+      print('Error getting all vouchers: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveVoucher(VoucherModel voucher) async {
+    try {
+      await _db.child('vouchers').child(voucher.id).set(voucher.toMap());
+    } catch (e) {
+      print('Error saving voucher: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateVoucher(VoucherModel voucher) async {
+    try {
+      await _db.child('vouchers').child(voucher.id).update(voucher.toMap());
+    } catch (e) {
+      print('Error updating voucher: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteVoucher(String voucherId) async {
+    try {
+      await _db.child('vouchers').child(voucherId).remove();
+    } catch (e) {
+      print('Error deleting voucher: $e');
+      rethrow;
+    }
+  }
+
   //CINEMA
   Future<String> saveCinema(CinemaModel cinema) async {
     final ref = _db.child('cinemas').push();
     await ref.set(cinema.toMap());
     return ref.key!;
+  }
+
+  Future<void> updateCinema(CinemaModel cinema) async {
+    try {
+      await _db.child('cinemas').child(cinema.id).update(cinema.toMap());
+    } catch (e) {
+      print('Error updating cinema: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCinema(String cinemaId) async {
+    try {
+      await _db.child('cinemas').child(cinemaId).remove();
+    } catch (e) {
+      print('Error deleting cinema: $e');
+      rethrow;
+    }
   }
 
   Future<CinemaModel?> getCinema(String cinemaId) async {

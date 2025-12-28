@@ -9,6 +9,7 @@ import '../models/movie.dart';
 import '../models/showtime.dart';
 import '../models/theater.dart';
 import '../models/cinema.dart';
+import '../models/voucher.dart';
 import '../services/database_services.dart';
 import 'admin_cleanup_screen.dart';
 
@@ -19,19 +20,68 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  int _currentIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+  void _navigateToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    Navigator.pop(context); // Close drawer
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Widget _getCurrentTab() {
+    switch (_currentIndex) {
+      case 0:
+        return const _CreateCinemaTab();
+      case 1:
+        return const _ManageCinemasTab();
+      case 2:
+        return const _CreateMovieTab();
+      case 3:
+        return const _ManageMoviesTab();
+      case 4:
+        return const _CreateShowtimeTab();
+      case 5:
+        return const _ManageShowtimesTab();
+      case 6:
+        return const _CreateTheaterTab();
+      case 7:
+        return const _ManageTheatersTab();
+      case 8:
+        return const _CreateVoucherTab();
+      case 9:
+        return const _ManageVouchersTab();
+      default:
+        return const _CreateCinemaTab();
+    }
+  }
+
+  String _getCurrentTitle() {
+    switch (_currentIndex) {
+      case 0:
+        return 'Tạo Rạp Chiếu';
+      case 1:
+        return 'Quản Lý Rạp Chiếu';
+      case 2:
+        return 'Tạo Phim';
+      case 3:
+        return 'Quản Lý Phim';
+      case 4:
+        return 'Tạo Lịch Chiếu';
+      case 5:
+        return 'Quản Lý Lịch Chiếu';
+      case 6:
+        return 'Tạo Phòng Chiếu';
+      case 7:
+        return 'Quản Lý Phòng Chiếu';
+      case 8:
+        return 'Tạo Voucher';
+      case 9:
+        return 'Quản Lý Voucher';
+      default:
+        return 'Admin Dashboard';
+    }
   }
 
   @override
@@ -39,8 +89,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     return BlocProvider(
       create: (context) => AdminBloc()..add(LoadAdminData()),
       child: Scaffold(
+        drawer: _buildDrawer(),
         appBar: AppBar(
-          title: const Text('Admin Dashboard'),
+          title: Text(_getCurrentTitle()),
           actions: [
             IconButton(
               icon: const Icon(Icons.cleaning_services),
@@ -55,33 +106,87 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               },
             ),
           ],
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabs: const [
-              Tab(text: 'Create Cinema'),
-              Tab(text: 'Create Movie'),
-              Tab(text: 'Manage Movies'),
-              Tab(text: 'Create Showtime'),
-              Tab(text: 'Manage Showtimes'),
-              Tab(text: 'Create Theater'),
-              Tab(text: 'Manage Theaters'),
-            ],
-          ),
         ),
-        body: TabBarView(
-          controller: _tabController,
-          children: const [
-            _CreateCinemaTab(),
-            _CreateMovieTab(),
-            _ManageMoviesTab(),
-            _CreateShowtimeTab(),
-            _ManageShowtimesTab(),
-            _CreateTheaterTab(),
-            _ManageTheatersTab(),
-          ],
-        ),
+        body: _getCurrentTab(),
       ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      backgroundColor: const Color(0xFF1A1A1A),
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              color: Color(0xFFE50914),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.white,
+                  size: 48,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Admin Dashboard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildDrawerItem(Icons.theaters, 'Tạo Rạp Chiếu', 0),
+          _buildDrawerItem(Icons.business, 'Quản Lý Rạp Chiếu', 1),
+          const Divider(color: Color(0xFF2A2A2A)),
+          _buildDrawerItem(Icons.movie, 'Tạo Phim', 2),
+          _buildDrawerItem(Icons.edit, 'Quản Lý Phim', 3),
+          _buildDrawerItem(Icons.schedule, 'Tạo Lịch Chiếu', 4),
+          _buildDrawerItem(Icons.event_available, 'Quản Lý Lịch Chiếu', 5),
+          _buildDrawerItem(Icons.meeting_room, 'Tạo Phòng Chiếu', 6),
+          _buildDrawerItem(Icons.room, 'Quản Lý Phòng Chiếu', 7),
+          const Divider(color: Color(0xFF2A2A2A)),
+          _buildDrawerItem(Icons.local_offer, 'Tạo Voucher', 8),
+          _buildDrawerItem(Icons.card_giftcard, 'Quản Lý Voucher', 9),
+          const Divider(color: Color(0xFF2A2A2A)),
+          ListTile(
+            leading: const Icon(Icons.cleaning_services, color: Colors.grey),
+            title: const Text(
+              'Database Cleanup',
+              style: TextStyle(color: Colors.white),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminCleanupScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(IconData icon, String title, int tabIndex) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white),
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white),
+      ),
+      onTap: () => _navigateToTab(tabIndex),
+      selected: _currentIndex == tabIndex,
+      selectedTileColor: const Color(0xFF2A2A2A),
     );
   }
 }
@@ -139,7 +244,7 @@ class _CreateCinemaTabState extends State<_CreateCinemaTab> {
         longitude: longitude,
       );
 
-      await DatabaseService().saveCinema(cinema);
+      context.read<AdminBloc>().add(CreateCinema(cinema));
 
       // Reset form
       _formKey.currentState!.reset();
@@ -274,7 +379,393 @@ class _CreateCinemaTabState extends State<_CreateCinemaTab> {
   }
 }
 
-// Tab 2: Create Movie - IMPROVED
+// Tab 2: Manage Cinemas (Edit & Delete)
+class _ManageCinemasTab extends StatelessWidget {
+  const _ManageCinemasTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AdminBloc, AdminState>(
+      builder: (context, state) {
+        if (state.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE50914)),
+          );
+        }
+
+        if (state.cinemas.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.theaters_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'Chưa có rạp chiếu nào',
+                    style: TextStyle(color: Colors.grey, fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Hãy tạo rạp chiếu mới ở tab "Tạo Rạp Chiếu"',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: state.cinemas.length,
+          itemBuilder: (context, index) {
+            final cinema = state.cinemas[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              color: const Color(0xFF1A1A1A),
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE50914).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.theaters, color: Color(0xFFE50914), size: 28),
+                ),
+                title: Text(
+                  cinema.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      cinema.address,
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                    if (cinema.phone != null && cinema.phone!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'ĐT: ${cinema.phone}',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                    ],
+                    if (cinema.latitude != null && cinema.longitude != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Vị trí: ${cinema.latitude!.toStringAsFixed(6)}, ${cinema.longitude!.toStringAsFixed(6)}',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Color(0xFF4CAF50)),
+                      onPressed: () => _showEditCinemaDialog(context, cinema),
+                      tooltip: 'Sửa rạp chiếu',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Color(0xFFE50914)),
+                      onPressed: () => _showDeleteCinemaConfirmDialog(context, cinema),
+                      tooltip: 'Xóa rạp chiếu',
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditCinemaDialog(BuildContext context, CinemaModel cinema) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => BlocProvider.value(
+        value: adminBloc,
+        child: _EditCinemaDialog(cinema: cinema),
+      ),
+    );
+  }
+
+  void _showDeleteCinemaConfirmDialog(BuildContext context, CinemaModel cinema) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              'Bạn có chắc chắn muốn xóa rạp chiếu "${cinema.name}"?\n\nHành động này không thể hoàn tác.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteCinema(cinema.id));
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Đã xóa rạp chiếu'),
+                      backgroundColor: Color(0xFF4CAF50),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                ),
+                child: const Text('Xóa'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Edit Cinema Dialog Widget
+class _EditCinemaDialog extends StatefulWidget {
+  final CinemaModel cinema;
+  const _EditCinemaDialog({required this.cinema});
+
+  @override
+  State<_EditCinemaDialog> createState() => _EditCinemaDialogState();
+}
+
+class _EditCinemaDialogState extends State<_EditCinemaDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  final _latitudeController = TextEditingController();
+  final _longitudeController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.cinema.name;
+    _addressController.text = widget.cinema.address;
+    _phoneController.text = widget.cinema.phone ?? '';
+    _imageUrlController.text = widget.cinema.imageUrl ?? '';
+    _latitudeController.text = widget.cinema.latitude?.toString() ?? '';
+    _longitudeController.text = widget.cinema.longitude?.toString() ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _imageUrlController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: Row(
+        children: [
+          const Icon(Icons.theaters, color: Color(0xFFE50914)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sửa Rạp Chiếu: ${widget.cinema.name}',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Name
+              TextFormField(
+                controller: _nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Tên Rạp Chiếu *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.theaters),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên rạp' : null,
+              ),
+              const SizedBox(height: 16),
+              // Address
+              TextFormField(
+                controller: _addressController,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Địa Chỉ *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập địa chỉ' : null,
+              ),
+              const SizedBox(height: 16),
+              // Phone
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Số Điện Thoại',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Image URL
+              TextFormField(
+                controller: _imageUrlController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Link Ảnh Rạp (URL)',
+                  hintText: 'https://example.com/cinema.jpg',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.image),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Latitude
+              TextFormField(
+                controller: _latitudeController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Vĩ Độ (Latitude)',
+                  hintText: '10.762622',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.map),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Longitude
+              TextFormField(
+                controller: _longitudeController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Kinh Độ (Longitude)',
+                  hintText: '106.660172',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.map),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : () async {
+            if (!_formKey.currentState!.validate()) return;
+
+            setState(() => _isSaving = true);
+            try {
+              double? latitude;
+              double? longitude;
+              if (_latitudeController.text.isNotEmpty) {
+                latitude = double.tryParse(_latitudeController.text);
+              }
+              if (_longitudeController.text.isNotEmpty) {
+                longitude = double.tryParse(_longitudeController.text);
+              }
+
+              final updatedCinema = CinemaModel(
+                id: widget.cinema.id,
+                name: _nameController.text.trim(),
+                address: _addressController.text.trim(),
+                phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+                imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
+                latitude: latitude,
+                longitude: longitude,
+                createdAt: widget.cinema.createdAt,
+              );
+
+              context.read<AdminBloc>().add(UpdateCinema(updatedCinema));
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Đã cập nhật rạp chiếu thành công!'),
+                  backgroundColor: Color(0xFF4CAF50),
+                ),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Lỗi: $e'),
+                  backgroundColor: const Color(0xFFE50914),
+                ),
+              );
+            } finally {
+              setState(() => _isSaving = false);
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE50914),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Lưu'),
+        ),
+      ],
+    );
+  }
+}
+
+// Tab 3: Create Movie - IMPROVED
 class _CreateMovieTab extends StatefulWidget {
   const _CreateMovieTab();
 
@@ -2671,5 +3162,636 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
             ),
           ],
         );
+  }
+}
+
+// Tab 8: Create Voucher
+class _CreateVoucherTab extends StatefulWidget {
+  const _CreateVoucherTab();
+
+  @override
+  State<_CreateVoucherTab> createState() => _CreateVoucherTabState();
+}
+
+class _CreateVoucherTabState extends State<_CreateVoucherTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _codeController = TextEditingController();
+  final _discountController = TextEditingController();
+  String _selectedType = 'percent';
+  DateTime? _expiryDate;
+  bool _isCreating = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _discountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createVoucher() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_expiryDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn ngày hết hạn'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isCreating = true);
+    try {
+      final voucher = VoucherModel(
+        id: _codeController.text.trim().toUpperCase(),
+        discount: double.parse(_discountController.text.trim()),
+        type: _selectedType,
+        expiryDate: _expiryDate!.millisecondsSinceEpoch,
+        isActive: true,
+      );
+
+      context.read<AdminBloc>().add(CreateVoucher(voucher));
+
+      // Reset form
+      _formKey.currentState!.reset();
+      setState(() {
+        _selectedType = 'percent';
+        _expiryDate = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Đã tạo voucher thành công!'),
+          backgroundColor: Color(0xFF4CAF50),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: const Color(0xFFE50914),
+        ),
+      );
+    } finally {
+      setState(() => _isCreating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Voucher Code
+            TextFormField(
+              controller: _codeController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Mã Voucher *',
+                hintText: 'VD: SALE50, NEWYEAR2024',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.local_offer),
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập mã voucher' : null,
+            ),
+            const SizedBox(height: 16),
+
+            // Discount Type
+            DropdownButtonFormField<String>(
+              value: _selectedType,
+              decoration: const InputDecoration(
+                labelText: 'Loại Giảm Giá *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'percent', child: Text('Phần trăm (%)')),
+                DropdownMenuItem(value: 'fixed', child: Text('Giá cố định (VND)')),
+              ],
+              onChanged: (value) {
+                setState(() => _selectedType = value!);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Discount Amount
+            TextFormField(
+              controller: _discountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: _selectedType == 'percent' ? 'Giảm Giá (%) *' : 'Giảm Giá (VND) *',
+                hintText: _selectedType == 'percent' ? 'VD: 10 (giảm 10%)' : 'VD: 50000 (giảm 50,000 VND)',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.discount),
+              ),
+              validator: (value) {
+                if (value?.isEmpty ?? true) return 'Vui lòng nhập số tiền giảm giá';
+                final discount = double.tryParse(value!);
+                if (discount == null) return 'Vui lòng nhập số hợp lệ';
+                if (_selectedType == 'percent' && (discount <= 0 || discount > 100)) {
+                  return 'Phần trăm phải từ 1-100';
+                }
+                if (_selectedType == 'fixed' && discount <= 0) {
+                  return 'Giá giảm phải lớn hơn 0';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Expiry Date
+            InkWell(
+              onTap: () async {
+                final DateTime? picked = await showDatePicker(
+                  context: context,
+                  initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 30)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2030),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.dark(
+                          primary: Color(0xFFE50914),
+                          onPrimary: Colors.white,
+                          surface: Color(0xFF1A1A1A),
+                          onSurface: Colors.white,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  setState(() => _expiryDate = picked);
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Ngày Hết Hạn *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                child: Text(
+                  _expiryDate == null
+                      ? 'Chọn ngày hết hạn'
+                      : DateFormat('dd/MM/yyyy').format(_expiryDate!),
+                  style: TextStyle(
+                    color: _expiryDate == null ? Colors.grey : Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Create Button
+            ElevatedButton(
+              onPressed: _isCreating ? null : _createVoucher,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE50914),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isCreating
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'TẠO VOUCHER',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Tab 9: Manage Vouchers
+class _ManageVouchersTab extends StatelessWidget {
+  const _ManageVouchersTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AdminBloc, AdminState>(
+      builder: (context, state) {
+        if (state.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE50914)),
+          );
+        }
+
+        if (state.vouchers.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.local_offer, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'Chưa có voucher nào',
+                    style: TextStyle(color: Colors.grey, fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Hãy tạo voucher mới ở tab "Create Voucher"',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: state.vouchers.length,
+          itemBuilder: (context, index) {
+            final voucher = state.vouchers[index];
+            final isExpired = DateTime.fromMillisecondsSinceEpoch(voucher.expiryDate).isBefore(DateTime.now());
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              color: const Color(0xFF1A1A1A),
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                leading: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isExpired || !voucher.isActive
+                        ? Colors.grey[800]
+                        : const Color(0xFFE50914).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.local_offer,
+                    color: isExpired || !voucher.isActive ? Colors.grey : const Color(0xFFE50914),
+                    size: 28,
+                  ),
+                ),
+                title: Text(
+                  voucher.id,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    decoration: isExpired ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      voucher.type == 'percent'
+                          ? 'Giảm ${voucher.discount.toStringAsFixed(0)}%'
+                          : 'Giảm ${NumberFormat('#,###', 'vi_VN').format(voucher.discount.toInt())} VND',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Hết hạn: ${DateFormat('dd/MM/yyyy').format(DateTime.fromMillisecondsSinceEpoch(voucher.expiryDate))}',
+                      style: TextStyle(
+                        color: isExpired ? Colors.red : Colors.grey[400],
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      voucher.isActive ? 'Đang hoạt động' : 'Đã tắt',
+                      style: TextStyle(
+                        color: voucher.isActive ? Colors.green : Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (isExpired)
+                      Text(
+                        'Đã hết hạn',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Color(0xFF4CAF50)),
+                      onPressed: () => _showEditVoucherDialog(context, voucher),
+                      tooltip: 'Sửa voucher',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Color(0xFFE50914)),
+                      onPressed: () => _showDeleteVoucherConfirmDialog(context, voucher),
+                      tooltip: 'Xóa voucher',
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditVoucherDialog(BuildContext context, VoucherModel voucher) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => BlocProvider.value(
+        value: adminBloc,
+        child: _EditVoucherDialog(voucher: voucher),
+      ),
+    );
+  }
+
+  void _showDeleteVoucherConfirmDialog(BuildContext context, VoucherModel voucher) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              'Bạn có chắc chắn muốn xóa voucher "${voucher.id}"?\n\nHành động này không thể hoàn tác.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteVoucher(voucher.id));
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Đã xóa voucher'),
+                      backgroundColor: Color(0xFF4CAF50),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                ),
+                child: const Text('Xóa'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Edit Voucher Dialog Widget
+class _EditVoucherDialog extends StatefulWidget {
+  final VoucherModel voucher;
+  const _EditVoucherDialog({required this.voucher});
+
+  @override
+  State<_EditVoucherDialog> createState() => _EditVoucherDialogState();
+}
+
+class _EditVoucherDialogState extends State<_EditVoucherDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _discountController = TextEditingController();
+  String _selectedType = 'percent';
+  DateTime? _expiryDate;
+  bool _isActive = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _discountController.text = widget.voucher.discount.toString();
+    _selectedType = widget.voucher.type;
+    _expiryDate = DateTime.fromMillisecondsSinceEpoch(widget.voucher.expiryDate);
+    _isActive = widget.voucher.isActive;
+  }
+
+  @override
+  void dispose() {
+    _discountController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: Row(
+        children: [
+          const Icon(Icons.local_offer, color: Color(0xFFE50914)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sửa Voucher: ${widget.voucher.id}',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Discount Type
+              DropdownButtonFormField<String>(
+                value: _selectedType,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Loại Giảm Giá *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                dropdownColor: const Color(0xFF2A2A2A),
+                items: const [
+                  DropdownMenuItem(value: 'percent', child: Text('Phần trăm (%)')),
+                  DropdownMenuItem(value: 'fixed', child: Text('Giá cố định (VND)')),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedType = value!);
+                },
+              ),
+              const SizedBox(height: 16),
+              // Discount Amount
+              TextFormField(
+                controller: _discountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: _selectedType == 'percent' ? 'Giảm Giá (%) *' : 'Giảm Giá (VND) *',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.discount),
+                  labelStyle: const TextStyle(color: Colors.white),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập số tiền giảm giá';
+                  final discount = double.tryParse(value!);
+                  if (discount == null) return 'Vui lòng nhập số hợp lệ';
+                  if (_selectedType == 'percent' && (discount <= 0 || discount > 100)) {
+                    return 'Phần trăm phải từ 1-100';
+                  }
+                  if (_selectedType == 'fixed' && discount <= 0) {
+                    return 'Giá giảm phải lớn hơn 0';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              // Expiry Date
+              InkWell(
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: _expiryDate ?? DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2030),
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: Color(0xFFE50914),
+                            onPrimary: Colors.white,
+                            surface: Color(0xFF1A1A1A),
+                            onSurface: Colors.white,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (picked != null) {
+                    setState(() => _expiryDate = picked);
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Ngày Hết Hạn *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.calendar_today),
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  child: Text(
+                    _expiryDate == null
+                        ? 'Chọn ngày hết hạn'
+                        : DateFormat('dd/MM/yyyy').format(_expiryDate!),
+                    style: TextStyle(
+                      color: _expiryDate == null ? Colors.grey : Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Active Status
+              SwitchListTile(
+                title: const Text(
+                  'Trạng thái hoạt động',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: Text(
+                  _isActive ? 'Đang hoạt động' : 'Đã tắt',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+                value: _isActive,
+                activeColor: const Color(0xFFE50914),
+                onChanged: (value) {
+                  setState(() => _isActive = value);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : () async {
+            if (!_formKey.currentState!.validate()) return;
+            if (_expiryDate == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Vui lòng chọn ngày hết hạn'),
+                  backgroundColor: Color(0xFFE50914),
+                ),
+              );
+              return;
+            }
+
+            setState(() => _isSaving = true);
+            try {
+              final updatedVoucher = VoucherModel(
+                id: widget.voucher.id,
+                discount: double.parse(_discountController.text.trim()),
+                type: _selectedType,
+                expiryDate: _expiryDate!.millisecondsSinceEpoch,
+                isActive: _isActive,
+              );
+
+              context.read<AdminBloc>().add(UpdateVoucher(updatedVoucher));
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Đã cập nhật voucher thành công!'),
+                  backgroundColor: Color(0xFF4CAF50),
+                ),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Lỗi: $e'),
+                  backgroundColor: const Color(0xFFE50914),
+                ),
+              );
+            } finally {
+              setState(() => _isSaving = false);
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE50914),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Lưu'),
+        ),
+      ],
+    );
   }
 }

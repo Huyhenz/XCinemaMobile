@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/movie.dart';
 import '../../models/showtime.dart';
 import '../../models/theater.dart';
+import '../../models/voucher.dart';
+import '../../models/cinema.dart';
 import '../../services/database_services.dart';
 import 'admin_event.dart';
 import 'admin_state.dart';
@@ -15,9 +17,38 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       try {
         // Use getAllMoviesForAdmin to show all movies including expired ones
         List<MovieModel> movies = await _dbService.getAllMoviesForAdmin();
+        List<CinemaModel> cinemas = await _dbService.getAllCinemas();
         List<TheaterModel> theaters = await _dbService.getAllTheaters();
         List<ShowtimeModel> showtimes = await _dbService.getAllShowtimes();
-        emit(AdminState(movies: movies, theaters: theaters, showtimes: showtimes));
+        List<VoucherModel> vouchers = await _dbService.getAllVouchers();
+        emit(AdminState(movies: movies, cinemas: cinemas, theaters: theaters, showtimes: showtimes, vouchers: vouchers));
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<CreateCinema>((event, emit) async {
+      try {
+        await _dbService.saveCinema(event.cinema);
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<UpdateCinema>((event, emit) async {
+      try {
+        await _dbService.updateCinema(event.cinema);
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<DeleteCinema>((event, emit) async {
+      try {
+        await _dbService.deleteCinema(event.cinemaId);
+        add(LoadAdminData());
       } catch (e) {
         emit(AdminState(error: e.toString()));
       }
@@ -98,6 +129,33 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<DeleteTheater>((event, emit) async {
       try {
         await _dbService.deleteTheater(event.theaterId);
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<CreateVoucher>((event, emit) async {
+      try {
+        await _dbService.saveVoucher(event.voucher);
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<UpdateVoucher>((event, emit) async {
+      try {
+        await _dbService.updateVoucher(event.voucher);
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<DeleteVoucher>((event, emit) async {
+      try {
+        await _dbService.deleteVoucher(event.voucherId);
         add(LoadAdminData());
       } catch (e) {
         emit(AdminState(error: e.toString()));
