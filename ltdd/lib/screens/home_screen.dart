@@ -655,7 +655,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
         // Movie grid
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 100), // Bottom padding cho navbar
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0), // Removed bottom padding - handled by bottom banner
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -1120,9 +1120,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildBottomPromoBanner() {
+    // Get bottom padding for navigation bar
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return SliverToBoxAdapter(
       child: Container(
-        margin: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        margin: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 80), // Dynamic bottom margin for navbar
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(

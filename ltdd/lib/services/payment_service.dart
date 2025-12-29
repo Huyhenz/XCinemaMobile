@@ -340,9 +340,11 @@ class PaymentService {
           // Note: clearCookies() is not available in the API, but clearCache() and clearLocalStorage()
           // combined with URL parameters (force_reauthentication) should force fresh login
           if (controller.platform is AndroidWebViewController) {
+            AndroidWebViewController.enableDebugging(false);
             final androidController = controller.platform as AndroidWebViewController;
-            androidController.clearCache();
-            androidController.clearLocalStorage();
+            androidController
+              ..clearCache()
+              ..clearLocalStorage();
             print('✅ Cleared Android WebView cache and localStorage');
           }
           
@@ -358,6 +360,29 @@ class PaymentService {
           
           controller.setNavigationDelegate(
             NavigationDelegate(
+              onWebResourceError: (WebResourceError error) {
+                print('❌ WebView resource error: ${error.description} (code: ${error.errorCode})');
+                // Handle WebView crash
+                if (error.errorCode == -1 || error.description.contains('net::ERR_')) {
+                  print('💥 WebView crashed or network error detected');
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                  if (context.mounted && !completer.isCompleted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (ctx) => PaymentFailureScreen(
+                          message: 'Lỗi kết nối với PayPal. Vui lòng thử lại.',
+                          isCancelled: false,
+                        ),
+                      ),
+                    );
+                  }
+                  if (!completer.isCompleted) {
+                    completer.complete(null);
+                  }
+                }
+              },
               onNavigationRequest: (NavigationRequest request) {
                 final url = request.url;
                 print('🌐 PayPal WebView navigation: $url');
@@ -694,18 +719,10 @@ class PaymentService {
           print('🔐 Loading PayPal with force login (cleared cookies/cache/localStorage)');
           print('   URL: ${modifiedUrl.toString()}');
           
-          // First, try to logout PayPal by loading logout URL
-          // This ensures any existing session is cleared
-          final logoutUrl = 'https://www.sandbox.paypal.com/webapps/auth/logout';
-          print('🧹 Loading PayPal logout page first...');
-          controller.loadRequest(Uri.parse(logoutUrl));
-          
-          // After logout page loads, wait a bit then load checkout page
-          // This ensures logout completes before showing login page
-          Future.delayed(const Duration(seconds: 2), () {
-            print('🔐 Now loading PayPal checkout page...');
-            controller.loadRequest(modifiedUrl);
-          });
+          // Load checkout URL directly - URL parameters (logout=true, force_reauthentication=true) 
+          // will handle logout and force fresh login
+          print('🔐 Loading PayPal checkout page...');
+          controller.loadRequest(modifiedUrl);
 
         return Dialog(
           backgroundColor: Colors.transparent,

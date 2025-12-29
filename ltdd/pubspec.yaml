@@ -50,6 +50,8 @@ dependencies:
   url_launcher: ^6.3.1
   flutter_dotenv: ^5.1.0
   webview_flutter: ^4.4.2
+  webview_flutter_android: ^3.16.0
+  webview_flutter_wkwebview: ^3.15.0
   
   # Email
   mailer: ^6.0.1

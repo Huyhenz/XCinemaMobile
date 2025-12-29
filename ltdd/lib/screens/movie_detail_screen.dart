@@ -14,6 +14,7 @@ import '../utils/age_utils.dart';
 import '../widgets/age_restriction_dialog.dart';
 import '../widgets/auth_guard.dart';
 import 'showtimes_screen.dart';
+import 'trailer_screen.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String movieId;
@@ -261,20 +262,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: InkWell(
-        onTap: () async {
-          final uri = Uri.parse(_movie!.trailerUrl!);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Không thể mở trailer'),
-                  backgroundColor: Color(0xFFE50914),
-                ),
-              );
-            }
-          }
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TrailerScreen(
+                trailerUrl: _movie!.trailerUrl!,
+              ),
+            ),
+          );
         },
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -473,11 +469,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final isTrailer = label == 'Trailer' && value == 'Xem';
     return InkWell(
       onTap: isTrailer && _movie?.trailerUrl != null
-          ? () async {
-              final uri = Uri.parse(_movie!.trailerUrl!);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
+          ? () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrailerScreen(
+                    trailerUrl: _movie!.trailerUrl!,
+                  ),
+                ),
+              );
             }
           : null,
       child: Column(
