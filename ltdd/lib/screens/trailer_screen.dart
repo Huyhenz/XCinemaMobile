@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/youtube_utils.dart';
 
 class TrailerScreen extends StatefulWidget {
@@ -14,106 +14,101 @@ class TrailerScreen extends StatefulWidget {
 }
 
 class _TrailerScreenState extends State<TrailerScreen> {
-  WebViewController? _controller;
+  YoutubePlayerController? _youtubeController;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _hasInternet = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeWebView();
+    _checkInternetAndInitialize();
   }
 
-  void _initializeWebView() {
-    final embedUrl = YoutubeUtils.getEmbedUrl(widget.trailerUrl);
+  Future<void> _checkInternetAndInitialize() async {
+    // Kiểm tra kết nối internet
+    final connectivityResult = await Connectivity().checkConnectivity();
+    _hasInternet = !connectivityResult.contains(ConnectivityResult.none);
     
-    if (embedUrl == null) {
+    if (!_hasInternet) {
       setState(() {
-        _errorMessage = 'URL trailer không hợp lệ';
+        _errorMessage = 'Không có kết nối internet. Vui lòng kiểm tra kết nối mạng của máy ảo.';
         _isLoading = false;
       });
       return;
     }
 
-    print('🎬 Loading YouTube embed URL: $embedUrl');
+    _initializePlayer();
+  }
+
+  void _initializePlayer() {
+    // Extract video ID from YouTube URL
+    final videoId = YoutubeUtils.extractVideoId(widget.trailerUrl);
+    
+    if (videoId == null) {
+      setState(() {
+        _errorMessage = 'URL trailer không hợp lệ. Vui lòng kiểm tra lại URL YouTube.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    print('🎬 Initializing YouTube player with video ID: $videoId');
 
     try {
-      // Tạo HTML đơn giản với iframe
-      final htmlContent = '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <style>
-    * { margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-    iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-  </style>
-</head>
-<body>
-  <iframe src="$embedUrl" allowfullscreen></iframe>
-</body>
-</html>
-''';
+      _youtubeController = YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true, // Tự động phát khi mở
+          mute: false, // Không tắt tiếng
+          enableCaption: true, // Bật phụ đề nếu có
+          loop: false, // Không lặp lại
+          isLive: false,
+          forceHD: false, // Không force HD để tránh lỗi trên máy ảo
+          controlsVisibleAtStart: true, // Hiển thị controls ngay từ đầu
+        ),
+      );
 
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.black)
-        ..enableZoom(false);
-
-      // Cấu hình platform-specific để tránh error 153
-      if (_controller!.platform is AndroidWebViewController) {
-        AndroidWebViewController.enableDebugging(false);
-        (_controller!.platform as AndroidWebViewController)
-          ..setMediaPlaybackRequiresUserGesture(false)
-          ..setOnShowFileSelector((params) async {
-            return [];
-          });
-      } else if (_controller!.platform is WebKitWebViewController) {
-        (_controller!.platform as WebKitWebViewController)
-          ..setAllowsBackForwardNavigationGestures(false);
-      }
-
-      _controller!
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onPageStarted: (String url) {
-              print('📄 Page started loading: $url');
-              setState(() {
-                _isLoading = true;
-              });
-            },
-            onPageFinished: (String url) {
-              print('✅ Page finished loading: $url');
-              setState(() {
-                _isLoading = false;
-              });
-            },
-            onWebResourceError: (WebResourceError error) {
-              print('❌ WebView error: ${error.description} (code: ${error.errorCode})');
-              if (error.errorCode == 153 || error.description.contains('153')) {
-                // YouTube embed error - có thể video không cho phép embed
-                if (mounted) {
-                  setState(() {
-                    _errorMessage = 'Video này không thể phát trong ứng dụng. Vui lòng xem trên YouTube.';
-                  });
-                }
-              }
-            },
-          ),
-        )
-        ..loadHtmlString(htmlContent, baseUrl: 'https://www.youtube.com');
+      // Listen to player state changes
+      _youtubeController!.addListener(_playerListener);
 
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
-      print('❌ Error initializing WebView: $e');
+      print('❌ Error initializing YouTube player: $e');
       setState(() {
-        _errorMessage = 'Không thể khởi tạo WebView: $e';
+        _errorMessage = 'Không thể khởi tạo player. Vui lòng kiểm tra kết nối internet.';
         _isLoading = false;
       });
     }
+  }
+
+  void _playerListener() {
+    if (_youtubeController!.value.hasError) {
+      final error = _youtubeController!.value.errorCode;
+      print('❌ YouTube player error: $error');
+      setState(() {
+        // Kiểm tra loại lỗi dựa trên error code
+        // Error code thường là string mô tả lỗi
+        final errorString = error?.toString().toLowerCase() ?? '';
+        if (errorString.contains('network') || 
+            errorString.contains('internet') ||
+            errorString.contains('connection') ||
+            errorString.contains('timeout')) {
+          _errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet của máy ảo.';
+        } else {
+          _errorMessage = 'Lỗi phát video: ${error ?? "Không xác định"}';
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _youtubeController?.removeListener(_playerListener);
+    _youtubeController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -130,12 +125,29 @@ class _TrailerScreenState extends State<TrailerScreen> {
           'Trailer',
           style: TextStyle(color: Colors.white),
         ),
+        actions: [
+          if (_youtubeController != null)
+            IconButton(
+              icon: const Icon(Icons.fullscreen, color: Colors.white),
+              onPressed: () {
+                _youtubeController!.toggleFullScreenMode();
+              },
+            ),
+        ],
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFE50914),
+        ),
+      );
+    }
+
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -159,14 +171,62 @@ class _TrailerScreenState extends State<TrailerScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () async {
+                  // Retry initialization
+                  await _checkInternetAndInitialize();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                 ),
                 child: const Text(
-                  'Quay lại',
+                  'Thử lại',
                   style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Nút mở trong trình duyệt nếu không có internet hoặc lỗi
+              if (YoutubeUtils.isValidYoutubeUrl(widget.trailerUrl))
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final watchUrl = YoutubeUtils.getWatchUrl(widget.trailerUrl);
+                    if (watchUrl != null) {
+                      try {
+                        final uri = Uri.parse(watchUrl);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Không thể mở: $e'),
+                              backgroundColor: const Color(0xFFE50914),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[800],
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  ),
+                  icon: const Icon(Icons.open_in_new, color: Colors.white),
+                  label: const Text(
+                    'Mở trên trình duyệt',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  'Quay lại',
+                  style: TextStyle(color: Colors.grey),
                 ),
               ),
             ],
@@ -175,7 +235,7 @@ class _TrailerScreenState extends State<TrailerScreen> {
       );
     }
 
-    if (_controller == null) {
+    if (_youtubeController == null) {
       return const Center(
         child: CircularProgressIndicator(
           color: Color(0xFFE50914),
@@ -183,24 +243,75 @@ class _TrailerScreenState extends State<TrailerScreen> {
       );
     }
 
-    return Stack(
-      children: [
-        Center(
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: WebViewWidget(controller: _controller!),
-          ),
-        ),
-        if (_isLoading)
-          Container(
-            color: Colors.black,
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFE50914),
-              ),
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: YoutubePlayerBuilder(
+          onExitFullScreen: () {
+            // Handle exit fullscreen if needed
+          },
+          player: YoutubePlayer(
+            controller: _youtubeController!,
+            showVideoProgressIndicator: true,
+            progressIndicatorColor: const Color(0xFFE50914),
+            progressColors: const ProgressBarColors(
+              playedColor: Color(0xFFE50914),
+              handleColor: Color(0xFFE50914),
+              bufferedColor: Colors.grey,
+              backgroundColor: Colors.grey,
             ),
+            onReady: () {
+              print('✅ YouTube player is ready');
+            },
+            onEnded: (metadata) {
+              print('✅ Video ended');
+              // Có thể tự động quay lại hoặc hiển thị thông báo
+            },
           ),
-      ],
+          builder: (context, player) {
+            return Column(
+              children: [
+                // Video player với aspect ratio 16:9
+                Expanded(
+                  child: Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: player,
+                      ),
+                    ),
+                  ),
+                ),
+                // Thông tin bổ sung (nếu cần)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: const Color(0xFF1A1A1A),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Vuốt lên/xuống để điều chỉnh âm lượng và độ sáng',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }

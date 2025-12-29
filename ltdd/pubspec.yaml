@@ -53,6 +53,10 @@ dependencies:
   webview_flutter_android: ^3.16.0
   webview_flutter_wkwebview: ^3.15.0
   
+  # Video Player
+  youtube_player_flutter: ^9.0.0
+  connectivity_plus: ^6.0.5
+  
   # Email
   mailer: ^6.0.1
 
