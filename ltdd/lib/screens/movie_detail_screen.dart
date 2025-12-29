@@ -14,7 +14,7 @@ import '../utils/age_utils.dart';
 import '../widgets/age_restriction_dialog.dart';
 import '../widgets/auth_guard.dart';
 import 'showtimes_screen.dart';
-import 'trailer_screen.dart';
+import '../widgets/trailer_dialog.dart';
 import 'user_info_screen.dart';
 
 class MovieDetailScreen extends StatefulWidget {
@@ -264,14 +264,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TrailerScreen(
-                trailerUrl: _movie!.trailerUrl!,
-              ),
-            ),
-          );
+          TrailerDialog.show(context, _movie!.trailerUrl!);
         },
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -471,14 +464,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return InkWell(
       onTap: isTrailer && _movie?.trailerUrl != null
           ? () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TrailerScreen(
-                    trailerUrl: _movie!.trailerUrl!,
-                  ),
-                ),
-              );
+              TrailerDialog.show(context, _movie!.trailerUrl!);
             }
           : null,
       child: Column(
