@@ -185,16 +185,26 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
 
   Future<void> _applyVoucher() async {
     VoucherModel? voucher;
+    VoucherModel? voucherForDropdown; // Voucher từ _userVouchers để dùng cho dropdown
 
     // Ưu tiên voucher đã chọn từ dropdown
     if (_selectedVoucher != null) {
       voucher = _selectedVoucher;
+      voucherForDropdown = _selectedVoucher; // Đã có trong dropdown
     } else if (_voucherCode != null && _voucherCode!.isNotEmpty) {
       // Nếu không có voucher từ dropdown, thử load từ mã
       voucher = await DatabaseService().getVoucher(_voucherCode!);
-      // Lưu voucher đã load để hiển thị sau này
+      // Kiểm tra xem voucher này có trong danh sách user vouchers không
       if (voucher != null) {
-        _selectedVoucher = voucher;
+        for (var item in _userVouchers) {
+          final userVoucher = item['voucher'] as VoucherModel;
+          if (userVoucher.id == voucher!.id) {
+            // Tìm thấy trong user vouchers, sử dụng instance từ _userVouchers
+            voucherForDropdown = userVoucher;
+            break;
+          }
+        }
+        // Nếu không tìm thấy trong user vouchers, voucherForDropdown sẽ là null
       }
     }
 
@@ -243,7 +253,9 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
       }
       _voucherCode = voucher.id; // Lưu mã voucher
       _appliedVoucherName = voucher.id; // Lưu tên voucher để hiển thị
-      _selectedVoucher = voucher; // Lưu voucher đã chọn để hiển thị thông tin
+      // Chỉ set _selectedVoucher nếu voucher này có trong dropdown items (_userVouchers)
+      // Sử dụng voucherForDropdown để đảm bảo cùng instance với items trong dropdown
+      _selectedVoucher = voucherForDropdown; // null nếu không có trong _userVouchers
       _finalPrice = basePrice - _discount;
       if (_finalPrice < 0) _finalPrice = 0; // Đảm bảo giá không âm
     });
