@@ -106,3 +106,4 @@ Nếu đã thử tất cả các cách trên mà vẫn không có internet:
    - Bật USB Debugging
    - Chạy `flutter run` và chọn thiết bị thật
 
+

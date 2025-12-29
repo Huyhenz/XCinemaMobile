@@ -115,3 +115,4 @@ adb shell "ping -c 3 8.8.8.8 && echo 'Internet OK' || echo 'No Internet'"
 
 Nếu thấy "Internet OK" thì emulator đã có internet!
 
+

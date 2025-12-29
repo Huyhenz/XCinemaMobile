@@ -285,6 +285,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
         body: SafeArea(
+          bottom: false, // Let bottom padding be handled by SliverPadding
           child: CustomScrollView(
             slivers: [
               _buildHeader(),
@@ -645,17 +646,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           }
           
           return SliverFillRemaining(
-            child: EmptyState(
-              icon: state.searchQuery != null ? Icons.search_off : Icons.movie_outlined,
-              title: emptyTitle,
-              subtitle: emptySubtitle,
+            hasScrollBody: false, // Prevent overflow
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: EmptyState(
+                icon: state.searchQuery != null ? Icons.search_off : Icons.movie_outlined,
+                title: emptyTitle,
+                subtitle: emptySubtitle,
+              ),
             ),
           );
         }
 
         // Movie grid
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0), // Removed bottom padding - handled by bottom banner
+          padding: const EdgeInsets.symmetric(horizontal: 20), // Removed bottom padding - handled by bottom banner
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -1122,56 +1127,58 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildBottomPromoBanner() {
     // Get bottom padding for navigation bar
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 80), // Dynamic bottom margin for navbar
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A90E2).withOpacity(0.4),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20), // Dynamic bottom padding for navbar
+      sliver: SliverToBoxAdapter(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'TẶNG NGAY 30.000₫',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Khi mua combo bắp nước',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4A90E2).withOpacity(0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
-            ),
-            const Icon(
-              Icons.card_giftcard,
-              color: Colors.white,
-              size: 50,
-            ),
-          ],
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TẶNG NGAY 30.000₫',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Khi mua combo bắp nước',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.card_giftcard,
+                color: Colors.white,
+                size: 50,
+              ),
+            ],
+          ),
         ),
       ),
     );
