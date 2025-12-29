@@ -15,6 +15,7 @@ import '../widgets/age_restriction_dialog.dart';
 import '../widgets/auth_guard.dart';
 import 'showtimes_screen.dart';
 import 'trailer_screen.dart';
+import 'user_info_screen.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String movieId;
@@ -840,26 +841,40 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
     }
     
-    // Bước 2: Kiểm tra độ tuổi nếu phim có age rating (sau khi đã chọn rạp)
+    // Bước 2: Kiểm tra ngày sinh của user (bắt buộc để đặt vé)
+    if (_user?.dateOfBirth == null) {
+      // User chưa có ngày sinh, hiển thị dialog yêu cầu cập nhật
+      final shouldProceed = await _showDateOfBirthDialog();
+      if (!shouldProceed) {
+        return; // Người dùng hủy hoặc chọn để sau
+      }
+      // Sau khi cập nhật, reload user data
+      if (_userId != null && mounted) {
+        try {
+          _user = await DatabaseService().getUser(_userId!);
+          if (_user?.dateOfBirth == null) {
+            // Vẫn chưa có ngày sinh sau khi quay lại
+            return;
+          }
+        } catch (e) {
+          print('Error reloading user data: $e');
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+    
+    // Bước 3: Kiểm tra độ tuổi nếu phim có age rating (sau khi đã có ngày sinh)
     if (_movie?.ageRating != null && _movie!.ageRating!.isNotEmpty) {
       final requiredAge = AgeUtils.parseAgeRating(_movie!.ageRating);
       
       // Nếu có yêu cầu tuổi (không phải P - Phổ thông)
       if (requiredAge != null && requiredAge > 0) {
-        // Lấy tuổi của user
-        int? userAge;
-        if (_user?.dateOfBirth != null) {
-          userAge = AgeUtils.calculateAge(_user!.dateOfBirth);
-        }
+        // Lấy tuổi của user (đã đảm bảo có dateOfBirth ở bước trên)
+        final userAge = AgeUtils.calculateAge(_user!.dateOfBirth);
         
-        // Kiểm tra nếu user không đủ tuổi
-        if (userAge == null) {
-          // User chưa có ngày sinh, không cho đặt vé nhưng không hiển thị thông báo ở đây
-          // Thông báo sẽ hiển thị ở profile screen
-          return;
-        }
-        
-        if (userAge < requiredAge) {
+        if (userAge != null && userAge < requiredAge) {
           // Hiển thị dialog cảnh báo
           final shouldContinue = await AgeRestrictionDialog.show(
             context: context,
@@ -876,7 +891,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
     }
     
-    // Bước 3: Điều hướng đến màn hình chọn lịch chiếu
+    // Bước 4: Điều hướng đến màn hình chọn lịch chiếu
     if (mounted) {
       Navigator.push(
         context,
@@ -888,6 +903,87 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       );
     }
+  }
+
+  Future<bool> _showDateOfBirthDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFFE50914), size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Cập nhật thông tin',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Vui lòng cập nhật ngày sinh trong thông tin cá nhân để có thể đặt vé phim có độ tuổi xem.',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 16,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Để sau',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true); // Trả về true để điều hướng
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE50914),
+            ),
+            child: const Text(
+              'Cập nhật ngay',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Nếu người dùng chọn "Cập nhật ngay", điều hướng đến UserInfoScreen
+    if (result == true) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const UserInfoScreen(),
+        ),
+      );
+      
+      // Sau khi quay lại, reload user data
+      if (_userId != null && mounted) {
+        try {
+          _user = await DatabaseService().getUser(_userId!);
+          setState(() {}); // Update UI
+          return _user?.dateOfBirth != null; // Trả về true nếu đã cập nhật
+        } catch (e) {
+          print('Error reloading user data: $e');
+          return false;
+        }
+      }
+    }
+    
+    return false;
   }
 
   Future<String?> _showCinemaSelectionDialog() async {

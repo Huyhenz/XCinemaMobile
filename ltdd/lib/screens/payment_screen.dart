@@ -291,6 +291,11 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           String userId = FirebaseAuth.instance.currentUser!.uid;
 
           // Create booking
+          // Chỉ set finalPrice khi có voucher và giá cuối cùng khác giá gốc
+          final double? bookingFinalPrice = (_voucherCode != null && _finalPrice != widget.totalPrice) 
+              ? _finalPrice 
+              : null;
+          
           BookingModel booking = BookingModel(
             id: '',
             userId: temp.userId,
@@ -298,7 +303,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             cinemaId: widget.cinemaId,
             seats: _selectedSeats.isNotEmpty ? _selectedSeats : temp.seats,
             totalPrice: widget.totalPrice,
-            finalPrice: _finalPrice,
+            finalPrice: bookingFinalPrice,
             voucherId: _voucherCode,
             status: 'confirmed',
           );

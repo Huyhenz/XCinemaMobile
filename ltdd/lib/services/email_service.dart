@@ -103,7 +103,16 @@ class EmailService {
         DateTime.fromMillisecondsSinceEpoch(showtime.startTime),
       );
       final seats = booking.seats.join(', ');
-      final totalPrice = NumberFormat('#,###', 'vi_VN').format(booking.totalPrice);
+      
+      // Sử dụng finalPrice nếu có (sau khi áp dụng voucher), nếu không thì dùng totalPrice
+      final displayPrice = booking.finalPrice ?? booking.totalPrice;
+      final totalPrice = NumberFormat('#,###', 'vi_VN').format(displayPrice);
+      final originalPrice = booking.finalPrice != null 
+          ? NumberFormat('#,###', 'vi_VN').format(booking.totalPrice)
+          : null;
+      final discountAmount = booking.finalPrice != null
+          ? NumberFormat('#,###', 'vi_VN').format(booking.totalPrice - booking.finalPrice!)
+          : null;
 
       // Tạo nội dung email HTML
       final emailBody = '''
@@ -164,6 +173,16 @@ class EmailService {
           <span class="info-label">Số lượng vé:</span>
           <span class="info-value">${booking.seats.length} vé</span>
         </div>
+        ${originalPrice != null ? '''
+        <div class="info-row">
+          <span class="info-label">Giá gốc:</span>
+          <span class="info-value"><del style="color: #999;">${originalPrice}₫</del></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Giảm giá:</span>
+          <span class="info-value" style="color: #28a745;"><strong>-${discountAmount}₫</strong></span>
+        </div>
+        ''' : ''}
         <div class="info-row">
           <span class="info-label">Tổng tiền:</span>
           <span class="info-value"><strong style="color: #E50914;">${totalPrice}₫</strong></span>
@@ -206,7 +225,7 @@ Chi tiết đặt vé:
 - Suất chiếu: ${showtimeDate}
 - Ghế đã chọn: ${seats}
 - Số lượng vé: ${booking.seats.length} vé
-- Tổng tiền: ${totalPrice}₫
+${originalPrice != null ? '- Giá gốc: ${originalPrice}₫\n- Giảm giá: -${discountAmount}₫\n' : ''}- Tổng tiền: ${totalPrice}₫
 
 Lưu ý:
 - Vui lòng đến rạp trước 15 phút để làm thủ tục vào rạp
