@@ -125,7 +125,16 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
   }
 
   void _calculateTotal() {
-    _totalPrice = _selectedSeats.length * _showtime!.price;
+    if (_theater == null) {
+      _totalPrice = 0.0;
+      return;
+    }
+    
+    // Tính tổng giá dựa trên loại ghế (đơn/cặp)
+    _totalPrice = 0.0;
+    for (String seat in _selectedSeats) {
+      _totalPrice += _theater!.getSeatPrice(seat);
+    }
   }
 
   void _proceedToPayment() async {

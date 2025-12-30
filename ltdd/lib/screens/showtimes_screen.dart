@@ -382,55 +382,77 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
+                      child: FutureBuilder(
+                        future: DatabaseService().getTheater(showtime.theaterId),
+                        builder: (context, snapshot) {
+                          final theater = snapshot.data;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.movie, color: Color(0xFFE50914), size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                '2D Phụ Đề',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2A2A2A),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '${showtime.availableSeats.length} ghế trống',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
+                              Row(
+                                children: [
+                                  const Icon(Icons.movie, color: Color(0xFFE50914), size: 18),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    '2D Phụ Đề',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '${NumberFormat('#,###', 'vi_VN').format(showtime.price)} ₫',
-                                style: const TextStyle(
-                                  color: Color(0xFFE50914),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              const SizedBox(height: 8),
+                              if (theater != null) ...[
+                                Row(
+                                  children: [
+                                    const Icon(Icons.meeting_room, color: Colors.grey, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      theater.name,
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 6),
+                              ],
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2A2A2A),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${showtime.availableSeats.length} ghế trống',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Giá theo loại ghế',
+                                    style: TextStyle(
+                                      color: Color(0xFFE50914),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                     const Icon(

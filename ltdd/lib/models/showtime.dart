@@ -5,7 +5,6 @@ class ShowtimeModel {
   final String movieId; // Tham chiếu đến Movie
   final String theaterId; // Tham chiếu đến phòng chiếu (nếu có model riêng)
   final int startTime; // Timestamp
-  final double price; // Giá vé cơ bản (VND)
   final List<String> availableSeats; // Danh sách ghế trống, ví dụ: ['A1', 'A2']
 
   ShowtimeModel({
@@ -13,7 +12,6 @@ class ShowtimeModel {
     required this.movieId,
     required this.theaterId,
     required this.startTime,
-    required this.price,
     required this.availableSeats,
   });
 
@@ -30,20 +28,6 @@ class ShowtimeModel {
       }
     } catch (e) {
       print('⚠️ Error parsing startTime in showtime $key: $e');
-    }
-    
-    // Safely convert price
-    double priceValue = 0.0;
-    try {
-      if (data['price'] != null) {
-        if (data['price'] is num) {
-          priceValue = data['price'].toDouble();
-        } else if (data['price'] is String) {
-          priceValue = double.tryParse(data['price']) ?? 0.0;
-        }
-      }
-    } catch (e) {
-      print('⚠️ Error parsing price in showtime $key: $e');
     }
     
     // Safely convert availableSeats
@@ -63,7 +47,6 @@ class ShowtimeModel {
       movieId: data['movieId']?.toString() ?? '',
       theaterId: data['theaterId']?.toString() ?? '',
       startTime: startTimeValue,
-      price: priceValue,
       availableSeats: seatsList,
     );
   }
@@ -73,7 +56,6 @@ class ShowtimeModel {
       'movieId': movieId,
       'theaterId': theaterId,
       'startTime': startTime,
-      'price': price,
       'availableSeats': availableSeats,
     };
   }

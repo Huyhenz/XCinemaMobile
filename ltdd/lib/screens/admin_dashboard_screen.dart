@@ -1158,7 +1158,6 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
   List<CinemaModel> _cinemas = [];
   List<MovieModel> _movies = [];
   List<TheaterModel> _theaters = [];
-  final _priceController = TextEditingController();
   DateTime _startTime = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   bool _isCreating = false;
@@ -1238,7 +1237,6 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
 
   @override
   void dispose() {
-    _priceController.dispose();
     super.dispose();
   }
 
@@ -1332,26 +1330,6 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
       );
       return;
     }
-    if (_priceController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng nhập giá vé'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
-      return;
-    }
-
-    final price = double.tryParse(_priceController.text.trim());
-    if (price == null || price <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Giá vé phải là số dương'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
-      return;
-    }
 
     setState(() => _isCreating = true);
     try {
@@ -1371,7 +1349,6 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
         movieId: _selectedMovieId!,
         theaterId: _selectedTheaterId!,
         startTime: _startTime.millisecondsSinceEpoch,
-        price: price,
         availableSeats: theater.seats,
       );
       context.read<AdminBloc>().add(CreateShowtime(showtime));
@@ -1386,7 +1363,6 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
         _startTime = DateTime.now();
         _selectedTime = TimeOfDay.now();
       });
-      _priceController.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1469,6 +1445,7 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
             else
               DropdownButtonFormField<String>(
                 value: _selectedMovieId,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Chọn Phim *',
                   border: OutlineInputBorder(),
@@ -1484,6 +1461,15 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                     ),
                   );
                 }).toList(),
+                selectedItemBuilder: (BuildContext context) {
+                  return _movies.map((movie) {
+                    return Text(
+                      movie.title,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    );
+                  }).toList();
+                },
                 onChanged: (value) {
                   setState(() => _selectedMovieId = value);
                 },
@@ -1554,24 +1540,6 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                 style: const TextStyle(color: Colors.white),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Price
-          TextFormField(
-            controller: _priceController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Giá Vé (VND) *',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.attach_money),
-            ),
-            validator: (value) {
-              if (value?.isEmpty ?? true) return 'Vui lòng nhập giá vé';
-              final price = double.tryParse(value!);
-              if (price == null || price <= 0) return 'Giá vé phải là số dương';
-              return null;
-            },
           ),
           const SizedBox(height: 24),
 
@@ -1682,10 +1650,6 @@ class _ManageShowtimesTab extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           'Thời gian: ${details['time']}',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                        ),
-                        Text(
-                          'Giá: ${NumberFormat('#,###', 'vi_VN').format(showtime.price)}₫',
                           style: TextStyle(color: Colors.grey[400], fontSize: 12),
                         ),
                         Text(
@@ -1802,7 +1766,6 @@ class _EditShowtimeDialog extends StatefulWidget {
 
 class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _priceController = TextEditingController();
   DateTime _startTime = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   String? _selectedTheaterId;
@@ -1815,7 +1778,6 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
     super.initState();
     _startTime = DateTime.fromMillisecondsSinceEpoch(widget.showtime.startTime);
     _selectedTime = TimeOfDay.fromDateTime(_startTime);
-    _priceController.text = widget.showtime.price.toString();
     _selectedTheaterId = widget.showtime.theaterId;
     _loadTheaters();
   }
@@ -1847,7 +1809,6 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
 
   @override
   void dispose() {
-    _priceController.dispose();
     super.dispose();
   }
 
@@ -1957,24 +1918,6 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
                   validator: (value) => value == null ? 'Vui lòng chọn phòng chiếu' : null,
                 ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Giá Vé (VND) *',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.attach_money),
-                  labelStyle: TextStyle(color: Colors.white),
-                ),
-                validator: (value) {
-                  if (value?.isEmpty ?? true) return 'Vui lòng nhập giá vé';
-                  final price = double.tryParse(value!);
-                  if (price == null || price <= 0) return 'Giá vé phải là số dương';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
               ListTile(
                 title: const Text('Ngày chiếu', style: TextStyle(color: Colors.white)),
                 subtitle: Text(
@@ -2024,7 +1967,6 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
                   movieId: widget.showtime.movieId,
                   theaterId: _selectedTheaterId ?? widget.showtime.theaterId,
                   startTime: _startTime.millisecondsSinceEpoch,
-                  price: double.parse(_priceController.text),
                   availableSeats: availableSeats,
                 );
                 context.read<AdminBloc>().add(UpdateShowtime(updatedShowtime));
@@ -2419,8 +2361,10 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
   String? _selectedCinemaId;
   List<CinemaModel> _cinemas = [];
   final _nameController = TextEditingController();
-  final _rowsController = TextEditingController();
-  final _seatsPerRowController = TextEditingController();
+  String? _selectedTheaterType; // 'normal', 'couple', 'vip'
+  final _singlePriceController = TextEditingController();
+  final _couplePriceController = TextEditingController();
+  final _vipPriceController = TextEditingController();
   bool _isLoading = true;
   bool _isCreating = false;
 
@@ -2443,35 +2387,136 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
     }
   }
 
+  // Tự động setup số hàng và số ghế dựa trên loại phòng
+  void _setupTheaterConfig() {
+    if (_selectedTheaterType == null) return;
+    
+    setState(() {
+      // Setup giá mặc định nếu chưa có
+      if (_singlePriceController.text.isEmpty) {
+        _singlePriceController.text = '50000';
+      }
+      if (_couplePriceController.text.isEmpty) {
+        _couplePriceController.text = '80000';
+      }
+      if (_vipPriceController.text.isEmpty) {
+        _vipPriceController.text = '150000';
+      }
+    });
+  }
+
+  // Tạo danh sách ghế và phân loại ghế dựa trên loại phòng
+  Map<String, dynamic> _generateSeats(String theaterType) {
+    List<String> seats = [];
+    Map<String, String> seatTypes = {};
+    int rows, seatsPerRow;
+
+    switch (theaterType) {
+      case 'normal':
+        // Phòng thường: 8 hàng, 12 ghế/hàng, hàng cuối là ghế đôi
+        rows = 8;
+        seatsPerRow = 12;
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, ...
+          String seatType = (i == rows - 1) ? 'couple' : 'single'; // Hàng cuối là ghế đôi
+          for (int j = 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = seatType;
+          }
+        }
+        break;
+      case 'couple':
+        // Phòng couple: 6 hàng, 8 ghế/hàng, tất cả là ghế đôi
+        rows = 6;
+        seatsPerRow = 8;
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, ...
+          for (int j = 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'couple';
+          }
+        }
+        break;
+      case 'vip':
+        // Phòng VIP: 4 hàng, 6 ghế/hàng, tất cả là giường nằm (VIP)
+        rows = 4;
+        seatsPerRow = 6;
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, ...
+          for (int j = 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'vip';
+          }
+        }
+        break;
+      default:
+        rows = 0;
+        seatsPerRow = 0;
+    }
+
+    return {
+      'seats': seats,
+      'seatTypes': seatTypes,
+      'rows': rows,
+      'seatsPerRow': seatsPerRow,
+      'capacity': seats.length,
+    };
+  }
+
   Future<void> _createTheater() async {
+    if (_selectedTheaterType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn loại phòng chiếu'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isCreating = true);
     try {
-      final rows = int.parse(_rowsController.text);
-      final seatsPerRow = int.parse(_seatsPerRowController.text);
+      final singlePrice = double.tryParse(_singlePriceController.text) ?? 0.0;
+      final couplePrice = double.tryParse(_couplePriceController.text) ?? 0.0;
+      final vipPrice = double.tryParse(_vipPriceController.text) ?? 0.0;
 
-      List<String> seats = [];
-      for (int i = 0; i < rows; i++) {
-        String row = String.fromCharCode(65 + i); // A, B, C, ...
-        for (int j = 1; j <= seatsPerRow; j++) {
-          seats.add('$row$j');
-        }
+      if (singlePrice <= 0 || couplePrice <= 0 || vipPrice <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng nhập giá hợp lệ cho tất cả loại ghế'),
+            backgroundColor: Color(0xFFE50914),
+          ),
+        );
+        setState(() => _isCreating = false);
+        return;
       }
-      final capacity = rows * seatsPerRow;
+
+      final config = _generateSeats(_selectedTheaterType!);
       final theater = TheaterModel(
         id: '',
         name: _nameController.text.trim(),
         cinemaId: _selectedCinemaId!,
-        capacity: capacity,
-        seats: seats,
+        capacity: config['capacity'] as int,
+        seats: config['seats'] as List<String>,
+        seatTypes: config['seatTypes'] as Map<String, String>,
+        theaterType: _selectedTheaterType!,
+        singleSeatPrice: singlePrice,
+        coupleSeatPrice: couplePrice,
+        vipSeatPrice: vipPrice,
       );
       context.read<AdminBloc>().add(CreateTheater(theater));
 
       // Reset form
       _nameController.clear();
-      _rowsController.clear();
-      _seatsPerRowController.clear();
+      _singlePriceController.clear();
+      _couplePriceController.clear();
+      _vipPriceController.clear();
       setState(() {
         _selectedCinemaId = null;
+        _selectedTheaterType = null;
       });
 
       if (mounted) {
@@ -2501,8 +2546,9 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
   @override
   void dispose() {
     _nameController.dispose();
-    _rowsController.dispose();
-    _seatsPerRowController.dispose();
+    _singlePriceController.dispose();
+    _couplePriceController.dispose();
+    _vipPriceController.dispose();
     super.dispose();
   }
 
@@ -2547,7 +2593,7 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
               const SizedBox(height: 16),
 
               // Theater Name
-                TextFormField(
+              TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: 'Tên Phòng Chiếu *',
@@ -2555,59 +2601,155 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
                   prefixIcon: Icon(Icons.meeting_room),
                   hintText: 'VD: Phòng 1, Phòng 2',
                 ),
-                  validator: (value) => value?.trim().isEmpty ?? true ? 'Vui lòng nhập tên phòng chiếu' : null,
+                validator: (value) => value?.trim().isEmpty ?? true ? 'Vui lòng nhập tên phòng chiếu' : null,
               ),
               const SizedBox(height: 16),
 
-              // Rows
-                TextFormField(
-                controller: _rowsController,
-                keyboardType: TextInputType.number,
+              // Theater Type
+              DropdownButtonFormField<String>(
+                value: _selectedTheaterType,
                 decoration: const InputDecoration(
-                  labelText: 'Số Hàng Ghế * (VD: 5 cho A-E)',
+                  labelText: 'Loại Phòng Chiếu *',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.grid_view),
-                    hintText: '5',
+                  prefixIcon: Icon(Icons.category),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'normal',
+                    child: Text(
+                      'Phòng Thường',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập số hàng ghế';
-                    }
-                    final rows = int.tryParse(value);
-                    if (rows == null || rows <= 0) {
-                      return 'Số hàng phải là số nguyên dương';
-                    }
-                    if (rows > 26) {
-                      return 'Số hàng không được vượt quá 26 (A-Z)';
-                    }
-                    return null;
-                  },
+                  DropdownMenuItem(
+                    value: 'couple',
+                    child: Text(
+                      'Phòng Couple',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'vip',
+                    child: Text(
+                      'Phòng VIP',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedTheaterType = value;
+                    _setupTheaterConfig();
+                  });
+                },
+                validator: (value) => value == null ? 'Vui lòng chọn loại phòng chiếu' : null,
               ),
               const SizedBox(height: 16),
 
-              // Seats per Row
-                TextFormField(
-                controller: _seatsPerRowController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Số Ghế Mỗi Hàng * (VD: 10)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.event_seat),
-                    hintText: '10',
+              // Hiển thị thông tin setup tự động
+              if (_selectedTheaterType != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE50914).withOpacity(0.3)),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập số ghế mỗi hàng';
-                    }
-                    final seatsPerRow = int.tryParse(value);
-                    if (seatsPerRow == null || seatsPerRow <= 0) {
-                      return 'Số ghế phải là số nguyên dương';
-                    }
-                    if (seatsPerRow > 50) {
-                      return 'Số ghế mỗi hàng không được vượt quá 50';
-                    }
-                    return null;
-                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Cấu hình tự động:',
+                        style: TextStyle(
+                          color: Color(0xFFE50914),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _selectedTheaterType == 'normal'
+                            ? '• 8 hàng (A-H), 12 ghế/hàng\n• Hàng A-G: Ghế đơn\n• Hàng H: Ghế đôi'
+                            : _selectedTheaterType == 'couple'
+                                ? '• 6 hàng (A-F), 8 ghế/hàng\n• Tất cả: Ghế đôi'
+                                : '• 4 hàng (A-D), 6 ghế/hàng\n• Tất cả: Giường nằm VIP',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Giá ghế đơn
+              TextFormField(
+                controller: _singlePriceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Giá Ghế Đơn (VND) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
+                  hintText: '50000',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập giá ghế đơn';
+                  }
+                  final price = double.tryParse(value);
+                  if (price == null || price <= 0) {
+                    return 'Giá phải là số dương';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Giá ghế đôi
+              TextFormField(
+                controller: _couplePriceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Giá Ghế Đôi (VND) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
+                  hintText: '80000',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập giá ghế đôi';
+                  }
+                  final price = double.tryParse(value);
+                  if (price == null || price <= 0) {
+                    return 'Giá phải là số dương';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Giá ghế VIP
+              TextFormField(
+                controller: _vipPriceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Giá Ghế VIP (VND) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
+                  hintText: '150000',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập giá ghế VIP';
+                  }
+                  final price = double.tryParse(value);
+                  if (price == null || price <= 0) {
+                    return 'Giá phải là số dương';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
 

@@ -222,14 +222,12 @@ class CompleteDatabaseFix {
       // 3. Tạo Showtimes
       print('⏰ Creating showtimes...');
       List<String> theaterIds = [theater1Id, theater2Id, theater3Id];
-      List<int> prices = [50000, 60000, 55000, 65000, 70000];
       int showtimeCount = 0;
 
       for (String movieId in movieIds) {
         // Mỗi phim 3-4 suất chiếu ở các rạp khác nhau
         for (int i = 0; i < 3; i++) {
           String theaterId = theaterIds[i % theaterIds.length];
-          int price = prices[i % prices.length];
 
           // Tạo suất chiếu vào các ngày khác nhau
           for (int day = 0; day < 2; day++) {
@@ -237,7 +235,7 @@ class CompleteDatabaseFix {
               Duration(days: day + 1, hours: 10 + (i * 3)),
             );
 
-            await _createShowtime(movieId, theaterId, showtime, price.toDouble());
+            await _createShowtime(movieId, theaterId, showtime);
             showtimeCount++;
           }
         }
@@ -314,7 +312,6 @@ class CompleteDatabaseFix {
       String movieId,
       String theaterId,
       DateTime startTime,
-      double price,
       ) async {
     final ref = _db.child('showtimes').push();
 
@@ -333,7 +330,6 @@ class CompleteDatabaseFix {
       'movieId': movieId,
       'theaterId': theaterId,
       'startTime': startTime.millisecondsSinceEpoch,
-      'price': price,
       'availableSeats': seats,
     });
 

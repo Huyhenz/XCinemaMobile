@@ -9,8 +9,6 @@ import '../blocs/profile/profile_bloc.dart';
 import '../blocs/profile/profile_event.dart';
 import '../blocs/profile/profile_state.dart';
 import '../services/database_services.dart';
-import '../utils/booking_helper.dart';
-import '../widgets/confirmation_dialog.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 import 'user_info_screen.dart';
@@ -676,27 +674,50 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          if (state.bookings.isEmpty)
-            const EmptyState(
-              icon: Icons.receipt_long_outlined,
-              title: 'Chưa có lịch sử đặt vé',
-              subtitle: 'Các vé bạn đặt sẽ hiển thị ở đây',
-            )
-          else
-            ...state.bookings.map((detail) => _buildBookingCardStatic(detail, context)),
+          // Box chứa lịch sử đặt vé với thanh cuộn
+          Container(
+            height: MediaQuery.of(context).size.height * 0.5, // Chiều cao động dựa trên màn hình (50% chiều cao màn hình)
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF2A2A2A)),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: state.bookings.isEmpty
+                  ? const Center(
+                      child: EmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Chưa có lịch sử đặt vé',
+                        subtitle: 'Các vé bạn đặt sẽ hiển thị ở đây',
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: state.bookings.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final detail = entry.value;
+                          final isLast = index == state.bookings.length - 1;
+                          return _buildBookingCardStatic(detail, context, removeBottomMargin: isLast);
+                        }).toList(),
+                      ),
+                    ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  static Widget _buildBookingCardStatic(BookingDetailModel detail, BuildContext context) {
+  static Widget _buildBookingCardStatic(BookingDetailModel detail, BuildContext context, {bool removeBottomMargin = false}) {
     final booking = detail.booking;
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm', 'vi_VN');
 
     return GestureDetector(
       onTap: () => _showBookingDetailStatic(context, detail),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: EdgeInsets.only(bottom: removeBottomMargin ? 0 : 16),
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(16),
@@ -907,34 +928,6 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            // ✅ Nút Xóa Booking (chỉ hiện nếu status = confirmed)
-            if (booking.status == 'confirmed') ...[
-              ElevatedButton(
-                onPressed: () => _confirmDeleteBookingStatic(context, booking.id, detail.movieTitle),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE50914),
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.delete_outline),
-                    SizedBox(width: 8),
-                    Text(
-                      'Hủy Đặt Vé',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
@@ -957,77 +950,6 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static void _confirmDeleteBookingStatic(BuildContext context, String bookingId, String movieTitle) {
-    ConfirmationDialog.show(
-      context: context,
-      title: 'Xác Nhận Hủy Vé',
-      message: 'Bạn có chắc muốn hủy vé xem phim "$movieTitle"?\n\nGhế sẽ được mở lại cho người khác đặt.',
-      confirmText: 'Xác Nhận Hủy',
-      cancelText: 'Không',
-      isDestructive: true,
-      icon: Icons.warning_amber_rounded,
-      onConfirm: () async {
-        Navigator.pop(context); // Đóng bottom sheet nếu đang mở
-        await _deleteBookingStatic(context, bookingId, movieTitle);
-      },
-    );
-  }
-
-  static Future<void> _deleteBookingStatic(BuildContext context, String bookingId, String movieTitle) async {
-    try {
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AppLoadingIndicator(message: 'Đang xử lý...'),
-      );
-
-      final userId = FirebaseAuth.instance.currentUser!.uid;
-
-      // Delete booking (tự động sync ghế trong deleteBooking)
-      await DatabaseService().deleteBooking(bookingId);
-
-      // Tạo notification hủy vé
-      await BookingHelper.createBookingCancelledNotification(
-        userId: userId,
-        bookingId: bookingId,
-        movieTitle: movieTitle,
-      );
-
-      // Close loading
-      if (context.mounted) Navigator.pop(context);
-
-      // Refresh profile
-      if (context.mounted) {
-        context.read<ProfileBloc>().add(RefreshProfile(userId));
-      }
-
-      // Show success message
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã hủy đặt vé. Ghế đã được mở lại!'),
-            backgroundColor: Color(0xFF4CAF50),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      // Close loading if still open
-      if (context.mounted) Navigator.pop(context);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi hủy vé: $e'),
-            backgroundColor: const Color(0xFFE50914),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
   }
 
   static Widget _buildDetailRowStatic(String label, String value, {bool isHighlight = false}) {

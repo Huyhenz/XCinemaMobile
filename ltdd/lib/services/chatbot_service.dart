@@ -363,7 +363,7 @@ class ChatBotService {
             for (var showtime in showtimes.take(5)) {
               final time = DateTime.fromMillisecondsSinceEpoch(showtime.startTime);
               final timeStr = DateFormat('HH:mm').format(time);
-              response += '    • $timeStr - ${showtime.price.toStringAsFixed(0)}₫\n';
+              response += '    • $timeStr\n';
             }
             if (showtimes.length > 5) {
               response += '    ... và ${showtimes.length - 5} suất khác\n';
