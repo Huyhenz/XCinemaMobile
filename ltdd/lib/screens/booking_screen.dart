@@ -275,28 +275,53 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
   }
 
   Widget _buildSeatLegend() {
+    if (_theater == null) return const SizedBox();
+    
+    // Lấy loại phòng để hiển thị legend phù hợp
+    final theaterType = _theater!.theaterType;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Column(
         children: [
-          _buildLegendItem('Trống', const Color(0xFF2A2A2A)),
-          _buildLegendItem('Đã chọn', const Color(0xFFE50914)),
-          _buildLegendItem('Đã đặt', const Color(0xFF616161)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildLegendItem('Trống', const Color(0xFF2A2A2A), theaterType),
+              _buildLegendItem('Đã chọn', const Color(0xFFE50914), theaterType),
+              _buildLegendItem('Đã đặt', const Color(0xFF616161), theaterType),
+            ],
+          ),
+          if (theaterType == 'normal') ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildLegendItem('Ghế đơn', const Color(0xFF2A2A2A), 'normal', seatType: 'single'),
+                _buildLegendItem('Ghế đôi', const Color(0xFF2A2A2A), 'normal', seatType: 'couple'),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
+  Widget _buildLegendItem(String label, Color color, String theaterType, {String? seatType}) {
+    final seatConfig = _getSeatConfig(theaterType, seatType ?? 'single');
     return Row(
       children: [
         Container(
-          width: 24,
-          height: 24,
+          width: seatConfig['width'] as double,
+          height: seatConfig['height'] as double,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(seatConfig['borderRadius'] as double),
+          ),
+          child: Icon(
+            seatConfig['icon'] as IconData,
+            color: Colors.white70,
+            size: seatConfig['iconSize'] as double,
           ),
         ),
         const SizedBox(width: 8),
@@ -308,8 +333,63 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     );
   }
 
+  // Lấy cấu hình icon và kích cỡ dựa trên loại phòng và loại ghế
+  Map<String, dynamic> _getSeatConfig(String theaterType, String seatType) {
+    switch (theaterType) {
+      case 'vip':
+        // Phòng VIP: giường đôi, kích cỡ bự (hình vuông lớn) - điều chỉnh để vừa 4 ô/hàng
+        return {
+          'icon': Icons.hotel,
+          'width': 65.0,
+          'height': 65.0,
+          'iconSize': 34.0,
+          'borderRadius': 10.0,
+          'isWide': false, // Giường đôi là hình vuông lớn
+        };
+      case 'couple':
+        // Phòng couple: ghế đôi dài ra (hình chữ nhật ngang dài)
+        return {
+          'icon': Icons.airline_seat_flat,
+          'width': 70.0,
+          'height': 40.0,
+          'iconSize': 28.0,
+          'borderRadius': 10.0,
+          'isWide': true, // Ghế đôi kéo dài ngang
+        };
+      case 'normal':
+      default:
+        // Phòng thường: ghế đơn nhỏ, ghế đôi ở hàng cuối dài ra
+        if (seatType == 'couple') {
+          return {
+            'icon': Icons.airline_seat_flat,
+            'width': 60.0,
+            'height': 38.0,
+            'iconSize': 24.0,
+            'borderRadius': 8.0,
+            'isWide': true,
+          };
+        } else {
+          return {
+            'icon': Icons.event_seat,
+            'width': 36.0,
+            'height': 36.0,
+            'iconSize': 18.0,
+            'borderRadius': 6.0,
+            'isWide': false,
+          };
+        }
+    }
+  }
+
   Widget _buildSeatMap() {
     if (_theater == null) return const SizedBox();
+
+    final theaterType = _theater!.theaterType;
+    
+    // Phòng VIP và Couple: cần hiển thị lối đi ở giữa
+    if (theaterType == 'vip' || theaterType == 'couple') {
+      return _buildVipSeatMap();
+    }
 
     Map<String, List<String>> rowSeats = {};
     for (String seat in _theater!.seats) {
@@ -344,8 +424,8 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
               Expanded(
                 child: Wrap(
                   alignment: WrapAlignment.center,
-                  spacing: 4,
-                  runSpacing: 4,
+                  spacing: 4.0,
+                  runSpacing: 4.0,
                   children: rowSeats[row]!.map((seat) => _buildSeat(seat)).toList(),
                 ),
               ),
@@ -356,10 +436,128 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     );
   }
 
+  // Hiển thị sơ đồ ghế cho phòng VIP và Couple với lối đi ở giữa
+  Widget _buildVipSeatMap() {
+    Map<String, List<String>> rowSeats = {};
+    for (String seat in _theater!.seats) {
+      String row = seat[0];
+      rowSeats.putIfAbsent(row, () => []);
+      rowSeats[row]!.add(seat);
+    }
+
+    List<String> sortedRows = rowSeats.keys.toList()..sort();
+    final theaterType = _theater!.theaterType;
+    
+    // Tính số ghế mỗi bên (chia đều)
+    int seatsPerRow = rowSeats[sortedRows.first]?.length ?? 4;
+    int leftSeatsCount = seatsPerRow ~/ 2;
+    int rightSeatsCount = seatsPerRow - leftSeatsCount;
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      children: sortedRows.map((row) {
+        // Tách ghế thành 2 nhóm: bên trái và bên phải
+        List<String> leftSeats = rowSeats[row]!.where((seat) {
+          final seatNum = int.tryParse(seat.substring(1)) ?? 0;
+          return seatNum <= leftSeatsCount;
+        }).toList()..sort();
+        
+        List<String> rightSeats = rowSeats[row]!.where((seat) {
+          final seatNum = int.tryParse(seat.substring(1)) ?? 0;
+          return seatNum > leftSeatsCount;
+        }).toList()..sort();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  row,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Bên trái: 2 giường đôi
+              Expanded(
+                flex: 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (leftSeats.isNotEmpty) _buildSeat(leftSeats[0]),
+                    if (leftSeats.length > 1) ...[
+                      const SizedBox(width: 4),
+                      _buildSeat(leftSeats[1]),
+                    ],
+                  ],
+                ),
+              ),
+              // Lối đi ở giữa
+              Container(
+                width: 30,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      height: 2,
+                      color: Colors.grey[700],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'LỐI ĐI',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      height: 2,
+                      color: Colors.grey[700],
+                    ),
+                  ],
+                ),
+              ),
+              // Bên phải: 2 giường đôi
+              Expanded(
+                flex: 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    if (rightSeats.isNotEmpty) _buildSeat(rightSeats[0]),
+                    if (rightSeats.length > 1) ...[
+                      const SizedBox(width: 4),
+                      _buildSeat(rightSeats[1]),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildSeat(String seat) {
+    if (_theater == null) return const SizedBox();
+    
     bool isAvailable = _showtime!.availableSeats.contains(seat);
     bool isSelected = _selectedSeats.contains(seat);
     bool isBooked = !isAvailable && !isSelected;
+    
+    // Lấy loại ghế từ theater
+    final seatType = _theater!.getSeatType(seat);
+    final theaterType = _theater!.theaterType;
+    final seatConfig = _getSeatConfig(theaterType, seatType);
 
     Color seatColor;
     if (isSelected) {
@@ -370,15 +568,21 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
       seatColor = const Color(0xFF616161);
     }
 
+    final width = seatConfig['width'] as double;
+    final height = seatConfig['height'] as double;
+    final borderRadius = seatConfig['borderRadius'] as double;
+    final icon = seatConfig['icon'] as IconData;
+    final iconSize = seatConfig['iconSize'] as double;
+
     return GestureDetector(
       onTap: isAvailable ? () => _toggleSeat(seat) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 36,
-        height: 36,
+        width: width,
+        height: height,
         decoration: BoxDecoration(
           color: seatColor,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(borderRadius),
           border: isBooked
               ? Border.all(
                   color: Colors.grey[700]!,
@@ -388,20 +592,24 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
         ),
         child: Center(
           child: isSelected
-              ? const Icon(Icons.check, color: Colors.white, size: 18)
+              ? Icon(Icons.check, color: Colors.white, size: iconSize * 0.9)
               : isBooked
                   ? Container(
                       decoration: BoxDecoration(
                         color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(borderRadius * 0.7),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close,
                         color: Colors.grey,
-                        size: 14,
+                        size: iconSize * 0.6,
                       ),
                     )
-                  : null,
+                  : Icon(
+                      icon,
+                      color: Colors.white70,
+                      size: iconSize,
+                    ),
         ),
       ),
     );

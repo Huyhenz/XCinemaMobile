@@ -2179,6 +2179,9 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
   final _nameController = TextEditingController();
   final _rowsController = TextEditingController();
   final _seatsPerRowController = TextEditingController();
+  final _singlePriceController = TextEditingController();
+  final _couplePriceController = TextEditingController();
+  final _vipPriceController = TextEditingController();
   bool _isSaving = false;
 
   @override
@@ -2195,6 +2198,10 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
       _rowsController.text = '5';
       _seatsPerRowController.text = '10';
     }
+    // Load giá hiện tại
+    _singlePriceController.text = widget.theater.singleSeatPrice.toStringAsFixed(0);
+    _couplePriceController.text = widget.theater.coupleSeatPrice.toStringAsFixed(0);
+    _vipPriceController.text = widget.theater.vipSeatPrice.toStringAsFixed(0);
   }
 
   @override
@@ -2202,7 +2209,88 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
     _nameController.dispose();
     _rowsController.dispose();
     _seatsPerRowController.dispose();
+    _singlePriceController.dispose();
+    _couplePriceController.dispose();
+    _vipPriceController.dispose();
     super.dispose();
+  }
+
+  // Tạo danh sách ghế và phân loại ghế dựa trên loại phòng (giống như trong _CreateTheaterTab)
+  Map<String, dynamic> _generateSeats(String theaterType, int rows, int seatsPerRow) {
+    List<String> seats = [];
+    Map<String, String> seatTypes = {};
+
+    switch (theaterType) {
+      case 'normal':
+        // Phòng thường: hàng cuối là ghế đôi, các hàng khác là ghế đơn
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, ...
+          String seatType = (i == rows - 1) ? 'couple' : 'single'; // Hàng cuối là ghế đôi
+          for (int j = 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = seatType;
+          }
+        }
+        break;
+      case 'couple':
+        // Phòng couple: tất cả là ghế đôi (chia đều 2 bên)
+        int leftSeats = seatsPerRow ~/ 2;
+        int rightSeats = seatsPerRow - leftSeats;
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, ...
+          // Bên trái
+          for (int j = 1; j <= leftSeats; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'couple';
+          }
+          // Bên phải
+          for (int j = leftSeats + 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'couple';
+          }
+        }
+        break;
+      case 'vip':
+        // Phòng VIP: tất cả là giường đôi (VIP)
+        // Nếu seatsPerRow là số chẵn, chia đều 2 bên
+        int leftSeats = seatsPerRow ~/ 2;
+        int rightSeats = seatsPerRow - leftSeats;
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, ...
+          // Bên trái
+          for (int j = 1; j <= leftSeats; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'vip';
+          }
+          // Bên phải
+          for (int j = leftSeats + 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'vip';
+          }
+        }
+        break;
+      default:
+        // Fallback: tất cả là ghế đơn
+        for (int i = 0; i < rows; i++) {
+          String row = String.fromCharCode(65 + i);
+          for (int j = 1; j <= seatsPerRow; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'single';
+          }
+        }
+    }
+
+    return {
+      'seats': seats,
+      'seatTypes': seatTypes,
+      'capacity': seats.length,
+    };
   }
 
   @override
@@ -2231,6 +2319,24 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                 ),
                 validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên phòng chiếu' : null,
               ),
+              // Hiển thị loại phòng (read-only)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.white70, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Loại phòng: ${widget.theater.theaterType == 'normal' ? 'Thường' : widget.theater.theaterType == 'couple' ? 'Couple' : 'VIP'}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _rowsController,
@@ -2249,21 +2355,100 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                   return null;
                 },
               ),
+              // Chỉ hiển thị số ghế mỗi hàng cho phòng normal
+              if (widget.theater.theaterType == 'normal') ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _seatsPerRowController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Số Ghế Mỗi Hàng * (VD: 10)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.event_seat),
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) return 'Vui lòng nhập số ghế mỗi hàng';
+                    final seatsPerRow = int.tryParse(value!);
+                    if (seatsPerRow == null || seatsPerRow <= 0) return 'Số ghế mỗi hàng phải là số dương';
+                    return null;
+                  },
+                ),
+              ] else ...[
+                // Phòng Couple và VIP: tự động tính số ghế mỗi hàng
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.white70, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Số ghế mỗi hàng: ${widget.theater.seats.isNotEmpty ? (widget.theater.seats.length ~/ widget.theater.seats.map((seat) => seat[0]).toSet().length) : 0} (tự động)',
+                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
-                controller: _seatsPerRowController,
+                controller: _singlePriceController,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
-                  labelText: 'Số Ghế Mỗi Hàng * (VD: 10)',
+                  labelText: 'Giá Ghế Đơn (₫) *',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.event_seat),
+                  prefixIcon: Icon(Icons.attach_money),
                   labelStyle: TextStyle(color: Colors.white),
                 ),
                 validator: (value) {
-                  if (value?.isEmpty ?? true) return 'Vui lòng nhập số ghế mỗi hàng';
-                  final seatsPerRow = int.tryParse(value!);
-                  if (seatsPerRow == null || seatsPerRow <= 0) return 'Số ghế mỗi hàng phải là số dương';
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập giá ghế đơn';
+                  final price = double.tryParse(value!);
+                  if (price == null || price <= 0) return 'Giá phải lớn hơn 0';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _couplePriceController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Giá Ghế Đôi (₫) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập giá ghế đôi';
+                  final price = double.tryParse(value!);
+                  if (price == null || price <= 0) return 'Giá phải lớn hơn 0';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _vipPriceController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Giá Giường Đôi VIP (₫) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.attach_money),
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập giá giường đôi VIP';
+                  final price = double.tryParse(value!);
+                  if (price == null || price <= 0) return 'Giá phải lớn hơn 0';
                   return null;
                 },
               ),
@@ -2282,7 +2467,21 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
               setState(() => _isSaving = true);
               try {
                 final rows = int.parse(_rowsController.text);
-                final seatsPerRow = int.parse(_seatsPerRowController.text);
+                int seatsPerRow;
+                
+                // Phòng Couple và VIP: tự động tính số ghế mỗi hàng từ seats hiện tại
+                if (widget.theater.theaterType == 'couple' || widget.theater.theaterType == 'vip') {
+                  if (widget.theater.seats.isNotEmpty) {
+                    final currentRows = widget.theater.seats.map((seat) => seat[0]).toSet().length;
+                    seatsPerRow = widget.theater.seats.length ~/ currentRows;
+                  } else {
+                    // Nếu không có seats, dùng giá trị mặc định
+                    seatsPerRow = widget.theater.theaterType == 'couple' ? 4 : 4;
+                  }
+                } else {
+                  // Phòng normal: lấy từ input
+                  seatsPerRow = int.parse(_seatsPerRowController.text);
+                }
                 
                 if (rows <= 0 || seatsPerRow <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -2295,22 +2494,24 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                   return;
                 }
 
-                // Regenerate seats based on rows and seatsPerRow
-                List<String> seats = [];
-                for (int i = 0; i < rows; i++) {
-                  String row = String.fromCharCode(65 + i); // A, B, C, ...
-                  for (int j = 1; j <= seatsPerRow; j++) {
-                    seats.add('$row$j');
-                  }
-                }
+                // Regenerate seats based on theaterType, rows and seatsPerRow (giữ nguyên loại ghế)
+                final singlePrice = double.parse(_singlePriceController.text);
+                final couplePrice = double.parse(_couplePriceController.text);
+                final vipPrice = double.parse(_vipPriceController.text);
                 
-                final capacity = rows * seatsPerRow;
+                final config = _generateSeats(widget.theater.theaterType, rows, seatsPerRow);
+                
                 final updatedTheater = TheaterModel(
                   id: widget.theater.id,
                   name: _nameController.text.trim(),
                   cinemaId: widget.theater.cinemaId,
-                  capacity: capacity,
-                  seats: seats,
+                  capacity: config['capacity'] as int,
+                  seats: config['seats'] as List<String>,
+                  seatTypes: config['seatTypes'] as Map<String, String>,
+                  theaterType: widget.theater.theaterType, // Giữ nguyên loại phòng
+                  singleSeatPrice: singlePrice,
+                  coupleSeatPrice: couplePrice,
+                  vipSeatPrice: vipPrice,
                 );
                 context.read<AdminBloc>().add(UpdateTheater(updatedTheater));
                 Navigator.pop(context);
@@ -2427,12 +2628,19 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
         }
         break;
       case 'couple':
-        // Phòng couple: 6 hàng, 8 ghế/hàng, tất cả là ghế đôi
+        // Phòng couple: 6 hàng, 4 ghế đôi/hàng, tất cả là ghế đôi (2 bên, mỗi bên 2 ghế, lối đi giữa)
         rows = 6;
-        seatsPerRow = 8;
+        seatsPerRow = 4; // Tổng 4 ghế đôi mỗi hàng (2 bên x 2 ghế)
         for (int i = 0; i < rows; i++) {
           String row = String.fromCharCode(65 + i); // A, B, C, ...
-          for (int j = 1; j <= seatsPerRow; j++) {
+          // Bên trái: 2 ghế đôi (1, 2)
+          for (int j = 1; j <= 2; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'couple';
+          }
+          // Bên phải: 2 ghế đôi (3, 4)
+          for (int j = 3; j <= 4; j++) {
             String seatName = '$row$j';
             seats.add(seatName);
             seatTypes[seatName] = 'couple';
@@ -2440,12 +2648,19 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
         }
         break;
       case 'vip':
-        // Phòng VIP: 4 hàng, 6 ghế/hàng, tất cả là giường nằm (VIP)
+        // Phòng VIP: 4 hàng, mỗi hàng 4 giường đôi (2 bên, mỗi bên 2 giường, lối đi giữa)
         rows = 4;
-        seatsPerRow = 6;
+        seatsPerRow = 4; // Tổng 4 giường đôi mỗi hàng (2 bên x 2 giường)
         for (int i = 0; i < rows; i++) {
-          String row = String.fromCharCode(65 + i); // A, B, C, ...
-          for (int j = 1; j <= seatsPerRow; j++) {
+          String row = String.fromCharCode(65 + i); // A, B, C, D
+          // Bên trái: 2 giường đôi (1, 2)
+          for (int j = 1; j <= 2; j++) {
+            String seatName = '$row$j';
+            seats.add(seatName);
+            seatTypes[seatName] = 'vip';
+          }
+          // Bên phải: 2 giường đôi (3, 4)
+          for (int j = 3; j <= 4; j++) {
             String seatName = '$row$j';
             seats.add(seatName);
             seatTypes[seatName] = 'vip';
@@ -2674,8 +2889,8 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
                         _selectedTheaterType == 'normal'
                             ? '• 8 hàng (A-H), 12 ghế/hàng\n• Hàng A-G: Ghế đơn\n• Hàng H: Ghế đôi'
                             : _selectedTheaterType == 'couple'
-                                ? '• 6 hàng (A-F), 8 ghế/hàng\n• Tất cả: Ghế đôi'
-                                : '• 4 hàng (A-D), 6 ghế/hàng\n• Tất cả: Giường nằm VIP',
+                                ? '• 6 hàng (A-F), 4 ghế đôi/hàng\n• Tất cả: Ghế đôi'
+                                : '• 4 hàng (A-D), 4 giường đôi/hàng\n• Lối đi giữa, mỗi bên 2 giường đôi',
                         style: const TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
