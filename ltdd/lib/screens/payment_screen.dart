@@ -353,12 +353,17 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           await DatabaseService().deleteTempBooking(_tempBookingId!, addBackSeats: false);
 
           // Gửi email xác nhận và tạo notification
+          bool emailSent = false;
+          String? userEmail;
+          String? emailError;
+          
           try {
             // Lấy thông tin user để gửi email
             final user = await DatabaseService().getUser(userId);
             if (user != null && user.email != null && user.email!.isNotEmpty) {
+              userEmail = user.email;
               // Gửi email xác nhận
-              final emailSent = await EmailService.sendBookingConfirmationEmail(
+              emailSent = await EmailService.sendBookingConfirmationEmail(
                 userEmail: user.email!,
                 userName: user.name ?? 'Khách hàng',
                 booking: booking,
@@ -382,15 +387,24 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 );
               } else {
                 print('⚠️ Không thể gửi email (SMTP chưa được cấu hình hoặc có lỗi)');
+                emailError = 'SMTP chưa được cấu hình. Vui lòng kiểm tra file .env';
                 // Vẫn tạo notification dù email không gửi được
                 await BookingHelper.createBookingSuccessNotification(
                   userId: userId,
                   bookingId: bookingId,
                   booking: booking,
                 );
+                // Tạo notification cảnh báo về email
+                await DatabaseService().createNotification(
+                  userId: userId,
+                  title: 'Không thể gửi email xác nhận',
+                  message: 'Email xác nhận không thể gửi được. Vui lòng kiểm tra cấu hình SMTP.',
+                  type: 'warning',
+                );
               }
             } else {
               print('⚠️ User không có email, chỉ tạo notification');
+              emailError = 'Tài khoản chưa có email';
               // Tạo notification nếu không có email
               await BookingHelper.createBookingSuccessNotification(
                 userId: userId,
@@ -400,6 +414,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             }
           } catch (e) {
             print('❌ Lỗi khi gửi email hoặc tạo notification: $e');
+            emailError = 'Lỗi khi gửi email: ${e.toString()}';
             // Vẫn tạo notification cơ bản nếu có lỗi
             try {
               await BookingHelper.createBookingSuccessNotification(
@@ -422,6 +437,9 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 builder: (context) => PaymentSuccessScreen(
                   transactionId: result.transactionId,
                   message: 'Vé của bạn đã được đặt thành công',
+                  emailSent: emailSent,
+                  userEmail: userEmail,
+                  emailError: emailError,
                 ),
               ),
             );

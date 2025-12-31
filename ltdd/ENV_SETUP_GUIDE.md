@@ -60,11 +60,20 @@ Sau khi tạo, file `.env` của bạn sẽ trông như thế này:
 PAYPAL_CLIENT_ID=AeA1QIZXiflr1_-...  # Client ID từ PayPal Dashboard
 PAYPAL_SECRET=EDrOnXQqL...           # Secret từ PayPal Dashboard
 PAYPAL_MODE=sandbox                  # 'sandbox' để test, 'live' cho production
+
+# SMTP Configuration (Cho Email Xác Nhận Đặt Vé)
+SMTP_HOST=smtp.gmail.com             # SMTP server (Gmail: smtp.gmail.com)
+SMTP_PORT=587                        # Port (Gmail: 587 cho TLS, 465 cho SSL)
+SMTP_USERNAME=your-email@gmail.com   # Email gửi đi
+SMTP_PASSWORD=your-app-password      # App Password (KHÔNG phải mật khẩu thường)
+SMTP_FROM_EMAIL=your-email@gmail.com # Email hiển thị trong "From"
+SMTP_FROM_NAME=XCinema               # Tên hiển thị trong "From"
 ```
 
 **Lưu ý**: 
 - ⚠️ **KHÔNG** commit file `.env` vào Git (đã thêm vào `.gitignore`)
 - ✅ File `.env.example` sẽ được commit (không có thông tin nhạy cảm)
+- 📧 **SMTP là tùy chọn**: Nếu không cấu hình SMTP, app vẫn hoạt động bình thường nhưng sẽ không gửi email xác nhận
 
 ## 🔒 Bảo Mật - Thêm vào .gitignore
 
@@ -127,12 +136,75 @@ Sau khi tạo file `.env`, test bằng cách:
 4. **LUÔN** sử dụng `.env` để lưu thông tin nhạy cảm
 5. File `.env.example` là template, **KHÔNG** chứa thông tin thật
 
+## 📧 Cấu Hình SMTP Cho Email Xác Nhận
+
+### Tại Sao Cần SMTP?
+Khi người dùng đặt vé thành công, hệ thống sẽ tự động gửi email xác nhận đến email của họ. Để gửi email, bạn cần cấu hình SMTP.
+
+### Cấu Hình Gmail (Khuyến Nghị)
+
+1. **Bật 2-Step Verification** cho tài khoản Gmail:
+   - Vào: https://myaccount.google.com/security
+   - Bật "2-Step Verification"
+
+2. **Tạo App Password**:
+   - Vào: https://myaccount.google.com/apppasswords
+   - Chọn "Mail" và "Other (Custom name)"
+   - Nhập tên: "XCinema App"
+   - Copy mật khẩu 16 ký tự được tạo (ví dụ: `abcd efgh ijkl mnop`)
+
+3. **Thêm vào file `.env`**:
+   ```env
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USERNAME=your-email@gmail.com
+   SMTP_PASSWORD=abcdefghijklmnop  # App Password (bỏ khoảng trắng)
+   SMTP_FROM_EMAIL=your-email@gmail.com
+   SMTP_FROM_NAME=XCinema
+   ```
+
+### Cấu Hình Email Khác
+
+**Outlook/Hotmail:**
+```env
+SMTP_HOST=smtp-mail.outlook.com
+SMTP_PORT=587
+```
+
+**Yahoo:**
+```env
+SMTP_HOST=smtp.mail.yahoo.com
+SMTP_PORT=587
+```
+
+**Custom SMTP Server:**
+```env
+SMTP_HOST=mail.yourdomain.com
+SMTP_PORT=587  # hoặc 465 cho SSL
+```
+
+### Kiểm Tra Email Đã Gửi
+
+Sau khi cấu hình SMTP:
+1. Đặt vé thành công
+2. Kiểm tra màn hình "Thanh toán thành công" - sẽ hiển thị trạng thái email
+3. Nếu email gửi thành công: "✅ Email xác nhận đã được gửi"
+4. Nếu email không gửi được: "⚠️ Email xác nhận chưa được gửi" + lý do
+
+### Lưu Ý Quan Trọng
+
+- ⚠️ **Gmail**: Phải dùng **App Password**, không dùng mật khẩu thường
+- ⚠️ **App Password**: Là chuỗi 16 ký tự, không có khoảng trắng
+- ✅ **Không bắt buộc**: Nếu không cấu hình SMTP, app vẫn hoạt động, chỉ không gửi email
+- ✅ **Vé vẫn hợp lệ**: Dù email không gửi được, vé vẫn được lưu và hiển thị trong lịch sử đặt vé
+
 ## 📋 Checklist
 
 - [ ] Đã copy `.env.example` thành `.env`
 - [ ] Đã điền PayPal Client ID
 - [ ] Đã điền PayPal Secret
 - [ ] Đã set `PAYPAL_MODE=sandbox` (để test)
+- [ ] Đã cấu hình SMTP (tùy chọn, để gửi email xác nhận)
 - [ ] Đã kiểm tra `.env` có trong `.gitignore`
 - [ ] Đã test app và không có lỗi về missing `.env`
 
@@ -152,4 +224,11 @@ Sau khi tạo file `.env`, test bằng cách:
 - Xóa file `.env` khỏi Git: `git rm --cached .env`
 - Kiểm tra `.gitignore` có chứa `.env` không
 - Commit lại: `git commit -m "Remove .env from tracking"`
+
+### Email Không Gửi Được
+- **Kiểm tra SMTP credentials**: Đảm bảo `SMTP_USERNAME` và `SMTP_PASSWORD` đã được điền trong `.env`
+- **Gmail**: Phải dùng App Password, không dùng mật khẩu thường
+- **Kiểm tra log**: Xem console log khi đặt vé để biết lý do email không gửi được
+- **Màn hình thành công**: Sẽ hiển thị trạng thái email và lý do nếu không gửi được
+- **Lưu ý**: Vé vẫn hợp lệ dù email không gửi được, có thể xem trong lịch sử đặt vé
 

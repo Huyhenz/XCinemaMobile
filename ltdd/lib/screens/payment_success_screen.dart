@@ -6,11 +6,17 @@ import 'package:flutter/material.dart';
 class PaymentSuccessScreen extends StatelessWidget {
   final String? transactionId;
   final String? message;
+  final bool? emailSent;
+  final String? userEmail;
+  final String? emailError;
 
   const PaymentSuccessScreen({
     super.key,
     this.transactionId,
     this.message,
+    this.emailSent,
+    this.userEmail,
+    this.emailError,
   });
 
   @override
@@ -92,6 +98,88 @@ class PaymentSuccessScreen extends StatelessWidget {
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                
+                // Email Status
+                if (emailSent != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: emailSent == true 
+                          ? const Color(0xFF4CAF50).withOpacity(0.1)
+                          : const Color(0xFFFF9800).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: emailSent == true 
+                            ? const Color(0xFF4CAF50).withOpacity(0.5)
+                            : const Color(0xFFFF9800).withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          emailSent == true 
+                              ? Icons.email
+                              : Icons.warning_amber_rounded,
+                          color: emailSent == true 
+                              ? const Color(0xFF4CAF50)
+                              : const Color(0xFFFF9800),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                emailSent == true 
+                                    ? 'Email xác nhận đã được gửi'
+                                    : 'Email xác nhận chưa được gửi',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: emailSent == true 
+                                      ? const Color(0xFF4CAF50)
+                                      : const Color(0xFFFF9800),
+                                ),
+                              ),
+                              if (emailSent == true && userEmail != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Đã gửi đến: $userEmail',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                              if (emailSent == false) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  emailError ?? 'Vui lòng kiểm tra cấu hình SMTP trong file .env',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  '💡 Lưu ý: Vé đã được đặt thành công và có trong lịch sử đặt vé.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],
