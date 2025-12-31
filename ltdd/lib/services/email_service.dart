@@ -102,6 +102,33 @@ class EmailService {
       final showtimeDate = dateFormat.format(
         DateTime.fromMillisecondsSinceEpoch(showtime.startTime),
       );
+      
+      // Format booking date
+      String bookingDateStr = 'N/A';
+      if (booking.bookedAt != null) {
+        bookingDateStr = dateFormat.format(
+          DateTime.fromMillisecondsSinceEpoch(booking.bookedAt!),
+        );
+      }
+      
+      // Format payment method
+      String paymentMethodStr = 'N/A';
+      if (booking.paymentMethod != null) {
+        switch (booking.paymentMethod!.toLowerCase()) {
+          case 'paypal':
+            paymentMethodStr = 'PayPal';
+            break;
+          case 'vnpay':
+            paymentMethodStr = 'VNPay';
+            break;
+          case 'zalopay':
+            paymentMethodStr = 'ZaloPay';
+            break;
+          default:
+            paymentMethodStr = booking.paymentMethod!;
+        }
+      }
+      
       final seats = booking.seats.join(', ');
       
       // Sử dụng finalPrice nếu có (sau khi áp dụng voucher), nếu không thì dùng totalPrice
@@ -113,6 +140,9 @@ class EmailService {
       final discountAmount = booking.finalPrice != null
           ? NumberFormat('#,###', 'vi_VN').format(booking.totalPrice - booking.finalPrice!)
           : null;
+      
+      // Generate QR code
+      final qrCode = _generateQRCode(bookingId);
 
       // Tạo nội dung email HTML
       final emailBody = '''
@@ -130,6 +160,7 @@ class EmailService {
     .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
     .info-label { font-weight: bold; color: #666; }
     .info-value { color: #333; }
+    .qr-code-box { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center; border: 2px solid #E50914; }
     .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
   </style>
 </head>
@@ -173,20 +204,26 @@ class EmailService {
           <span class="info-label">Số lượng vé:</span>
           <span class="info-value">${booking.seats.length} vé</span>
         </div>
-        ${originalPrice != null ? '''
-        <div class="info-row">
-          <span class="info-label">Giá gốc:</span>
-          <span class="info-value"><del style="color: #999;">${originalPrice}₫</del></span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Giảm giá:</span>
-          <span class="info-value" style="color: #28a745;"><strong>-${discountAmount}₫</strong></span>
-        </div>
-        ''' : ''}
         <div class="info-row">
           <span class="info-label">Tổng tiền:</span>
           <span class="info-value"><strong style="color: #E50914;">${totalPrice}₫</strong></span>
         </div>
+        <div class="info-row">
+          <span class="info-label">Ngày giờ đặt vé:</span>
+          <span class="info-value">${bookingDateStr}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Cách thức thanh toán:</span>
+          <span class="info-value"><strong>${paymentMethodStr}</strong></span>
+        </div>
+      </div>
+
+      <div class="qr-code-box" style="background: white; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center; border: 2px solid #E50914;">
+        <h3 style="color: #E50914; margin-bottom: 15px;">Mã QR Vé</h3>
+        <div style="background: white; padding: 20px; display: inline-block; border: 2px solid #ddd; border-radius: 8px;">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(qrCode)}" alt="QR Code" style="width: 200px; height: 200px;" />
+        </div>
+        <p style="margin-top: 15px; color: #666; font-size: 12px;">Vui lòng mang mã QR này khi đến rạp</p>
       </div>
 
       <p><strong>Lưu ý:</strong></p>
@@ -225,7 +262,10 @@ Chi tiết đặt vé:
 - Suất chiếu: ${showtimeDate}
 - Ghế đã chọn: ${seats}
 - Số lượng vé: ${booking.seats.length} vé
-${originalPrice != null ? '- Giá gốc: ${originalPrice}₫\n- Giảm giá: -${discountAmount}₫\n' : ''}- Tổng tiền: ${totalPrice}₫
+- Tổng tiền: ${totalPrice}₫
+- Ngày giờ đặt vé: ${bookingDateStr}
+- Cách thức thanh toán: ${paymentMethodStr}
+- Mã QR vé: ${qrCode}
 
 Lưu ý:
 - Vui lòng đến rạp trước 15 phút để làm thủ tục vào rạp
@@ -258,6 +298,19 @@ XCinema
       print('❌ Lỗi trong sendBookingConfirmationEmail: $e');
       return false;
     }
+  }
+  
+  /// Generate random QR code for booking
+  static String _generateQRCode(String bookingId) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final buffer = StringBuffer();
+    buffer.write(bookingId.substring(0, bookingId.length > 4 ? 4 : bookingId.length));
+    buffer.write('-');
+    for (int i = 0; i < 8; i++) {
+      buffer.write(chars[(random + i) % chars.length]);
+    }
+    return buffer.toString();
   }
 }
 

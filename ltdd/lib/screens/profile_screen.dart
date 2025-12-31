@@ -781,6 +781,20 @@ class ProfileScreen extends StatelessWidget {
                           Icons.event_seat,
                           booking.seats.join(', '),
                         ),
+                        if (booking.bookedAt != null) ...[
+                          const SizedBox(height: 4),
+                          _buildInfoRowStatic(
+                            Icons.calendar_today,
+                            'Đặt vé: ${dateFormat.format(DateTime.fromMillisecondsSinceEpoch(booking.bookedAt!))}',
+                          ),
+                        ],
+                        if (booking.paymentMethod != null) ...[
+                          const SizedBox(height: 4),
+                          _buildInfoRowStatic(
+                            Icons.payment,
+                            'Thanh toán: ${_getPaymentMethodName(booking.paymentMethod!)}',
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -827,6 +841,19 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _getPaymentMethodName(String paymentMethod) {
+    switch (paymentMethod.toLowerCase()) {
+      case 'paypal':
+        return 'PayPal';
+      case 'vnpay':
+        return 'VNPay';
+      case 'zalopay':
+        return 'ZaloPay';
+      default:
+        return paymentMethod;
+    }
   }
 
   static Widget _buildInfoRowStatic(IconData icon, String text) {
@@ -919,6 +946,20 @@ class ProfileScreen extends StatelessWidget {
                   const Divider(color: Color(0xFF3A3A3A)),
                   _buildDetailRowStatic('Ghế', booking.seats.join(', ')),
                   const Divider(color: Color(0xFF3A3A3A)),
+                  if (booking.bookedAt != null) ...[
+                    _buildDetailRowStatic(
+                      'Ngày giờ đặt vé',
+                      dateFormat.format(DateTime.fromMillisecondsSinceEpoch(booking.bookedAt!)),
+                    ),
+                    const Divider(color: Color(0xFF3A3A3A)),
+                  ],
+                  if (booking.paymentMethod != null) ...[
+                    _buildDetailRowStatic(
+                      'Cách thức thanh toán',
+                      _getPaymentMethodName(booking.paymentMethod!),
+                    ),
+                    const Divider(color: Color(0xFF3A3A3A)),
+                  ],
                   _buildDetailRowStatic(
                     'Tổng tiền',
                     '${NumberFormat('#,###', 'vi_VN').format(booking.finalPrice ?? booking.totalPrice)}đ',

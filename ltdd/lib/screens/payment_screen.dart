@@ -308,6 +308,10 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               ? _finalPrice 
               : null;
           
+          // Convert selected payment method string to string for database
+          // _selectedPaymentMethod is already a string ('paypal', 'vnpay', 'zalopay')
+          String paymentMethodStr = _selectedPaymentMethod;
+          
           BookingModel booking = BookingModel(
             id: '',
             userId: temp.userId,
@@ -318,6 +322,8 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             finalPrice: bookingFinalPrice,
             voucherId: _voucherCode,
             status: 'confirmed',
+            paymentMethod: paymentMethodStr,
+            bookedAt: DateTime.now().millisecondsSinceEpoch,
           );
           String bookingId = await DatabaseService().saveBooking(booking);
 
@@ -329,7 +335,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             amount: _finalPrice,
             status: 'success',
             transactionId: result.transactionId,
-            paymentMethod: _selectedPaymentMethod,
+            paymentMethod: paymentMethodStr,
           );
           await DatabaseService().savePayment(payment);
 

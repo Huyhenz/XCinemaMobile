@@ -11,6 +11,7 @@ class BookingModel {
   final String? voucherId; // Nếu áp dụng
   final int? bookedAt; // Timestamp
   final String status; // 'pending', 'confirmed', 'cancelled'
+  final String? paymentMethod; // 'paypal', 'vnpay', 'zalopay'
 
   BookingModel({
     required this.id,
@@ -23,6 +24,7 @@ class BookingModel {
     this.voucherId,
     this.bookedAt,
     this.status = 'pending',
+    this.paymentMethod,
   });
 
   factory BookingModel.fromMap(Map<dynamic, dynamic> data, String key) {
@@ -92,6 +94,7 @@ class BookingModel {
       voucherId: data['voucherId']?.toString(),
       bookedAt: bookedAtValue,
       status: data['status']?.toString() ?? 'pending',
+      paymentMethod: data['paymentMethod']?.toString(),
     );
   }
 
@@ -104,8 +107,9 @@ class BookingModel {
       'totalPrice': totalPrice,
       'finalPrice': finalPrice,
       'voucherId': voucherId,
-      'bookedAt': ServerValue.timestamp,
+      'bookedAt': bookedAt ?? ServerValue.timestamp,
       'status': status,
+      'paymentMethod': paymentMethod,
     };
   }
 }

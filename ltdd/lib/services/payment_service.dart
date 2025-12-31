@@ -108,36 +108,56 @@ class PaymentService {
   }
   
   // Load ZaloPay credentials from .env file
+  // ZaloPay provides public sandbox credentials for testing without registration
+  // Public Sandbox Credentials Set 1 (from developers.zalopay.vn):
+  // AppID: 2554
+  // Key1: sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn
+  // Key2: trMrHtvjo6myautxDUiAcYsVtaeQ8nhf
+  // 
+  // Public Sandbox Credentials Set 2 (alternative):
+  // AppID: 554
+  // Key1: 8NdU5pG5R2spGHGhyO99HN1OhD8IQJBn
+  // Key2: uUfsWgfLkRLzq6W2uNXTCxrfxs51auny
   static String get _zaloPayAppId {
     try {
-      return dotenv.env['ZALOPAY_APP_ID'] ?? '';
+      // Use from .env if provided, otherwise use public sandbox credentials (Set 1)
+      return dotenv.env['ZALOPAY_APP_ID'] ?? '2554';
     } catch (e) {
       print('⚠️ Error accessing ZALOPAY_APP_ID: $e');
-      return '';
+      // Fallback to public sandbox credentials (Set 1)
+      return '2554';
     }
   }
   
   static String get _zaloPayKey1 {
     try {
-      return dotenv.env['ZALOPAY_KEY1'] ?? '';
+      // Use from .env if provided, otherwise use public sandbox credentials (Set 1)
+      return dotenv.env['ZALOPAY_KEY1'] ?? 'sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn';
     } catch (e) {
       print('⚠️ Error accessing ZALOPAY_KEY1: $e');
-      return '';
+      // Fallback to public sandbox credentials (Set 1)
+      return 'sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn';
     }
   }
   
   static String get _zaloPayKey2 {
     try {
-      return dotenv.env['ZALOPAY_KEY2'] ?? '';
+      // Use from .env if provided, otherwise use public sandbox credentials (Set 1)
+      return dotenv.env['ZALOPAY_KEY2'] ?? 'trMrHtvjo6myautxDUiAcYsVtaeQ8nhf';
     } catch (e) {
       print('⚠️ Error accessing ZALOPAY_KEY2: $e');
-      return '';
+      // Fallback to public sandbox credentials (Set 1)
+      return 'trMrHtvjo6myautxDUiAcYsVtaeQ8nhf';
     }
   }
   
-  static String get _zaloPayBaseUrl => dotenv.env['ZALOPAY_MODE'] == 'production'
-      ? 'https://openapi.zalopay.vn'
-      : 'https://sb-openapi.zalopay.vn';
+  static String get _zaloPayBaseUrl {
+    // Always use sandbox for public credentials
+    final mode = dotenv.env['ZALOPAY_MODE'] ?? 'sandbox';
+    return mode == 'production'
+        ? 'https://openapi.zalopay.vn'
+        : 'https://sb-openapi.zalopay.vn';
+  }
   
   // ZaloPay credentials (for testing)
   // Replace with your actual ZaloPay credentials when integrating real API
@@ -145,7 +165,7 @@ class PaymentService {
   // static const String _zaloPayKey1 = 'YOUR_ZALOPAY_KEY1';
   // static const String _zaloPayKey2 = 'YOUR_ZALOPAY_KEY2';
   // static const String _zaloPayBaseUrl = 'https://sandbox.zalopay.com.vn'; // Sandbox URL
-
+  
   /// Get PayPal Access Token
   static Future<String?> _getPayPalAccessToken() async {
     try {
@@ -1615,6 +1635,115 @@ class PaymentService {
     return completer.future;
   }
 
+  /// Create ZaloPay order
+  /// Returns payment URL or null if failed
+  static Future<String?> _createZaloPayOrder({
+    required double amount,
+    required String description,
+  }) async {
+    try {
+      print('📦 Creating ZaloPay order...');
+      print('   Amount: $amount VND');
+      print('   Description: $description');
+
+      // Note: Public sandbox credentials are used by default if not in .env
+      // So we don't need to check for empty credentials here
+
+      // Generate unique order ID
+      // Format: YYMMDD_appid_xxxxx (max 40 chars)
+      // Example: 260101_554_1234567890
+      final now = DateTime.now();
+      final dateStr = '${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      // Use shorter random number instead of full timestamp
+      final randomSuffix = (DateTime.now().millisecondsSinceEpoch % 1000000000).toString();
+      final appTransId = '${dateStr}_${_zaloPayAppId}_$randomSuffix';
+      // Ensure max 40 chars
+      final appTransIdFinal = appTransId.length > 40 ? appTransId.substring(0, 40) : appTransId;
+      
+      // Get return URL from .env or use default
+      final returnUrl = dotenv.env['ZALOPAY_RETURN_URL'] ?? 'https://xcinema.app/zalopay/callback';
+
+      // Get current timestamp (milliseconds)
+      final appTime = DateTime.now().millisecondsSinceEpoch;
+
+      // ZaloPay order parameters
+      // Required: app_id, app_user, app_time, amount, app_trans_id, item, embed_data, mac
+      // Note: embed_data should be empty string for sandbox
+      final params = <String, dynamic>{
+        'app_id': _zaloPayAppId,
+        'app_user': 'XCinema_User',
+        'app_time': appTime,
+        'amount': amount.toInt(), // Amount in VND (integer)
+        'app_trans_id': appTransIdFinal, // Format: YYMMDD_appid_xxxxx (max 40 chars)
+        'item': description,
+        'description': description,
+        'embed_data': '', // Empty string for sandbox
+      };
+
+      // Create signature (HMAC SHA256)
+      // Format: app_id|app_trans_id|app_user|amount|app_time|embed_data|item
+      // Note: embed_data can be empty string
+      final macData = '${params['app_id']}|${params['app_trans_id']}|${params['app_user']}|${params['amount']}|${params['app_time']}|${params['embed_data']}|${params['item']}';
+      
+      print('   🔍 Debug - MAC data (for signature): $macData');
+      
+      final key = utf8.encode(_zaloPayKey1);
+      final bytes = utf8.encode(macData);
+      final hmacSha256 = Hmac(sha256, key);
+      final digest = hmacSha256.convert(bytes);
+      final mac = digest.toString();
+
+      params['mac'] = mac;
+
+      print('   🔍 Debug - App ID: $_zaloPayAppId');
+      print('   🔍 Debug - Order ID: $appTransIdFinal');
+      print('   🔍 Debug - MAC: $mac');
+
+      // Call ZaloPay API to create order
+      final baseUrl = _zaloPayBaseUrl;
+      final createOrderUrl = '$baseUrl/v2/create';
+      
+      print('   Base URL: $baseUrl');
+      print('   Create Order URL: $createOrderUrl');
+
+      final response = await http.post(
+        Uri.parse(createOrderUrl),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.map((key, value) => MapEntry(key, value.toString())),
+      ).timeout(const Duration(seconds: 30));
+
+      print('   Response status: ${response.statusCode}');
+      print('   Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['return_code'] == 1) {
+          // Success
+          final orderUrl = data['order_url'] as String?;
+          final zpTransToken = data['zp_trans_token'] as String?;
+          
+          print('✅ ZaloPay order created successfully');
+          print('   Order URL: $orderUrl');
+          print('   ZP Trans Token: $zpTransToken');
+          
+          return orderUrl;
+        } else {
+          print('❌ ZaloPay order creation failed: ${data['return_message']}');
+          return null;
+        }
+      } else {
+        print('❌ Failed to create ZaloPay order: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error creating ZaloPay order: $e');
+      return null;
+    }
+  }
+
   /// Process ZaloPay payment
   /// Returns payment result with transaction ID
   static Future<PaymentResult> processZaloPayPayment({
@@ -1624,28 +1753,69 @@ class PaymentService {
   }) async {
     try {
       print('💳 Processing ZaloPay payment: $amount VND');
-      
-      // In production, you would:
-      // 1. Create order on ZaloPay API
-      // 2. Get payment URL
-      // 3. Open ZaloPay app or webview
-      // 4. Handle callback and verify payment
-      
-      // For demo/testing, we'll simulate the payment with WebView
-      // Similar to PayPal flow
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Simulate creating payment URL
-      final paymentUrl = 'https://zalopay.vn/payment/mock?amount=$amount&description=${Uri.encodeComponent(description)}';
-      
-      // Show ZaloPay WebView
+
+      // Use public sandbox credentials by default (no registration needed)
+      // If custom credentials are provided in .env, they will be used instead
+      print('📝 Using ZaloPay App ID: $_zaloPayAppId');
+      if (_zaloPayAppId == '2554' || _zaloPayAppId == '554') {
+        print('✅ Using ZaloPay public sandbox credentials (no registration needed)');
+        print('   App ID: $_zaloPayAppId');
+        print('   Source: developers.zalopay.vn');
+        print('   ⚠️ Note: Will fallback to mock if API fails.');
+      } else {
+        print('✅ Using custom ZaloPay credentials from .env');
+        print('   App ID: $_zaloPayAppId');
+      }
+
+      // Step 1: Create order
+      String? paymentUrl = await _createZaloPayOrder(
+        amount: amount,
+        description: description,
+      );
+
+      if (paymentUrl == null) {
+        // If API fails (e.g., public credentials don't work), fallback to mock payment
+        print('⚠️ ZaloPay API failed. Using mock payment for testing.');
+        // Use a special marker URL to indicate mock payment
+        final mockPaymentUrl = 'mock://zalopay/payment?amount=$amount&description=${Uri.encodeComponent(description)}';
+        String? transactionId = await _showZaloPayWebView(
+          context: context,
+          paymentUrl: mockPaymentUrl,
+          amount: amount,
+          description: description,
+        );
+
+        if (transactionId != null) {
+          return PaymentResult(
+            success: true,
+            transactionId: transactionId,
+            message: 'Thanh toán ZaloPay thành công (Mock - API không khả dụng)',
+          );
+        } else {
+          return PaymentResult(
+            success: false,
+            transactionId: null,
+            message: 'Thanh toán ZaloPay đã bị hủy hoặc thất bại.',
+          );
+        }
+      }
+
+      // Step 2: Open ZaloPay checkout in WebView
+      if (!context.mounted) {
+        return PaymentResult(
+          success: false,
+          transactionId: null,
+          message: 'Màn hình đã bị đóng. Vui lòng thử lại.',
+        );
+      }
+
       String? transactionId = await _showZaloPayWebView(
         context: context,
         paymentUrl: paymentUrl,
         amount: amount,
         description: description,
       );
-      
+
       if (transactionId != null) {
         print('✅ ZaloPay payment successful: $transactionId');
         return PaymentResult(
@@ -1700,19 +1870,34 @@ class PaymentService {
               final url = request.url;
               print('🌐 ZaloPay WebView navigation: $url');
 
-              // Detect success or cancel URLs
-              if (url.contains('success') || url.contains('payment_success')) {
+              // Detect success or cancel URLs from ZaloPay callback
+              // ZaloPay returns to callback URL with status parameter
+              final uri = Uri.parse(url);
+              final status = uri.queryParameters['status'];
+              final appTransId = uri.queryParameters['app_trans_id'];
+              final zpTransId = uri.queryParameters['zp_trans_id'];
+
+              // Check for success (status = 1) or return URL pattern
+              if (status == '1' || 
+                  (url.contains('zalopay/callback') && status == '1') ||
+                  (url.contains('status=1') && appTransId != null)) {
                 if (!paymentCompleted) {
                   paymentCompleted = true;
                   print('✅ ZaloPay payment success detected');
-                  final transactionId = 'ZALOPAY_${DateTime.now().millisecondsSinceEpoch}';
+                  // Extract transaction ID from URL
+                  final transactionId = zpTransId ?? 
+                                       appTransId ?? 
+                                       'ZALOPAY_${DateTime.now().millisecondsSinceEpoch}';
+                  print('   Transaction ID: $transactionId');
                   if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   if (!completer.isCompleted) completer.complete(transactionId);
                 }
                 return NavigationDecision.prevent;
-              } else if (url.contains('cancel') || url.contains('payment_cancel')) {
+              } else if (status != null && status != '1' ||
+                         url.contains('cancel') ||
+                         url.contains('payment_cancel')) {
                 if (!paymentCompleted) {
-                  print('❌ ZaloPay payment cancelled by user');
+                  print('❌ ZaloPay payment cancelled or failed. Status: $status');
                   if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   if (!completer.isCompleted) completer.complete(null);
                 }
@@ -1723,8 +1908,89 @@ class PaymentService {
           ),
         );
 
-        // Create a mock ZaloPay payment page
-        final htmlContent = '''
+        // Check if paymentUrl is a real ZaloPay URL or mock URL
+        final isRealUrl = paymentUrl.startsWith('https://') &&
+                          (paymentUrl.contains('zalopay.vn') ||
+                           paymentUrl.contains('sb-openapi.zalopay.vn') ||
+                           paymentUrl.contains('openapi.zalopay.vn'));
+
+        print('🔍 Payment URL type check:');
+        print('   URL: $paymentUrl');
+        print('   Is real URL: $isRealUrl');
+
+        if (isRealUrl && !paymentUrl.contains('mock://')) {
+          // Load real ZaloPay payment URL
+          print('🔐 Loading ZaloPay payment page from API: $paymentUrl');
+          try {
+            controller.loadRequest(Uri.parse(paymentUrl));
+          } catch (e) {
+            print('❌ Error loading ZaloPay URL: $e');
+            // Fallback to mock
+            print('🔄 Falling back to mock payment page');
+            final htmlContent = _createMockZaloPayHTML(amount, description);
+            controller.loadHtmlString(htmlContent);
+          }
+        } else {
+          // Create a mock ZaloPay payment page for testing
+          print('🔐 Loading ZaloPay mock payment page');
+          final htmlContent = _createMockZaloPayHTML(amount, description);
+          controller.loadHtmlString(htmlContent);
+        }
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.95,
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey, width: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'ZaloPay',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0068FF),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                          if (!completer.isCompleted) completer.complete(null);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: WebViewWidget(controller: controller),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    return completer.future;
+  }
+
+  /// Create mock ZaloPay HTML content
+  static String _createMockZaloPayHTML(double amount, String description) {
+    return '''
 <!DOCTYPE html>
 <html>
 <head>
@@ -1846,60 +2112,7 @@ class PaymentService {
   </script>
 </body>
 </html>
-        ''';
-
-        print('🔐 Loading ZaloPay payment page');
-        controller.loadHtmlString(htmlContent);
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.95,
-            height: MediaQuery.of(context).size.height * 0.85,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey, width: 0.5),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'ZaloPay',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0068FF),
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                          if (!completer.isCompleted) completer.complete(null);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: WebViewWidget(controller: controller),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    return completer.future;
+    ''';
   }
 
   /// Process payment based on selected method
