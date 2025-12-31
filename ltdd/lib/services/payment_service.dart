@@ -274,7 +274,7 @@ class PaymentService {
             // Using custom URLs so we can detect when payment is successful
             'return_url': 'https://xcinema.app/payment/success',
             'cancel_url': 'https://xcinema.app/payment/cancel',
-            'user_action': 'PAY_NOW',
+            'user_action': 'PAY_NOW', // Use PAY_NOW to show "Pay Now" or "Complete Purchase" button
             'brand_name': 'XCinema',
             'landing_page': 'LOGIN', // Force login page every time (don't save session)
             'shipping_preference': 'NO_SHIPPING', // No shipping for movie tickets
@@ -391,6 +391,7 @@ class PaymentService {
     try {
       final Completer<String?> completer = Completer<String?>();
       bool paymentCaptured = false;
+      DateTime? paypalConfirmationPageLoadedTime;
       
       if (!context.mounted) {
         completer.complete(null);
@@ -469,7 +470,18 @@ class PaymentService {
             NavigationDelegate(
               onWebResourceError: (WebResourceError error) {
                 print('❌ WebView resource error: ${error.description} (code: ${error.errorCode})');
-                // Handle WebView crash
+                
+                // Check if this is the return URL error (ERR_NAME_NOT_RESOLVED)
+                // This happens when PayPal redirects to our non-existent return URL
+                // We want to handle this gracefully without closing the WebView immediately
+                if (error.errorCode == -2 && error.description.contains('ERR_NAME_NOT_RESOLVED')) {
+                  print('⚠️ Return URL not found (expected) - PayPal has shown confirmation screen');
+                  // Don't close WebView here - let the navigation handler deal with it
+                  // The error is expected since return URL doesn't exist
+                  return;
+                }
+                
+                // Handle other WebView crashes
                 if (error.errorCode == -1 || error.description.contains('net::ERR_')) {
                   print('💥 WebView crashed or network error detected');
                   if (dialogContext.mounted) {
@@ -552,6 +564,12 @@ class PaymentService {
                 bool hasApprovalToken = token != null && token.isNotEmpty;
                 bool hasPayerId = payerId != null && payerId.isNotEmpty;
                 
+                // Check if this is PayPal's confirmation page (hermes page)
+                // PayPal shows its own confirmation screen before redirecting to return URL
+                bool isPayPalConfirmationPage = url.contains('sandbox.paypal.com/webapps/hermes') ||
+                                                 url.contains('paypal.com/webapps/hermes') ||
+                                                 (url.contains('paypal.com') && url.contains('useraction=CONTINUE'));
+                
                 // Check if this is a return/approval URL AFTER user approved
                 // PayPal redirects to our return_url after approval with token and PayerID
                 // Our return URL: https://xcinema.app/payment/success?token=ORDER_ID&PayerID=PAYER_ID
@@ -559,162 +577,49 @@ class PaymentService {
                                    url.contains('/payment/success')) &&
                                   payerId != null && payerId.isNotEmpty;
                 
-                // Only treat as approval if:
-                // 1. We have PayerID (user has approved) AND
-                // 2. It's our return URL (PayPal redirected to our success URL)
-                // 3. NOT an error page
-                // 4. Haven't captured yet
-                bool isApproval = hasPayerId && 
-                                  isReturnUrl &&
-                                  !url.contains('/genericError') &&
-                                  !url.contains('/error') &&
-                                  !paymentCaptured;
-                
                 print('   Token: ${token ?? 'none'}');
                 print('   PayerID: ${payerId ?? 'none'}');
+                print('   Is PayPal confirmation page: $isPayPalConfirmationPage');
                 print('   Is return URL: $isReturnUrl');
-                print('   Is approval: $isApproval');
                 
-                if (isApproval && !paymentCaptured) {
+                // Allow PayPal to show its own confirmation page
+                // PayPal will show confirmation screen on its domain before redirecting
+                if (isPayPalConfirmationPage && !paymentCaptured) {
+                  print('✅ PayPal confirmation page detected - allowing to display');
+                  // Allow navigation to PayPal's confirmation page
+                  // PayPal will redirect to return URL after showing confirmation (usually 3 seconds)
+                  return NavigationDecision.navigate;
+                }
+                
+                // When PayPal redirects to our return URL (which doesn't exist),
+                // PayPal has already shown its confirmation screen
+                // We prevent navigation to avoid WebView crash, but keep WebView on PayPal's confirmation page
+                // Then we wait to ensure user has seen the confirmation before closing
+                if (isReturnUrl && !paymentCaptured) {
+                  print('✅ PayPal approval detected - return URL called');
+                  print('   PayPal confirmation screen is visible, preventing navigation to return URL');
+                  
                   paymentCaptured = true;
-                  print('✅ PayPal approval detected (token: $token, PayerID: $payerId), capturing payment...');
                   
-                  // Capture the payment immediately
-                  _capturePayPalPayment(
-                    accessToken: accessToken,
-                    orderId: orderId,
-                  ).then((result) {
-                    if (result != null && result['status'] == 'COMPLETED') {
-                      final purchaseUnits = result['purchase_units'] as List?;
-                      if (purchaseUnits != null && purchaseUnits.isNotEmpty) {
-                        final payments = purchaseUnits[0]['payments'] as Map?;
-                        if (payments != null) {
-                          final captures = payments['captures'] as List?;
-                          if (captures != null && captures.isNotEmpty) {
-                            final captureId = captures[0]['id'] as String?;
-                            print('✅ PayPal payment captured: $captureId');
-                            if (dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop(); // Close WebView dialog
-                            }
-                            // Don't navigate here - let payment_screen.dart handle navigation after processing booking
-                            if (!completer.isCompleted) {
-                              completer.complete(captureId ?? orderId);
-                            }
-                            return;
-                          }
-                        }
-                      }
-                      // Fallback to orderId if capture ID not found
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(); // Close WebView dialog
-                      }
-                      // Don't navigate here - let payment_screen.dart handle navigation after processing booking
-                      if (!completer.isCompleted) {
-                        completer.complete(orderId);
-                      }
+                  // Calculate delay to ensure user has seen PayPal's confirmation screen
+                  // PayPal shows confirmation for 2-3 seconds before redirecting
+                  Duration delay = const Duration(seconds: 3);
+                  if (paypalConfirmationPageLoadedTime != null) {
+                    final timeSinceConfirmation = DateTime.now().difference(paypalConfirmationPageLoadedTime!);
+                    // If confirmation page was loaded less than 3 seconds ago, wait for the remaining time
+                    if (timeSinceConfirmation < const Duration(seconds: 3)) {
+                      delay = Duration(milliseconds: 3000 - timeSinceConfirmation.inMilliseconds);
+                      print('   Confirmation page was loaded ${timeSinceConfirmation.inMilliseconds}ms ago, waiting ${delay.inMilliseconds}ms more');
                     } else {
-                      print('❌ PayPal capture failed: ${result?['status']}');
-                      if (result != null && result['details'] != null) {
-                        print('Error details: ${result['details']}');
-                      }
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(); // Close WebView dialog
-                      }
-                      // Navigate to failure screen - payment failed, no booking to process
-                      if (context.mounted) {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (ctx) => PaymentFailureScreen(
-                              message: 'Thanh toán không thể được xử lý. Vui lòng thử lại.',
-                              isCancelled: false,
-                            ),
-                          ),
-                        );
-                      }
-                      if (!completer.isCompleted) {
-                        completer.complete(null);
-                      }
+                      print('   Confirmation page was shown for ${timeSinceConfirmation.inSeconds}s, closing now');
+                      delay = const Duration(seconds: 0);
                     }
-                  }).catchError((error) {
-                    print('❌ Error capturing PayPal payment: $error');
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop(); // Close WebView dialog
-                    }
-                    // Navigate to failure screen - payment error, no booking to process
-                    if (context.mounted) {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (ctx) => PaymentFailureScreen(
-                            message: 'Lỗi xử lý thanh toán: $error',
-                            isCancelled: false,
-                          ),
-                        ),
-                      );
-                    }
-                    if (!completer.isCompleted) {
-                      completer.complete(null);
-                    }
-                  });
-                  
-                  // Prevent navigation to return URL (we handle it ourselves)
-                  return NavigationDecision.prevent;
-                }
-                
-                // Check if user cancelled - detect our cancel URL
-                // Our cancel URL: https://xcinema.app/payment/cancel
-                bool isCancelUrl = url.contains('xcinema.app/payment/cancel') || 
-                                  url.contains('/payment/cancel');
-                
-                if (isCancelUrl && !paymentCaptured) {
-                  print('❌ PayPal payment cancelled by user');
-                  print('   Cancel URL: $url');
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop(); // Close WebView dialog
                   }
-                  // Navigate to failure screen - user cancelled, no booking to process
-                  if (context.mounted) {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (ctx) => PaymentFailureScreen(
-                          message: 'Bạn đã hủy giao dịch thanh toán.',
-                          isCancelled: true,
-                        ),
-                      ),
-                    );
-                  }
-                  if (!completer.isCompleted) {
-                    completer.complete(null);
-                  }
-                  return NavigationDecision.prevent;
-                }
-                
-                // Allow all other navigations (login pages, approval pages, etc.)
-                // Don't interfere with PayPal's normal flow
-                return NavigationDecision.navigate;
-              },
-              onPageFinished: (String url) {
-                print('📄 PayPal page finished loading: $url');
-                
-                // Backup detection for approval (only if navigation didn't catch it)
-                // IMPORTANT: Don't detect approval on checkout page - only on return URL after approval
-                if (!paymentCaptured) {
-                  final uri = Uri.parse(url);
-                  final token = uri.queryParameters['token'];
-                  final payerId = uri.queryParameters['PayerID'];
                   
-                  // Only detect approval if:
-                  // 1. We have PayerID (user has approved) AND
-                  // 2. It's our return URL (PayPal redirected to our success URL)
-                  // 3. NOT an error page
-                  bool hasPayerId = payerId != null && payerId.isNotEmpty;
-                  bool isReturnUrl = (url.contains('xcinema.app/payment/success') || 
-                                     url.contains('/payment/success')) &&
-                                    hasPayerId;
-                  
-                  if (hasPayerId && isReturnUrl && !url.contains('/genericError') && !url.contains('/error')) {
-                    print('✅ Approval detected on page finished (backup)');
-                    print('   Token: $token, PayerID: $payerId');
-                    paymentCaptured = true;
+                  // Wait to ensure user has seen PayPal's confirmation screen
+                  // WebView will stay on PayPal's confirmation page (since we prevent navigation)
+                  Future.delayed(delay, () {
+                    if (!paymentCaptured) return; // Double check
                     
                     // Capture payment
                     _capturePayPalPayment(
@@ -791,7 +696,55 @@ class PaymentService {
                         completer.complete(null);
                       }
                     });
+                  });
+                  
+                  // Prevent navigation to non-existent return URL
+                  // This keeps WebView on PayPal's confirmation page so user can see it
+                  // WebView will show PayPal's confirmation screen until we close it after delay
+                  return NavigationDecision.prevent;
+                }
+                
+                // Check if user cancelled - detect our cancel URL
+                // Our cancel URL: https://xcinema.app/payment/cancel
+                bool isCancelUrl = url.contains('xcinema.app/payment/cancel') || 
+                                  url.contains('/payment/cancel');
+                
+                if (isCancelUrl && !paymentCaptured) {
+                  print('❌ PayPal payment cancelled by user');
+                  print('   Cancel URL: $url');
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop(); // Close WebView dialog
                   }
+                  // Navigate to failure screen - user cancelled, no booking to process
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (ctx) => PaymentFailureScreen(
+                          message: 'Bạn đã hủy giao dịch thanh toán.',
+                          isCancelled: true,
+                        ),
+                      ),
+                    );
+                  }
+                  if (!completer.isCompleted) {
+                    completer.complete(null);
+                  }
+                  return NavigationDecision.prevent;
+                }
+                
+                // Allow all other navigations (login pages, approval pages, etc.)
+                // Don't interfere with PayPal's normal flow
+                return NavigationDecision.navigate;
+              },
+              onPageFinished: (String url) {
+                print('📄 PayPal page finished loading: $url');
+                
+                // Detect when PayPal's confirmation page finishes loading
+                // Record the time so we can calculate proper delay when return URL is called
+                if (!paymentCaptured && url.contains('webapps/hermes') && url.contains('useraction=CONTINUE')) {
+                  paypalConfirmationPageLoadedTime = DateTime.now();
+                  print('✅ PayPal confirmation page loaded at ${paypalConfirmationPageLoadedTime}');
+                  print('   User can see PayPal\'s confirmation screen');
                 }
               },
             ),
