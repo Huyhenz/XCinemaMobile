@@ -278,8 +278,8 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         case 'paypal':
           paymentMethod = PaymentMethod.paypal;
           break;
-        case 'googlepay':
-          paymentMethod = PaymentMethod.googlePay;
+        case 'vnpay':
+          paymentMethod = PaymentMethod.vnpay;
           break;
         case 'zalopay':
           paymentMethod = PaymentMethod.zaloPay;
@@ -932,11 +932,11 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             const Color(0xFF0070BA), // PayPal blue
           ),
           _buildPaymentMethodTile(
-            'googlepay',
-            'Google Pay',
-            'Thanh toán qua Google Pay',
-            Icons.payment,
-            const Color(0xFF4285F4), // Google blue
+            'vnpay',
+            'VNPay',
+            'Thanh toán qua VNPay',
+            Icons.qr_code,
+            const Color(0xFFEE2D24), // VNPay red
           ),
           _buildPaymentMethodTile(
             'zalopay',

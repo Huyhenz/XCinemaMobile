@@ -26,6 +26,18 @@ void main() async {
       print('⚠️ PayPal Client ID not found in .env');
     }
     
+    // Check VNPay config
+    final vnpayTmnCode = dotenv.env['VNPAY_TMN_CODE'] ?? '';
+    final vnpayHashSecret = dotenv.env['VNPAY_HASH_SECRET'] ?? '';
+    if (vnpayTmnCode.isNotEmpty && vnpayHashSecret.isNotEmpty) {
+      print('✅ VNPay credentials found in .env');
+      print('📝 VNPay TMN Code: ${vnpayTmnCode.substring(0, vnpayTmnCode.length > 10 ? 10 : vnpayTmnCode.length)}...');
+      print('📝 VNPay Mode: ${dotenv.env['VNPAY_MODE'] ?? 'sandbox'}');
+    } else {
+      print('⚠️ VNPay credentials not found in .env (VNPay payment will use mock)');
+      print('💡 To enable real VNPay payment, add VNPAY_TMN_CODE, VNPAY_HASH_SECRET to .env file');
+    }
+    
     // Check SMTP config
     final smtpUsername = dotenv.env['SMTP_USERNAME'] ?? '';
     final smtpPassword = dotenv.env['SMTP_PASSWORD'] ?? '';

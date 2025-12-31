@@ -42,16 +42,18 @@ dependencies:
   flutter_staggered_animations: ^1.1.1
   smooth_page_indicator: ^1.1.0
   flutter_rating_bar: ^4.0.1
-  intl: ^0.19.0
+  intl: ^0.20.2
   qr_flutter: ^4.1.0
   
   # Payment
   http: ^1.2.2
   url_launcher: ^6.3.1
+  crypto: ^3.0.5
   flutter_dotenv: ^5.1.0
   webview_flutter: ^4.4.2
   webview_flutter_android: ^3.16.0
   webview_flutter_wkwebview: ^3.15.0
+  pay: ^2.0.0
   
   # Video Player
   youtube_player_flutter: ^9.0.0
@@ -71,6 +73,7 @@ dependency_overrides:
 flutter:
   uses-material-design: true
   
-  # Assets for .env file
+  # Assets for .env file and payment configs
   assets:
     - .env
+    - assets/google_pay_config.json
