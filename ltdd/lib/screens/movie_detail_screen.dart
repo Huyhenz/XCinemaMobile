@@ -37,6 +37,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _isLoading = true;
   String? _userId;
   UserModel? _user;
+  bool _hasShowtimes = false;
 
   @override
   void initState() {
@@ -80,6 +81,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         _averageRating = ratings.fold(0.0, (sum, r) => sum + r.rating) / ratings.length;
       }
       _comments = await DatabaseService().getCommentsByMovie(widget.movieId);
+      
+      // Kiểm tra xem phim có lịch chiếu không
+      final showtimes = await DatabaseService().getShowtimesByMovie(widget.movieId);
+      _hasShowtimes = showtimes.isNotEmpty;
     } catch (e) {
       print('Error loading data: $e');
     } finally {
@@ -1013,41 +1018,53 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _buildBookButton() {
+    final bool isEnabled = _hasShowtimes;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE50914), Color(0xFFB20710)],
-        ),
+        gradient: isEnabled
+            ? const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+              )
+            : null,
+        color: isEnabled ? null : Colors.grey.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFE50914).withOpacity(0.5),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow: isEnabled
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.5),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ]
+            : null,
       ),
       child: ElevatedButton(
-        onPressed: _handleBookButton,
+        onPressed: isEnabled ? _handleBookButton : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_seat, color: Colors.white, size: 24),
-            SizedBox(width: 12),
+            Icon(
+              isEnabled ? Icons.event_seat : Icons.event_busy,
+              color: isEnabled ? Colors.white : Colors.grey[400],
+              size: 24,
+            ),
+            const SizedBox(width: 12),
             Text(
-              'ĐẶT VÉ NGAY',
+              isEnabled ? 'ĐẶT VÉ NGAY' : 'CHƯA CÓ LỊCH CHIẾU',
               style: TextStyle(
-                color: Colors.white,
+                color: isEnabled ? Colors.white : Colors.grey[400],
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,

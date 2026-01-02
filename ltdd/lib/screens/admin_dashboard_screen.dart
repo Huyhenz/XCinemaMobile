@@ -810,6 +810,7 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
   DateTime? _releaseDate;
   bool _isCreating = false;
   bool _isLoadingCinemas = true;
+  bool _createForAllCinemas = false;
 
   @override
   void initState() {
@@ -843,10 +844,10 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
 
   Future<void> _createMovie() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCinemaId == null || _selectedCinemaId!.isEmpty) {
+    if (!_createForAllCinemas && (_selectedCinemaId == null || _selectedCinemaId!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng chọn rạp chiếu'),
+          content: Text('Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp'),
           backgroundColor: Color(0xFFE50914),
         ),
       );
@@ -864,34 +865,59 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
 
     setState(() => _isCreating = true);
     try {
-      final movie = MovieModel(
-        id: '',
-        title: _titleController.text.trim(),
-        description: _descController.text.trim(),
-        genre: _genreController.text.trim(),
-        duration: int.parse(_durationController.text.trim()),
-        posterUrl: _posterUrlController.text.trim(),
-        cinemaId: _selectedCinemaId!,
-        trailerUrl: _trailerUrlController.text.trim().isEmpty ? null : _trailerUrlController.text.trim(),
-        ageRating: _ageRatingController.text.trim().isEmpty ? null : _ageRatingController.text.trim(),
-        releaseDate: _releaseDate!.millisecondsSinceEpoch,
-      );
+      final List<String> cinemaIds = _createForAllCinemas 
+          ? _cinemas.map((c) => c.id).toList()
+          : [_selectedCinemaId!];
 
-      context.read<AdminBloc>().add(CreateMovie(movie));
+      int successCount = 0;
+      int failCount = 0;
+
+      for (final cinemaId in cinemaIds) {
+        try {
+          final movie = MovieModel(
+            id: '',
+            title: _titleController.text.trim(),
+            description: _descController.text.trim(),
+            genre: _genreController.text.trim(),
+            duration: int.parse(_durationController.text.trim()),
+            posterUrl: _posterUrlController.text.trim(),
+            cinemaId: cinemaId,
+            trailerUrl: _trailerUrlController.text.trim().isEmpty ? null : _trailerUrlController.text.trim(),
+            ageRating: _ageRatingController.text.trim().isEmpty ? null : _ageRatingController.text.trim(),
+            releaseDate: _releaseDate!.millisecondsSinceEpoch,
+          );
+
+          context.read<AdminBloc>().add(CreateMovie(movie));
+          successCount++;
+        } catch (e) {
+          print('Error creating movie for cinema $cinemaId: $e');
+          failCount++;
+        }
+      }
 
       // Reset form
       _formKey.currentState!.reset();
       setState(() {
         _selectedCinemaId = null;
         _releaseDate = null;
+        _createForAllCinemas = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Đã tạo phim thành công!'),
-          backgroundColor: Color(0xFF4CAF50),
-        ),
-      );
+      if (failCount == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Đã tạo phim thành công cho ${successCount} rạp!'),
+            backgroundColor: const Color(0xFF4CAF50),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Đã tạo phim cho $successCount rạp, thất bại $failCount rạp'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -921,7 +947,30 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
                     padding: EdgeInsets.all(16.0),
                     child: CircularProgressIndicator(color: Color(0xFFE50914)),
                   ))
-                else
+                else ...[
+                  // Checkbox for "Create for all cinemas"
+                  CheckboxListTile(
+                    title: const Text(
+                      'Tạo cho tất cả rạp',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Tạo phim này cho tất cả rạp cùng lúc',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    value: _createForAllCinemas,
+                    onChanged: (value) {
+                      setState(() {
+                        _createForAllCinemas = value ?? false;
+                        if (_createForAllCinemas) {
+                          _selectedCinemaId = null;
+                        }
+                      });
+                    },
+                    activeColor: const Color(0xFFE50914),
+                  ),
+                  const SizedBox(height: 8),
+                  // Cinema dropdown (disabled when "create for all" is selected)
                   DropdownButtonFormField<String>(
                     value: _selectedCinemaId,
                     decoration: const InputDecoration(
@@ -935,13 +984,14 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
                         child: Text(cinema.name),
                       );
                     }).toList(),
-                    onChanged: (value) {
+                    onChanged: _createForAllCinemas ? null : (value) {
                       setState(() {
                         _selectedCinemaId = value;
                       });
                     },
-                    validator: (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
+                    validator: _createForAllCinemas ? null : (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
                   ),
+                ],
                 const SizedBox(height: 16),
 
                 // Title
@@ -1186,6 +1236,8 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
   bool _isLoadingCinemas = true;
   bool _isLoadingMovies = false;
   bool _isLoadingTheaters = false;
+  bool _createForAllCinemas = false;
+  bool _useRandomTime = false;
 
   @override
   void initState() {
@@ -1251,10 +1303,28 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
       _movies = [];
       _theaters = [];
     });
-    if (cinemaId != null && cinemaId.isNotEmpty) {
+    if (cinemaId != null && cinemaId.isNotEmpty && !_createForAllCinemas) {
       _loadMoviesByCinema(cinemaId);
       _loadTheatersByCinema(cinemaId);
     }
+  }
+
+  // Generate random time between 7 AM and 11 PM
+  DateTime _generateRandomTime(DateTime baseDate) {
+    final random = Random();
+    // Random hour between 7 (7 AM) and 23 (11 PM)
+    final hour = 7 + random.nextInt(17); // 7 to 23 inclusive
+    // Random minute in 5-minute intervals: 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+    final minuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+    final minute = minuteOptions[random.nextInt(minuteOptions.length)];
+    
+    return DateTime(
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
+      hour,
+      minute,
+    );
   }
 
   @override
@@ -1325,10 +1395,10 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
   }
 
   Future<void> _createShowtime() async {
-    if (_selectedCinemaId == null || _selectedCinemaId!.isEmpty) {
+    if (!_createForAllCinemas && (_selectedCinemaId == null || _selectedCinemaId!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng chọn rạp chiếu'),
+          content: Text('Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp'),
           backgroundColor: Color(0xFFE50914),
         ),
       );
@@ -1343,7 +1413,7 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
       );
       return;
     }
-    if (_selectedTheaterId == null) {
+    if (!_createForAllCinemas && _selectedTheaterId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng chọn phòng chiếu'),
@@ -1355,25 +1425,84 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
 
     setState(() => _isCreating = true);
     try {
-      final theater = await DatabaseService().getTheater(_selectedTheaterId!);
-      if (theater == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Không tìm thấy phòng chiếu'),
-            backgroundColor: Color(0xFFE50914),
-          ),
-        );
-        return;
-      }
+      int successCount = 0;
+      int failCount = 0;
 
-      final showtime = ShowtimeModel(
-        id: '',
-        movieId: _selectedMovieId!,
-        theaterId: _selectedTheaterId!,
-        startTime: _startTime.millisecondsSinceEpoch,
-        availableSeats: theater.seats,
-      );
-      context.read<AdminBloc>().add(CreateShowtime(showtime));
+      if (_createForAllCinemas) {
+        // Create showtimes for all cinemas
+        for (final cinema in _cinemas) {
+          try {
+            // Get all theaters for this cinema
+            final theaters = await DatabaseService().getTheatersByCinema(cinema.id);
+            if (theaters.isEmpty) {
+              print('No theaters found for cinema ${cinema.id}');
+              continue;
+            }
+
+            // Get movies for this cinema (to check if the selected movie exists in this cinema)
+            final cinemaMovies = await DatabaseService().getMoviesByCinemaForAdmin(cinema.id);
+            final movieExists = cinemaMovies.any((m) => m.id == _selectedMovieId);
+            
+            if (!movieExists) {
+              print('Movie ${_selectedMovieId} does not exist in cinema ${cinema.id}');
+              continue;
+            }
+
+            // Create showtime for each theater in this cinema
+            for (final theater in theaters) {
+              try {
+                // Generate time: use random if enabled, otherwise use selected time
+                final showtimeDateTime = _useRandomTime 
+                    ? _generateRandomTime(_startTime)
+                    : _startTime;
+
+                final showtime = ShowtimeModel(
+                  id: '',
+                  movieId: _selectedMovieId!,
+                  theaterId: theater.id,
+                  startTime: showtimeDateTime.millisecondsSinceEpoch,
+                  availableSeats: theater.seats,
+                );
+                context.read<AdminBloc>().add(CreateShowtime(showtime));
+                successCount++;
+              } catch (e) {
+                print('Error creating showtime for theater ${theater.id}: $e');
+                failCount++;
+              }
+            }
+          } catch (e) {
+            print('Error processing cinema ${cinema.id}: $e');
+            failCount++;
+          }
+        }
+      } else {
+        // Create showtime for single cinema
+        final theater = await DatabaseService().getTheater(_selectedTheaterId!);
+        if (theater == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không tìm thấy phòng chiếu'),
+              backgroundColor: Color(0xFFE50914),
+            ),
+          );
+          return;
+        }
+
+        // Generate time: use random if enabled, otherwise use selected time
+        final showtimeDateTime = _useRandomTime 
+            ? _generateRandomTime(_startTime)
+            : _startTime;
+
+        final showtime = ShowtimeModel(
+          id: '',
+          movieId: _selectedMovieId!,
+          theaterId: _selectedTheaterId!,
+          startTime: showtimeDateTime.millisecondsSinceEpoch,
+          availableSeats: theater.seats,
+        );
+        context.read<AdminBloc>().add(CreateShowtime(showtime));
+        successCount++;
+      }
 
       // Reset form
       setState(() {
@@ -1384,14 +1513,25 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
         _theaters = [];
         _startTime = DateTime.now();
         _selectedTime = TimeOfDay.now();
+        _createForAllCinemas = false;
+        _useRandomTime = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Đã tạo lịch chiếu thành công!'),
-          backgroundColor: Color(0xFF4CAF50),
-        ),
-      );
+      if (failCount == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Đã tạo lịch chiếu thành công! (${successCount} lịch chiếu)'),
+            backgroundColor: const Color(0xFF4CAF50),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Đã tạo $successCount lịch chiếu, thất bại $failCount lịch chiếu'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1417,7 +1557,34 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
               padding: EdgeInsets.all(16.0),
               child: CircularProgressIndicator(color: Color(0xFFE50914)),
             ))
-          else
+          else ...[
+            // Checkbox for "Create for all cinemas"
+            CheckboxListTile(
+              title: const Text(
+                'Tạo cho tất cả rạp',
+                style: TextStyle(fontSize: 16),
+              ),
+              subtitle: const Text(
+                'Tạo lịch chiếu cho tất cả rạp cùng lúc',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              value: _createForAllCinemas,
+              onChanged: (value) {
+                setState(() {
+                  _createForAllCinemas = value ?? false;
+                  if (_createForAllCinemas) {
+                    _selectedCinemaId = null;
+                    _selectedMovieId = null;
+                    _selectedTheaterId = null;
+                    _movies = [];
+                    _theaters = [];
+                  }
+                });
+              },
+              activeColor: const Color(0xFFE50914),
+            ),
+            const SizedBox(height: 8),
+            // Cinema dropdown (disabled when "create for all" is selected)
             DropdownButtonFormField<String>(
               value: _selectedCinemaId,
               decoration: const InputDecoration(
@@ -1431,13 +1598,84 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                   child: Text(cinema.name),
                 );
               }).toList(),
-              onChanged: _onCinemaChanged,
-              validator: (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
+              onChanged: _createForAllCinemas ? null : _onCinemaChanged,
+              validator: _createForAllCinemas ? null : (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
             ),
+          ],
           const SizedBox(height: 16),
 
-          // Movie Selection (chỉ hiển thị sau khi chọn cinema)
-          if (_selectedCinemaId != null && _selectedCinemaId!.isNotEmpty) ...[
+          // Movie Selection (chỉ hiển thị sau khi chọn cinema hoặc khi tạo cho tất cả rạp)
+          if (_createForAllCinemas || (_selectedCinemaId != null && _selectedCinemaId!.isNotEmpty)) ...[
+            // When creating for all cinemas, load all movies
+            if (_createForAllCinemas) ...[
+              FutureBuilder<List<MovieModel>>(
+                future: DatabaseService().getAllMoviesForAdmin(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(color: Color(0xFFE50914)),
+                    ));
+                  }
+                  if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2A2A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Không có phim nào trong hệ thống. Vui lòng tạo phim trước.',
+                              style: TextStyle(color: Colors.orange, fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final allMovies = snapshot.data!;
+                  return DropdownButtonFormField<String>(
+                    value: _selectedMovieId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Chọn Phim *',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.movie),
+                    ),
+                    items: allMovies.map((movie) {
+                      return DropdownMenuItem<String>(
+                        value: movie.id,
+                        child: Text(
+                          movie.title,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                      );
+                    }).toList(),
+                    selectedItemBuilder: (BuildContext context) {
+                      return allMovies.map((movie) {
+                        return Text(
+                          movie.title,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        );
+                      }).toList();
+                    },
+                    onChanged: (value) {
+                      setState(() => _selectedMovieId = value);
+                    },
+                    validator: (value) => value == null ? 'Vui lòng chọn phim' : null,
+                  );
+                },
+              ),
+            ] else
+            // When creating for single cinema, use existing logic
             if (_isLoadingMovies)
               const Center(child: Padding(
                 padding: EdgeInsets.all(16.0),
@@ -1499,8 +1737,29 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
               ),
             const SizedBox(height: 16),
 
-            // Theater Selection (chỉ hiển thị sau khi chọn cinema)
-            if (_isLoadingTheaters)
+            // Theater Selection (chỉ hiển thị khi tạo cho 1 rạp, không hiển thị khi tạo cho tất cả rạp)
+            if (_createForAllCinemas)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Lịch chiếu sẽ được tạo cho tất cả phòng chiếu của tất cả rạp',
+                        style: TextStyle(color: Colors.blue, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (_isLoadingTheaters)
               const Center(child: Padding(
                 padding: EdgeInsets.all(16.0),
                 child: CircularProgressIndicator(color: Color(0xFFE50914)),
@@ -1548,18 +1807,45 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
           ],
           const SizedBox(height: 16),
 
+          // Random Time Checkbox
+          CheckboxListTile(
+            title: const Text(
+              'Random thời gian',
+              style: TextStyle(fontSize: 16),
+            ),
+            subtitle: const Text(
+              'Tự động tạo thời gian ngẫu nhiên từ 7h sáng đến 11h tối (chỉ áp dụng khi tạo cho tất cả rạp)',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            value: _useRandomTime,
+            onChanged: (value) {
+              setState(() {
+                _useRandomTime = value ?? false;
+              });
+            },
+            activeColor: const Color(0xFFE50914),
+          ),
+          const SizedBox(height: 8),
+
           // Date & Time Selection
           InkWell(
-            onTap: _selectDateTime,
+            onTap: _useRandomTime && _createForAllCinemas ? null : _selectDateTime,
             child: InputDecorator(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Ngày và Giờ Chiếu *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.calendar_today),
+                suffixIcon: _useRandomTime && _createForAllCinemas
+                    ? const Icon(Icons.shuffle, color: Colors.orange)
+                    : null,
               ),
               child: Text(
-                '${DateFormat('dd/MM/yyyy').format(_startTime)} ${_selectedTime.format(context)}',
-                style: const TextStyle(color: Colors.white),
+                _useRandomTime && _createForAllCinemas
+                    ? '${DateFormat('dd/MM/yyyy').format(_startTime)} - Thời gian sẽ được random'
+                    : '${DateFormat('dd/MM/yyyy').format(_startTime)} ${_selectedTime.format(context)}',
+                style: TextStyle(
+                  color: _useRandomTime && _createForAllCinemas ? Colors.orange : Colors.white,
+                ),
               ),
             ),
           ),
@@ -2590,6 +2876,7 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
   final _vipPriceController = TextEditingController();
   bool _isLoading = true;
   bool _isCreating = false;
+  bool _createForAllCinemas = false;
 
   @override
   void initState() {
@@ -2713,6 +3000,15 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
       );
       return;
     }
+    if (!_createForAllCinemas && (_selectedCinemaId == null || _selectedCinemaId!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
 
     setState(() => _isCreating = true);
     try {
@@ -2732,19 +3028,50 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
       }
 
       final config = _generateSeats(_selectedTheaterType!);
-      final theater = TheaterModel(
-        id: '',
-        name: _nameController.text.trim(),
-        cinemaId: _selectedCinemaId!,
-        capacity: config['capacity'] as int,
-        seats: config['seats'] as List<String>,
-        seatTypes: config['seatTypes'] as Map<String, String>,
-        theaterType: _selectedTheaterType!,
-        singleSeatPrice: singlePrice,
-        coupleSeatPrice: couplePrice,
-        vipSeatPrice: vipPrice,
-      );
-      context.read<AdminBloc>().add(CreateTheater(theater));
+      
+      int successCount = 0;
+      int failCount = 0;
+
+      if (_createForAllCinemas) {
+        // Tạo phòng chiếu cho tất cả rạp
+        for (final cinema in _cinemas) {
+          try {
+            final theater = TheaterModel(
+              id: '',
+              name: _nameController.text.trim(),
+              cinemaId: cinema.id,
+              capacity: config['capacity'] as int,
+              seats: config['seats'] as List<String>,
+              seatTypes: config['seatTypes'] as Map<String, String>,
+              theaterType: _selectedTheaterType!,
+              singleSeatPrice: singlePrice,
+              coupleSeatPrice: couplePrice,
+              vipSeatPrice: vipPrice,
+            );
+            context.read<AdminBloc>().add(CreateTheater(theater));
+            successCount++;
+          } catch (e) {
+            print('Error creating theater for cinema ${cinema.id}: $e');
+            failCount++;
+          }
+        }
+      } else {
+        // Tạo phòng chiếu cho một rạp
+        final theater = TheaterModel(
+          id: '',
+          name: _nameController.text.trim(),
+          cinemaId: _selectedCinemaId!,
+          capacity: config['capacity'] as int,
+          seats: config['seats'] as List<String>,
+          seatTypes: config['seatTypes'] as Map<String, String>,
+          theaterType: _selectedTheaterType!,
+          singleSeatPrice: singlePrice,
+          coupleSeatPrice: couplePrice,
+          vipSeatPrice: vipPrice,
+        );
+        context.read<AdminBloc>().add(CreateTheater(theater));
+        successCount++;
+      }
 
       // Reset form
       _nameController.clear();
@@ -2754,15 +3081,25 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
       setState(() {
         _selectedCinemaId = null;
         _selectedTheaterType = null;
+        _createForAllCinemas = false;
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã tạo phòng chiếu thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        if (failCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Đã tạo phòng chiếu thành công cho ${successCount} rạp!'),
+              backgroundColor: const Color(0xFF4CAF50),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠️ Đã tạo phòng chiếu cho $successCount rạp, thất bại $failCount rạp'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -2806,7 +3143,29 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Cinema Selection
+              // Checkbox for "Create for all cinemas"
+              CheckboxListTile(
+                title: const Text(
+                  'Tạo cho tất cả rạp',
+                  style: TextStyle(fontSize: 16),
+                ),
+                subtitle: const Text(
+                  'Tạo phòng chiếu này cho tất cả rạp cùng lúc',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                value: _createForAllCinemas,
+                onChanged: (value) {
+                  setState(() {
+                    _createForAllCinemas = value ?? false;
+                    if (_createForAllCinemas) {
+                      _selectedCinemaId = null;
+                    }
+                  });
+                },
+                activeColor: const Color(0xFFE50914),
+              ),
+              const SizedBox(height: 8),
+              // Cinema Selection (disabled when "create for all" is selected)
               DropdownButtonFormField<String>(
                 value: _selectedCinemaId,
                 decoration: const InputDecoration(
@@ -2820,12 +3179,12 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
                     child: Text(cinema.name),
                   );
                 }).toList(),
-                onChanged: (value) {
+                onChanged: _createForAllCinemas ? null : (value) {
                   setState(() {
                     _selectedCinemaId = value;
                   });
                 },
-                validator: (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
+                validator: _createForAllCinemas ? null : (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
               ),
               const SizedBox(height: 16),
 
