@@ -292,5 +292,40 @@ class PointsService {
       rethrow;
     }
   }
+
+  // Thêm voucher vào user (cho free voucher hoặc task voucher đã unlock)
+  Future<void> addUserVoucher(String userId, String voucherId, {String? source}) async {
+    try {
+      // Kiểm tra voucher có tồn tại không
+      final voucher = await _dbService.getVoucher(voucherId);
+      if (voucher == null) {
+        throw Exception('Voucher không tồn tại');
+      }
+
+      // Kiểm tra voucher còn hạn không
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (voucher.expiryDate < now) {
+        throw Exception('Voucher đã hết hạn');
+      }
+
+      if (!voucher.isActive) {
+        throw Exception('Voucher không còn hoạt động');
+      }
+
+      // Lưu voucher vào user_vouchers
+      final ref = _db.child('user_vouchers').child(userId).child(voucherId).push();
+      await ref.set({
+        'voucherId': voucherId,
+        'redeemedAt': ServerValue.timestamp,
+        'isUsed': false,
+        'source': source ?? 'direct', // 'direct', 'free', 'task', 'random'
+      });
+      
+      print('✅ Đã thêm voucher $voucherId cho user $userId (source: ${source ?? 'direct'})');
+    } catch (e) {
+      print('❌ Error adding voucher to user: $e');
+      rethrow;
+    }
+  }
 }
 

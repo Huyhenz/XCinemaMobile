@@ -3,11 +3,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import '../models/voucher.dart';
 import '../services/database_services.dart';
 import '../models/user.dart';
+import '../services/points_service.dart';
 import 'redeem_voucher_screen.dart';
+import 'voucher_tasks_screen.dart';
 
 class AllVouchersScreen extends StatefulWidget {
   const AllVouchersScreen({super.key});
@@ -18,10 +21,13 @@ class AllVouchersScreen extends StatefulWidget {
 
 class _AllVouchersScreenState extends State<AllVouchersScreen> {
   final DatabaseService _dbService = DatabaseService();
+  final PointsService _pointsService = PointsService();
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
   
   List<VoucherModel> _allVouchers = [];
   UserModel? _user;
   bool _isLoading = true;
+  Map<String, bool> _taskCompletionStatus = {}; // Track task completion
 
   @override
   void initState() {
@@ -35,14 +41,32 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId != null) {
         _user = await _dbService.getUser(userId);
+        await _checkTaskCompletions(userId);
       }
       final allVouchers = await _dbService.getAllVouchers();
       final now = DateTime.now().millisecondsSinceEpoch;
       
-      // Filter active vouchers that haven't expired
+      // Filter active vouchers that haven't expired and update unlock status
       setState(() {
         _allVouchers = allVouchers.where((voucher) {
           return voucher.isActive && voucher.expiryDate > now;
+        }).map((voucher) {
+          // Update unlock status for task vouchers
+          if (voucher.voucherType == 'task' && voucher.requiredTaskId != null) {
+            final isTaskCompleted = _taskCompletionStatus[voucher.requiredTaskId!] ?? false;
+            return VoucherModel(
+              id: voucher.id,
+              discount: voucher.discount,
+              type: voucher.type,
+              expiryDate: voucher.expiryDate,
+              isActive: voucher.isActive,
+              points: voucher.points,
+              voucherType: voucher.voucherType,
+              requiredTaskId: voucher.requiredTaskId,
+              isUnlocked: isTaskCompleted,
+            );
+          }
+          return voucher;
         }).toList();
       });
     } catch (e) {
@@ -52,53 +76,134 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
     }
   }
 
+  // Check task completion status for task vouchers
+  Future<void> _checkTaskCompletions(String userId) async {
+    try {
+      // Check completed tasks from user's task history
+      final snapshot = await _dbRef.child('users/$userId/completedTasks').get();
+      if (snapshot.exists) {
+        final completedTasks = snapshot.value;
+        if (completedTasks is Map) {
+          setState(() {
+            _taskCompletionStatus = Map<String, bool>.from(
+              completedTasks.map((key, value) => MapEntry(key.toString(), true)),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      print('Error checking task completions: $e');
+    }
+  }
+
   Color _getVoucherColor(VoucherModel voucher) {
-    if (voucher.points != null) {
-      return const Color(0xFFE50914);
-    } else {
-      return const Color(0xFF4CAF50);
+    switch (voucher.voucherType) {
+      case 'free':
+        return const Color(0xFF4CAF50); // Xanh lá - Free
+      case 'task':
+        return voucher.isUnlocked 
+            ? const Color(0xFF2196F3) // Xanh dương - Đã unlock
+            : Colors.grey[700]!; // Xám - Chưa unlock
+      case 'points':
+        return const Color(0xFFE50914); // Đỏ - Cần điểm
+      default:
+        return const Color(0xFF4CAF50);
     }
   }
 
   IconData _getVoucherIcon(VoucherModel voucher) {
-    if (voucher.points != null) {
-      return Icons.stars;
-    } else {
-      return Icons.card_giftcard;
+    switch (voucher.voucherType) {
+      case 'free':
+        return Icons.card_giftcard;
+      case 'task':
+        return voucher.isUnlocked ? Icons.lock_open : Icons.lock;
+      case 'points':
+        return Icons.stars;
+      default:
+        return Icons.card_giftcard;
+    }
+  }
+
+  String _getVoucherTypeLabel(VoucherModel voucher) {
+    switch (voucher.voucherType) {
+      case 'free':
+        return 'Miễn phí';
+      case 'task':
+        return voucher.isUnlocked ? 'Đã mở khóa' : 'Cần làm nhiệm vụ';
+      case 'points':
+        return voucher.points != null ? '${voucher.points} điểm' : 'Cần điểm';
+      default:
+        return 'Miễn phí';
+    }
+  }
+
+  Future<void> _claimFreeVoucher(VoucherModel voucher) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      // Add voucher to user's vouchers với source tương ứng
+      String source = 'direct';
+      if (voucher.voucherType == 'free') {
+        source = 'free';
+      } else if (voucher.voucherType == 'task') {
+        source = 'task';
+      }
+      
+      await _pointsService.addUserVoucher(userId, voucher.id, source: source);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã nhận voucher ${voucher.id}!'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        // Reload data to refresh UI
+        await _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi nhận voucher: $e'),
+            backgroundColor: const Color(0xFFE50914),
+          ),
+        );
+      }
     }
   }
 
   void _navigateToAction(VoucherModel voucher) {
-    if (voucher.points != null) {
-      // Navigate to redeem voucher screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const RedeemVoucherScreen(),
-        ),
-      );
-    } else {
-      // Show dialog with options
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1A1A),
-          title: const Text(
-            'Cách Nhận Voucher',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Text(
-            'Voucher này có thể nhận được qua:\n• Thực hiện nhiệm vụ\n• Chơi minigame',
-            style: TextStyle(color: Colors.grey[400]),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Đóng', style: TextStyle(color: Colors.grey)),
+    switch (voucher.voucherType) {
+      case 'free':
+        // Nhận voucher free ngay
+        _claimFreeVoucher(voucher);
+        break;
+      case 'task':
+        if (voucher.isUnlocked) {
+          // Đã unlock, có thể nhận
+          _claimFreeVoucher(voucher);
+        } else {
+          // Chưa unlock, điều hướng đến màn hình nhiệm vụ
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const VoucherTasksScreen(),
             ),
-          ],
-        ),
-      );
+          );
+        }
+        break;
+      case 'points':
+        // Điều hướng đến màn hình đổi điểm
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const RedeemVoucherScreen(),
+          ),
+        );
+        break;
     }
   }
 
@@ -176,9 +281,18 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                         itemBuilder: (context, index) {
                           final voucher = _allVouchers[index];
                           final voucherColor = _getVoucherColor(voucher);
-                          final canRedeem = _user != null && 
-                              voucher.points != null && 
-                              _user!.points >= voucher.points!;
+                          
+                          // Check if can redeem based on voucher type
+                          bool canRedeem = false;
+                          if (voucher.voucherType == 'free') {
+                            canRedeem = true;
+                          } else if (voucher.voucherType == 'task') {
+                            canRedeem = voucher.isUnlocked;
+                          } else if (voucher.voucherType == 'points') {
+                            canRedeem = _user != null && 
+                                voucher.points != null && 
+                                _user!.points >= voucher.points!;
+                          }
                           
                           return _buildVoucherCard(voucher, voucherColor, canRedeem);
                         },
@@ -266,7 +380,7 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        voucher.points != null ? '${voucher.points} điểm' : 'Miễn phí',
+                        _getVoucherTypeLabel(voucher),
                         style: TextStyle(
                           color: voucherColor,
                           fontSize: 12,
@@ -296,6 +410,58 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                // Info message for task vouchers
+                if (voucher.voucherType == 'task' && !voucher.isUnlocked)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Hoàn thành nhiệm vụ để mở khóa voucher này',
+                            style: TextStyle(
+                              color: Colors.orange[300],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Points info for points vouchers
+                if (voucher.voucherType == 'points' && !canRedeem && _user != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Bạn có ${_user!.points} điểm, cần ${voucher.points} điểm',
+                            style: TextStyle(
+                              color: Colors.red[300],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 // Action button
                 SizedBox(
                   width: double.infinity,
@@ -303,7 +469,7 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                   child: ElevatedButton(
                     onPressed: () => _navigateToAction(voucher),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: voucherColor,
+                      backgroundColor: canRedeem ? voucherColor : Colors.grey[700],
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -313,14 +479,20 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          voucher.points != null ? Icons.swap_horiz : Icons.card_giftcard,
+                          voucher.voucherType == 'free' 
+                              ? Icons.card_giftcard
+                              : voucher.voucherType == 'task'
+                                  ? (voucher.isUnlocked ? Icons.card_giftcard : Icons.task_alt)
+                                  : Icons.swap_horiz,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          voucher.points != null
-                              ? (canRedeem ? 'Đổi Ngay' : 'Không Đủ Điểm')
-                              : 'Xem Cách Nhận',
+                          voucher.voucherType == 'free'
+                              ? 'Nhận Ngay'
+                              : voucher.voucherType == 'task'
+                                  ? (voucher.isUnlocked ? 'Nhận Ngay' : 'Làm Nhiệm Vụ')
+                                  : (canRedeem ? 'Đổi Ngay' : 'Không Đủ Điểm'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

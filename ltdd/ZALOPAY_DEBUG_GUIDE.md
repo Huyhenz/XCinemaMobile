@@ -276,3 +276,5 @@ Nếu sau khi debug vẫn không hoạt động:
 
 **Lưu ý:** Public sandbox credentials có thể bị vô hiệu hóa hoặc thay đổi bất cứ lúc nào bởi ZaloPay. Để đảm bảo ổn định, nên đăng ký tài khoản sandbox riêng hoặc dùng cổng trung gian.
 
+
+

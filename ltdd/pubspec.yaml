@@ -61,6 +61,9 @@ dependencies:
   
   # Email
   mailer: ^6.0.1
+  
+  # Local Storage
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

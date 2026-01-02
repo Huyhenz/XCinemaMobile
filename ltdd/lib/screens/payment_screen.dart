@@ -7,6 +7,7 @@ import '../models/tempbooking.dart';
 import '../models/showtime.dart';
 import '../models/movie.dart';
 import '../models/voucher.dart';
+import '../models/snack.dart';
 import '../services/database_services.dart';
 import '../services/payment_service.dart';
 import '../services/email_service.dart';
@@ -21,6 +22,7 @@ class PaymentScreen extends StatefulWidget {
   final List<String> selectedSeats;
   final double totalPrice;
   final String? voucherId;
+  final Map<String, int>? selectedSnacks; // snackId -> quantity
 
   const PaymentScreen({
     super.key,
@@ -29,6 +31,7 @@ class PaymentScreen extends StatefulWidget {
     required this.selectedSeats,
     required this.totalPrice,
     this.voucherId,
+    this.selectedSnacks,
   });
 
   @override
@@ -57,6 +60,9 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   double _finalPrice = 0.0;
   String? _appliedVoucherName; // Tên voucher đã áp dụng
   String? _discountType; // 'percent' hoặc 'fixed' để hiển thị
+  
+  // Snacks
+  Map<String, SnackModel> _snackMap = {}; // snackId -> SnackModel
 
   @override
   void initState() {
@@ -98,6 +104,20 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         } catch (e) {
           print('⚠️ Error loading user vouchers (non-critical): $e');
           _userVouchers = []; // Continue without vouchers
+        }
+      }
+      
+      // Load snacks nếu có
+      if (widget.selectedSnacks != null && widget.selectedSnacks!.isNotEmpty) {
+        try {
+          final allSnacks = await DatabaseService().getAllSnacks();
+          for (var snack in allSnacks) {
+            if (widget.selectedSnacks!.containsKey(snack.id)) {
+              _snackMap[snack.id] = snack;
+            }
+          }
+        } catch (e) {
+          print('⚠️ Error loading snacks: $e');
         }
       }
     } catch (e) {
@@ -324,6 +344,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             status: 'confirmed',
             paymentMethod: paymentMethodStr,
             bookedAt: DateTime.now().millisecondsSinceEpoch,
+            snacks: widget.selectedSnacks,
           );
           String bookingId = await DatabaseService().saveBooking(booking);
 
@@ -609,6 +630,53 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             ),
           ),
           const SizedBox(height: 20),
+          
+          // Hiển thị snacks nếu có
+          if (widget.selectedSnacks != null && widget.selectedSnacks!.isNotEmpty && _snackMap.isNotEmpty) ...[
+            const Text(
+              'Bắp Nước',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...widget.selectedSnacks!.entries.map((entry) {
+              final snack = _snackMap[entry.key];
+              if (snack == null) return const SizedBox.shrink();
+              final quantity = entry.value;
+              final snackTotal = snack.price * quantity;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${snack.name} x$quantity',
+                        style: TextStyle(
+                          color: Colors.grey[300],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${NumberFormat('#,###', 'vi_VN').format(snackTotal)}đ',
+                      style: TextStyle(
+                        color: Colors.grey[300],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFF2A2A2A), height: 1),
+            const SizedBox(height: 16),
+          ],
+          
           _buildSummaryRow('Tổng tiền', '${NumberFormat('#,###', 'vi_VN').format(widget.totalPrice)}đ'),
           if (_discount > 0 && _appliedVoucherName != null) ...[
             // Hiển thị thông tin giảm giá với voucher

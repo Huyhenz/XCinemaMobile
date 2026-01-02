@@ -3,10 +3,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import '../services/database_services.dart';
 import '../services/points_service.dart';
 import '../models/user.dart';
+import '../models/minigame.dart';
+import '../models/minigame_config.dart';
+import '../games/minigame_factory.dart';
 
 class VoucherMinigameScreen extends StatefulWidget {
   const VoucherMinigameScreen({super.key});
@@ -21,18 +25,17 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
   
   UserModel? _user;
   bool _isLoading = false;
-  int _score = 0;
-  final int _target = 10;
-  bool _gameStarted = false;
-  bool _gameEnded = false;
-  List<bool> _tiles = List.generate(25, (index) => false);
-  int _currentIndex = -1;
-  final Random _random = Random();
+  MinigameItem? _currentGame;
+  bool _gameCompleted = false;
+  int _earnedPoints = 0;
+  bool _isAdmin = false;
+  Map<String, MinigameConfig> _gameConfigs = {};
 
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _initializeGame();
   }
 
   Future<void> _loadUser() async {
@@ -40,137 +43,237 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId != null) {
         final user = await _dbService.getUser(userId);
-        setState(() => _user = user);
+        setState(() {
+          _user = user;
+          _isAdmin = user?.role == 'admin';
+        });
+        // Load configs nếu là admin hoặc để sử dụng trong game
+        await _loadGameConfigs();
       }
     } catch (e) {
       print('Error loading user: $e');
     }
   }
 
-  void _startGame() {
-    setState(() {
-      _gameStarted = true;
-      _gameEnded = false;
-      _score = 0;
-      _tiles = List.generate(25, (index) => false);
-      _currentIndex = -1;
-    });
-    _nextTile();
+  // Load cấu hình cho tất cả trò chơi
+  Future<void> _loadGameConfigs() async {
+    try {
+      final allGames = MinigameFactory.getAllGames();
+      for (var game in allGames) {
+        final config = await _dbService.getMinigameConfig(game.id);
+        if (config != null) {
+          _gameConfigs[game.id] = config;
+        } else {
+          // Sử dụng default config nếu chưa có trong database
+          _gameConfigs[game.id] = MinigameConfig.getDefault(game.id);
+        }
+      }
+      setState(() {});
+    } catch (e) {
+      print('Error loading game configs: $e');
+    }
   }
 
-  void _nextTile() {
-    if (_score >= _target) {
-      _endGame();
-      return;
-    }
+  // Lấy config cho trò chơi hiện tại
+  MinigameConfig? getCurrentGameConfig() {
+    if (_currentGame == null) return null;
+    return _gameConfigs[_currentGame!.id] ?? MinigameConfig.getDefault(_currentGame!.id);
+  }
 
-    setState(() {
-      // Reset previous tile
-      if (_currentIndex >= 0) {
-        _tiles[_currentIndex] = false;
+  // Khởi tạo trò chơi - kiểm tra ngày và chọn trò chơi
+  Future<void> _initializeGame() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+      final lastGameDateKey = 'minigame_last_date_$userId';
+      final currentGameKey = 'minigame_current_game_$userId';
+      final adminOverrideKey = 'minigame_admin_override_$userId';
+      
+      final today = DateTime.now();
+      final todayString = '${today.year}-${today.month}-${today.day}';
+      
+      final lastGameDate = prefs.getString(lastGameDateKey);
+      final isAdminOverride = prefs.getBool(adminOverrideKey) ?? false;
+      
+      // Nếu là admin override, giữ nguyên trò chơi đã chọn
+      if (isAdminOverride && _isAdmin) {
+        final savedGameId = prefs.getString(currentGameKey);
+        if (savedGameId != null) {
+          final allGames = MinigameFactory.getAllGames();
+          _currentGame = allGames.firstWhere(
+            (game) => game.id == savedGameId,
+            orElse: () => allGames.first,
+          );
+          setState(() {});
+          return;
+        }
       }
       
-      // Choose new random tile
-      int newIndex;
-      do {
-        newIndex = _random.nextInt(25);
-      } while (newIndex == _currentIndex);
+      // Nếu chưa có ngày lưu hoặc ngày khác thì chọn trò chơi mới
+      if (lastGameDate == null || lastGameDate != todayString) {
+        _selectDailyGame();
+        await prefs.setString(lastGameDateKey, todayString);
+        // Reset admin override khi qua ngày mới
+        await prefs.setBool(adminOverrideKey, false);
+      } else {
+        // Load lại trò chơi đã chọn hôm nay
+        final savedGameId = prefs.getString(currentGameKey);
+        if (savedGameId != null) {
+          final allGames = MinigameFactory.getAllGames();
+          _currentGame = allGames.firstWhere(
+            (game) => game.id == savedGameId,
+            orElse: () => allGames.first,
+          );
+        } else {
+          _selectDailyGame();
+        }
+      }
       
-      _currentIndex = newIndex;
-      _tiles[_currentIndex] = true;
-    });
+      setState(() {});
+    } catch (e) {
+      print('Error initializing game: $e');
+      _selectDailyGame();
+    }
   }
 
-  void _tapTile(int index) {
-    if (!_gameStarted || _gameEnded) return;
+  // Chọn trò chơi ngẫu nhiên cho ngày hôm nay
+  Future<void> _selectDailyGame() async {
+    final allGames = MinigameFactory.getAllGames();
+    final random = Random();
+    final selectedGame = allGames[random.nextInt(allGames.length)];
     
-    if (index == _currentIndex) {
+    setState(() {
+      _currentGame = selectedGame;
+    });
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+      await prefs.setString('minigame_current_game_$userId', selectedGame.id);
+    } catch (e) {
+      print('Error saving game: $e');
+    }
+  }
+
+  // Đổi trò chơi (chỉ dành cho admin)
+  Future<void> _changeGame() async {
+    final allGames = MinigameFactory.getAllGames();
+    final currentGameId = _currentGame?.id;
+
+    // Hiển thị dialog để chọn trò chơi
+    final selectedGame = await showDialog<MinigameItem>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Chọn Trò Chơi',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: allGames.length,
+            itemBuilder: (context, index) {
+              final game = allGames[index];
+              final isCurrentGame = game.id == currentGameId;
+              return ListTile(
+                leading: Icon(game.icon, color: isCurrentGame ? Colors.blue : Colors.white),
+                title: Text(
+                  game.name,
+                  style: TextStyle(
+                    color: isCurrentGame ? Colors.blue : Colors.white,
+                    fontWeight: isCurrentGame ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                subtitle: Text(
+                  game.description,
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+                trailing: isCurrentGame
+                    ? const Icon(Icons.check, color: Colors.blue)
+                    : null,
+                onTap: () {
+                  Navigator.pop(context, game);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedGame != null) {
       setState(() {
-        _score++;
-        _tiles[index] = false;
-        _currentIndex = -1;
+        _currentGame = selectedGame;
+        _gameCompleted = false;
+        _earnedPoints = 0;
       });
       
-      if (_score >= _target) {
-        _endGame();
-      } else {
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) _nextTile();
-        });
+      // Lưu trò chơi đã chọn (admin override daily game)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+        await prefs.setString('minigame_current_game_$userId', selectedGame.id);
+        await prefs.setBool('minigame_admin_override_$userId', true);
+      } catch (e) {
+        print('Error saving admin game selection: $e');
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Đã đổi sang trò chơi: ${selectedGame.name}'),
+          backgroundColor: const Color(0xFF4CAF50),
+        ),
+      );
     }
   }
 
-  void _endGame() {
+  // Xử lý khi hoàn thành trò chơi
+  Future<void> _onGameComplete(int points) async {
     setState(() {
-      _gameEnded = true;
-      _gameStarted = false;
-      if (_currentIndex >= 0) {
-        _tiles[_currentIndex] = false;
-      }
-      _currentIndex = -1;
+      _gameCompleted = true;
+      _earnedPoints = points;
     });
-  }
-
-  Future<void> _claimReward() async {
-    if (_score < _target) return;
-
-    setState(() => _isLoading = true);
 
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) return;
-
-      // Random reward: 70% chance points, 30% chance voucher
-      final rewardType = _random.nextDouble() < 0.7 ? 'points' : 'voucher';
-      
-      if (rewardType == 'points') {
-        // Give 5-10 random points
-        final points = 5 + _random.nextInt(6);
-        await _pointsService.addPoints(userId, points, 'Minigame');
+      if (userId != null && points > 0) {
+        setState(() => _isLoading = true);
+        
+        // Thưởng điểm dựa trên điểm số của trò chơi
+        final rewardPoints = _currentGame!.rewardPoints;
+        await _pointsService.addPoints(
+          userId, 
+          rewardPoints, 
+          'Minigame: ${_currentGame!.name}'
+        );
+        
+        await _loadUser();
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Đã nhận $points điểm!'),
+              content: Text('🎉 Chúc mừng! Bạn đã nhận $rewardPoints điểm!'),
               backgroundColor: const Color(0xFF4CAF50),
+              duration: const Duration(seconds: 2),
             ),
           );
-          await _loadUser();
-        }
-      } else {
-        // Give random voucher
-        final voucher = await _pointsService.getRandomFreeVoucher();
-        if (voucher != null) {
-          await _pointsService.addRandomVoucherToUser(userId, voucher.id);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('✅ Đã nhận voucher ${voucher.id}!'),
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-            );
-          }
-        } else {
-          // Fallback to points if no voucher available
-          final points = 5 + _random.nextInt(6);
-          await _pointsService.addPoints(userId, points, 'Minigame');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('✅ Đã nhận $points điểm!'),
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-            );
-            await _loadUser();
-          }
         }
       }
     } catch (e) {
+      print('Error claiming reward: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -183,15 +286,33 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_currentGame == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F0F0F),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFE50914)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         title: const Text(
-          'Minigame',
+          'Trò Chơi',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          // Nút đổi trò chơi cho admin
+          if (_isAdmin)
+            IconButton(
+              icon: const Icon(Icons.swap_horiz, color: Colors.white),
+              tooltip: 'Đổi trò chơi (Admin)',
+              onPressed: _changeGame,
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -226,7 +347,7 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
               ),
             const SizedBox(height: 24),
 
-            // Game instructions
+            // Game info card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -237,26 +358,67 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 24),
-                      SizedBox(width: 12),
-                      Text(
-                        'Hướng Dẫn',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2196F3).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _currentGame!.icon,
+                          color: const Color(0xFF2196F3),
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _currentGame!.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _currentGame!.description,
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Nhấn vào các ô sáng để ghi điểm!\nMục tiêu: $_target điểm\nHoàn thành để nhận điểm hoặc voucher ngẫu nhiên!',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 14,
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.stars, color: Color(0xFF4CAF50), size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Phần thưởng: ${_currentGame!.rewardPoints} điểm',
+                          style: const TextStyle(
+                            color: Color(0xFF4CAF50),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -264,172 +426,39 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Score display
+            // Game widget
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A1A1A), Color(0xFF2A2A2A)],
-                ),
+                color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF2196F3).withOpacity(0.3),
-                ),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
-                    children: [
-                      const Text(
-                        'Điểm',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$_score',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: Colors.grey[700],
-                  ),
-                  Column(
-                    children: [
-                      const Text(
-                        'Mục Tiêu',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$_target',
-                        style: const TextStyle(
-                          color: Color(0xFF2196F3),
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              child: MinigameFactory.getGameWidget(
+                _currentGame!.type,
+                _onGameComplete,
+                config: getCurrentGameConfig(),
+              ) ?? const SizedBox(),
             ),
-            const SizedBox(height: 24),
 
-            // Game grid
-            if (_gameStarted || _gameEnded)
+            // Game completed message
+            if (_gameCompleted)
               Container(
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(top: 24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF2A2A2A)),
-                ),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
                   ),
-                  itemCount: 25,
-                  itemBuilder: (context, index) {
-                    return GestureDetector(
-                      onTap: () => _tapTile(index),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _tiles[index]
-                              ? const Color(0xFF2196F3)
-                              : const Color(0xFF2A2A2A),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _tiles[index]
-                                ? Colors.white
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                          boxShadow: _tiles[index]
-                              ? [
-                                  BoxShadow(
-                                    color: const Color(0xFF2196F3).withOpacity(0.5),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: _tiles[index]
-                            ? const Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 32,
-                              )
-                            : null,
-                      ),
-                    );
-                  },
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF2A2A2A)),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Nhấn "Bắt Đầu" để chơi!',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 24),
-
-            // Game end result
-            if (_gameEnded)
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: _score >= _target
-                      ? const LinearGradient(
-                          colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
-                        )
-                      : const LinearGradient(
-                          colors: [Color(0xFFE50914), Color(0xFFB20710)],
-                        ),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   children: [
-                    Icon(
-                      _score >= _target ? Icons.celebration : Icons.sentiment_dissatisfied,
-                      color: Colors.white,
-                      size: 60,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _score >= _target ? 'Chúc Mừng!' : 'Chưa Đạt!',
-                      style: const TextStyle(
+                    const Icon(Icons.celebration, color: Colors.white, size: 48),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Hoàn Thành!',
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -437,9 +466,7 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _score >= _target
-                          ? 'Bạn đã hoàn thành thử thách!\nNhận phần thưởng ngay!'
-                          : 'Bạn cần đạt $_target điểm để nhận thưởng.',
+                      'Bạn đã hoàn thành trò chơi và nhận ${_currentGame!.rewardPoints} điểm!',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 16,
@@ -449,88 +476,9 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
                   ],
                 ),
               ),
-
-            const SizedBox(height: 24),
-
-            // Action buttons
-            if (!_gameStarted && !_gameEnded)
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _startGame,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2196F3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text(
-                    'Bắt Đầu',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              )
-            else if (_gameEnded)
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 56,
-                      child: OutlinedButton(
-                        onPressed: _startGame,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF2196F3),
-                          side: const BorderSide(color: Color(0xFF2196F3)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Chơi Lại',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_score >= _target) ...[
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _claimReward,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4CAF50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                                  'Nhận Thưởng',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
           ],
         ),
       ),
     );
   }
 }
-

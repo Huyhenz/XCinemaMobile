@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../blocs/admin/admin_bloc.dart';
 import '../blocs/admin/admin_event.dart';
 import '../blocs/admin/admin_state.dart';
@@ -11,6 +12,10 @@ import '../models/showtime.dart';
 import '../models/theater.dart';
 import '../models/cinema.dart';
 import '../models/voucher.dart';
+import '../models/minigame_config.dart';
+import '../models/minigame.dart';
+import '../models/snack.dart';
+import '../games/minigame_factory.dart';
 import '../services/database_services.dart';
 import 'admin_cleanup_screen.dart';
 
@@ -53,6 +58,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return const _CreateVoucherTab();
       case 9:
         return const _ManageVouchersTab();
+      case 10:
+        return const _ManageMinigameConfigTab();
+      case 11:
+        return const _CreateSnackTab();
+      case 12:
+        return const _ManageSnacksTab();
       default:
         return const _CreateCinemaTab();
     }
@@ -80,6 +91,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return 'Tạo Voucher';
       case 9:
         return 'Quản Lý Voucher';
+      case 10:
+        return 'Quản Lý Minigame';
+      case 11:
+        return 'Tạo Bắp Nước';
+      case 12:
+        return 'Quản Lý Bắp Nước';
       default:
         return 'Admin Dashboard';
     }
@@ -156,6 +173,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const Divider(color: Color(0xFF2A2A2A)),
           _buildDrawerItem(Icons.local_offer, 'Tạo Voucher', 8),
           _buildDrawerItem(Icons.card_giftcard, 'Quản Lý Voucher', 9),
+          const Divider(color: Color(0xFF2A2A2A)),
+          _buildDrawerItem(Icons.games, 'Quản Lý Minigame', 10),
+          const Divider(color: Color(0xFF2A2A2A)),
+          _buildDrawerItem(Icons.fastfood, 'Tạo Bắp Nước', 11),
+          _buildDrawerItem(Icons.restaurant_menu, 'Quản Lý Bắp Nước', 12),
           const Divider(color: Color(0xFF2A2A2A)),
           ListTile(
             leading: const Icon(Icons.cleaning_services, color: Colors.grey),
@@ -3536,30 +3558,142 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
   final _codeController = TextEditingController();
   final _discountController = TextEditingController();
   final _pointsController = TextEditingController();
+  final _taskIdController = TextEditingController();
   String _selectedType = 'percent';
+  String _voucherType = 'free'; // 'free', 'task', 'points'
   DateTime? _expiryDate;
   bool _isCreating = false;
-  bool _requiresPoints = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tự động điền thông tin khi init (free voucher mặc định)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoFillVoucherInfo();
+    });
+  }
 
   @override
   void dispose() {
     _codeController.dispose();
     _discountController.dispose();
     _pointsController.dispose();
+    _taskIdController.dispose();
     super.dispose();
   }
 
-  // Generate voucher code ngẫu nhiên
+  // Generate voucher code ngẫu nhiên (6 ký tự)
   void _generateVoucherCode() {
     final random = Random();
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     
-    // Tạo mã 8 ký tự ngẫu nhiên
-    final code = List.generate(8, (index) => chars[random.nextInt(chars.length)]).join();
+    // Tạo mã 6 ký tự ngẫu nhiên
+    final code = List.generate(6, (index) => chars[random.nextInt(chars.length)]).join();
     
     setState(() {
       _codeController.text = code;
     });
+  }
+
+  // Tự động điền thông tin mặc định cho voucher
+  void _autoFillVoucherInfo() {
+    final random = Random();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    
+    // Generate mã 6 ký tự
+    final code = List.generate(6, (index) => chars[random.nextInt(chars.length)]).join();
+    _codeController.text = code;
+    
+    // Set giá trị giảm giá mặc định theo loại voucher
+    if (_voucherType == 'free') {
+      // Free voucher: giá trị thấp (5-15%)
+      _selectedType = 'percent';
+      _discountController.text = (5 + random.nextInt(11)).toString(); // 5-15%
+      _pointsController.clear();
+      _taskIdController.clear();
+    } else if (_voucherType == 'task') {
+      // Task voucher: giá trị trung bình (10-20%)
+      _selectedType = 'percent';
+      _discountController.text = (10 + random.nextInt(11)).toString(); // 10-20%
+      // Tự động set task ID mẫu
+      _taskIdController.text = 'task_${1 + random.nextInt(10)}'; // task_1 đến task_10
+      _pointsController.clear();
+    } else if (_voucherType == 'points') {
+      // Points voucher: giá trị cao hơn (15-25%)
+      _selectedType = 'percent';
+      _discountController.text = (15 + random.nextInt(11)).toString(); // 15-25%
+      // Tự động set điểm (100-500, bước 50)
+      final pointsOptions = [100, 150, 200, 250, 300, 350, 400, 450, 500];
+      _pointsController.text = pointsOptions[random.nextInt(pointsOptions.length)].toString();
+      _taskIdController.clear();
+    }
+    
+    // Set ngày hết hạn mặc định là 30 ngày sau
+    if (_expiryDate == null) {
+      _expiryDate = DateTime.now().add(const Duration(days: 30));
+    }
+  }
+
+  Widget _buildVoucherTypeOption(String value, String title, String subtitle, IconData icon, Color color) {
+    final isSelected = _voucherType == value;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _voucherType = value;
+          // Tự động điền thông tin khi chọn loại voucher
+          _autoFillVoucherInfo();
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFF2A2A2A),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? color : Colors.grey[800],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: Color(0xFF4CAF50)),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _createVoucher() async {
@@ -3574,6 +3708,27 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
       return;
     }
 
+    // Validate based on voucher type
+    if (_voucherType == 'points' && (_pointsController.text.trim().isEmpty || int.tryParse(_pointsController.text.trim()) == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voucher điểm cần nhập số điểm hợp lệ'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
+    if (_voucherType == 'task' && _taskIdController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Voucher nhiệm vụ cần nhập ID nhiệm vụ'),
+          backgroundColor: Color(0xFFE50914),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isCreating = true);
     try {
       final voucher = VoucherModel(
@@ -3582,9 +3737,14 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
         type: _selectedType,
         expiryDate: _expiryDate!.millisecondsSinceEpoch,
         isActive: true,
-        points: _requiresPoints && _pointsController.text.trim().isNotEmpty
+        voucherType: _voucherType,
+        points: _voucherType == 'points' && _pointsController.text.trim().isNotEmpty
             ? int.tryParse(_pointsController.text.trim())
             : null,
+        requiredTaskId: _voucherType == 'task' && _taskIdController.text.trim().isNotEmpty
+            ? _taskIdController.text.trim()
+            : null,
+        isUnlocked: false, // Task voucher sẽ unlock khi task hoàn thành
       );
 
       context.read<AdminBloc>().add(CreateVoucher(voucher));
@@ -3593,14 +3753,16 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
       _formKey.currentState!.reset();
       setState(() {
         _selectedType = 'percent';
+        _voucherType = 'free';
         _expiryDate = null;
-        _requiresPoints = false;
+        _pointsController.clear();
+        _taskIdController.clear();
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Đã tạo voucher thành công!'),
-          backgroundColor: Color(0xFF4CAF50),
+        SnackBar(
+          content: Text('✅ Đã tạo voucher ${_voucherType == 'free' ? 'miễn phí' : _voucherType == 'task' ? 'nhiệm vụ' : 'điểm'} thành công!'),
+          backgroundColor: const Color(0xFF4CAF50),
         ),
       );
     } catch (e) {
@@ -3624,192 +3786,301 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Voucher Code
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _codeController,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      labelText: 'Mã Voucher *',
-                      hintText: 'VD: SALE50, NEWYEAR2024',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.local_offer),
-                    ),
-                    validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập mã voucher' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: _generateVoucherCode,
-                  icon: const Icon(Icons.autorenew, size: 20),
-                  label: const Text('Tự động'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2A2A2A),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Discount Type
-            DropdownButtonFormField<String>(
-              value: _selectedType,
-              decoration: const InputDecoration(
-                labelText: 'Loại Giảm Giá *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.category),
+            // Info message
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2196F3).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3)),
               ),
-              items: const [
-                DropdownMenuItem(value: 'percent', child: Text('Phần trăm (%)')),
-                DropdownMenuItem(value: 'fixed', child: Text('Giá cố định (VND)')),
-              ],
-              onChanged: (value) {
-                setState(() => _selectedType = value!);
-              },
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Chọn loại voucher và bấm "Tạo" - Hệ thống sẽ tự động điền thông tin',
+                      style: TextStyle(color: Colors.blue[200], fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Voucher Type Selection
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Loại Voucher *',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Free Voucher
+                  _buildVoucherTypeOption(
+                    'free',
+                    'Voucher Miễn Phí',
+                    'Giá trị thấp, người dùng có thể nhận ngay',
+                    Icons.card_giftcard,
+                    const Color(0xFF4CAF50),
+                  ),
+                  const SizedBox(height: 8),
+                  // Task Voucher
+                  _buildVoucherTypeOption(
+                    'task',
+                    'Voucher Nhiệm Vụ',
+                    'Phải hoàn thành nhiệm vụ để mở khóa',
+                    Icons.task_alt,
+                    const Color(0xFF2196F3),
+                  ),
+                  const SizedBox(height: 8),
+                  // Points Voucher
+                  _buildVoucherTypeOption(
+                    'points',
+                    'Voucher Đổi Điểm',
+                    'Cần đủ điểm để đổi được voucher',
+                    Icons.stars,
+                    const Color(0xFFE50914),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
-            // Discount Amount
+            // Preview voucher info (hidden fields for form validation)
+            // Voucher Code (hidden but required for validation)
+            TextFormField(
+              controller: _codeController,
+              textCapitalization: TextCapitalization.characters,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Vui lòng chọn loại voucher' : null,
+            ),
+            
+            // Discount Type (hidden)
+            TextFormField(
+              readOnly: true,
+              controller: TextEditingController(text: _selectedType),
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+            ),
+            
+            // Discount Amount (hidden)
             TextFormField(
               controller: _discountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: _selectedType == 'percent' ? 'Giảm Giá (%) *' : 'Giảm Giá (VND) *',
-                hintText: _selectedType == 'percent' ? 'VD: 10 (giảm 10%)' : 'VD: 50000 (giảm 50,000 VND)',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.discount),
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
               ),
               validator: (value) {
-                if (value?.isEmpty ?? true) return 'Vui lòng nhập số tiền giảm giá';
+                if (value?.isEmpty ?? true) return 'Vui lòng chọn loại voucher';
                 final discount = double.tryParse(value!);
-                if (discount == null) return 'Vui lòng nhập số hợp lệ';
+                if (discount == null) return 'Lỗi hệ thống';
                 if (_selectedType == 'percent' && (discount <= 0 || discount > 100)) {
-                  return 'Phần trăm phải từ 1-100';
-                }
-                if (_selectedType == 'fixed' && discount <= 0) {
-                  return 'Giá giảm phải lớn hơn 0';
+                  return 'Lỗi giá trị';
                 }
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-
-            // Requires Points Checkbox
-            CheckboxListTile(
-              title: const Text(
-                'Yêu cầu điểm để đổi voucher',
-                style: TextStyle(color: Colors.white),
+            
+            // Preview Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
               ),
-              subtitle: const Text(
-                'Nếu bật, user cần đủ điểm mới đổi được voucher này',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-              value: _requiresPoints,
-              onChanged: (value) {
-                setState(() {
-                  _requiresPoints = value ?? false;
-                  if (!_requiresPoints) {
-                    _pointsController.clear();
-                  }
-                });
-              },
-              activeColor: const Color(0xFFE50914),
-            ),
-            if (_requiresPoints) ...[
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _pointsController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Điểm cần để đổi *',
-                  hintText: 'VD: 100, 200, 500',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.stars),
-                ),
-                validator: (value) {
-                  if (_requiresPoints && (value?.isEmpty ?? true)) {
-                    return 'Vui lòng nhập điểm cần để đổi';
-                  }
-                  if (_requiresPoints && value != null && value.isNotEmpty) {
-                    final points = int.tryParse(value);
-                    if (points == null || points <= 0) {
-                      return 'Điểm phải là số nguyên dương';
-                    }
-                  }
-                  return null;
-                },
-              ),
-            ],
-            const SizedBox(height: 16),
-
-            // Expiry Date
-            InkWell(
-              onTap: () async {
-                final DateTime? picked = await showDatePicker(
-                  context: context,
-                  initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 30)),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2030),
-                  builder: (context, child) {
-                    return Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.dark(
-                          primary: Color(0xFFE50914),
-                          onPrimary: Colors.white,
-                          surface: Color(0xFF1A1A1A),
-                          onSurface: Colors.white,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _voucherType == 'free'
+                            ? Icons.card_giftcard
+                            : _voucherType == 'task'
+                                ? Icons.task_alt
+                                : Icons.stars,
+                        color: _voucherType == 'free'
+                            ? const Color(0xFF4CAF50)
+                            : _voucherType == 'task'
+                                ? const Color(0xFF2196F3)
+                                : const Color(0xFFE50914),
+                        size: 32,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _codeController.text.isEmpty ? '---' : _codeController.text.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                            Text(
+                              _discountController.text.isEmpty
+                                  ? '---'
+                                  : 'Giảm ${_discountController.text}%',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (picked != null) {
-                  setState(() => _expiryDate = picked);
-                }
-              },
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Ngày Hết Hạn *',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                child: Text(
-                  _expiryDate == null
-                      ? 'Chọn ngày hết hạn'
-                      : DateFormat('dd/MM/yyyy').format(_expiryDate!),
-                  style: TextStyle(
-                    color: _expiryDate == null ? Colors.grey : Colors.white,
+                    ],
                   ),
-                ),
+                  if (_discountController.text.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFF2A2A2A)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, color: Colors.grey[400], size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          _expiryDate == null
+                              ? 'Chưa có ngày hết hạn'
+                              : 'Hết hạn: ${DateFormat('dd/MM/yyyy').format(_expiryDate!)}',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    if (_voucherType == 'points' && _pointsController.text.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.stars, color: Colors.grey[400], size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Cần ${_pointsController.text} điểm',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_voucherType == 'task' && _taskIdController.text.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.task_alt, color: Colors.grey[400], size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Nhiệm vụ: ${_taskIdController.text}',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ],
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Hidden fields for validation
+            // Points (hidden)
+            TextFormField(
+              controller: _pointsController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) {
+                if (_voucherType == 'points' && (value?.isEmpty ?? true)) {
+                  return 'Lỗi hệ thống';
+                }
+                return null;
+              },
+            ),
+            
+            // Task ID (hidden)
+            TextFormField(
+              controller: _taskIdController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) {
+                if (_voucherType == 'task' && (value?.isEmpty ?? true)) {
+                  return 'Lỗi hệ thống';
+                }
+                return null;
+              },
+            ),
+            
+            // Expiry Date (hidden, auto-set to 30 days)
+            // Set default expiry date
+            Builder(
+              builder: (context) {
+                if (_expiryDate == null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    setState(() {
+                      _expiryDate = DateTime.now().add(const Duration(days: 30));
+                    });
+                  });
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            
             const SizedBox(height: 24),
 
             // Create Button
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: _isCreating ? null : _createVoucher,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE50914),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isCreating
+              icon: _isCreating
                   ? const SizedBox(
-                      height: 20,
                       width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.white,
                       ),
                     )
-                  : const Text(
-                      'TẠO VOUCHER',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
+                  : const Icon(Icons.add_circle_outline),
+              label: Text(
+                _isCreating 
+                    ? 'Đang tạo...'
+                    : 'TẠO VOUCHER ${_voucherType == 'free' ? 'MIỄN PHÍ' : _voucherType == 'task' ? 'NHIỆM VỤ' : 'ĐIỂM'}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _voucherType == 'free'
+                    ? const Color(0xFF4CAF50)
+                    : _voucherType == 'task'
+                        ? const Color(0xFF2196F3)
+                        : const Color(0xFFE50914),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
             ),
           ],
         ),
@@ -4290,6 +4561,1124 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
                     strokeWidth: 2,
                     color: Colors.white,
                   ),
+                )
+              : const Text('Lưu'),
+        ),
+      ],
+    );
+  }
+}
+
+// Tab 11: Manage Minigame Config
+class _ManageMinigameConfigTab extends StatefulWidget {
+  const _ManageMinigameConfigTab();
+
+  @override
+  State<_ManageMinigameConfigTab> createState() => _ManageMinigameConfigTabState();
+}
+
+class _ManageMinigameConfigTabState extends State<_ManageMinigameConfigTab> {
+  final DatabaseService _dbService = DatabaseService();
+  List<MinigameItem> _games = [];
+  Map<String, MinigameConfig> _configs = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConfigs();
+  }
+
+  Future<void> _loadConfigs() async {
+    setState(() => _isLoading = true);
+    try {
+      _games = MinigameFactory.getAllGames();
+      
+      // Load configs từ database
+      final savedConfigs = await _dbService.getAllMinigameConfigs();
+      for (var config in savedConfigs) {
+        _configs[config.gameId] = config;
+      }
+      
+      // Thêm default configs cho những game chưa có config
+      for (var game in _games) {
+        if (!_configs.containsKey(game.id)) {
+          _configs[game.id] = MinigameConfig.getDefault(game.id);
+        }
+      }
+    } catch (e) {
+      print('Error loading configs: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveConfig(String gameId, MinigameConfig config) async {
+    try {
+      await _dbService.saveMinigameConfig(config);
+      setState(() {
+        _configs[gameId] = config;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Đã lưu cấu hình thành công!'),
+            backgroundColor: Color(0xFF4CAF50),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _editConfig(MinigameItem game) {
+    final config = _configs[game.id]!;
+    
+    final maxWrongAttemptsController = TextEditingController(
+      text: config.maxWrongAttempts?.toString() ?? '',
+    );
+    final timeLimitController = TextEditingController(
+      text: config.timeLimitSeconds?.toString() ?? '',
+    );
+    final maxLevelController = TextEditingController(
+      text: config.maxLevel?.toString() ?? '',
+    );
+    final targetScoreController = TextEditingController(
+      text: config.targetScore?.toString() ?? '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: Text(
+          'Chỉnh Sửa: ${game.name}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: maxWrongAttemptsController,
+                decoration: const InputDecoration(
+                  labelText: 'Số lần sai tối đa',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  hintText: 'VD: 5 (cho trò đoán chữ)',
+                  hintStyle: TextStyle(color: Colors.grey),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: timeLimitController,
+                decoration: const InputDecoration(
+                  labelText: 'Thời gian giới hạn (giây)',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  hintText: 'VD: 5 (cho trò toán học)',
+                  hintStyle: TextStyle(color: Colors.grey),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: maxLevelController,
+                decoration: const InputDecoration(
+                  labelText: 'Level tối đa',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  hintText: 'VD: 5',
+                  hintStyle: TextStyle(color: Colors.grey),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: targetScoreController,
+                decoration: const InputDecoration(
+                  labelText: 'Điểm mục tiêu',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  hintText: 'VD: 10',
+                  hintStyle: TextStyle(color: Colors.grey),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newConfig = MinigameConfig(
+                gameId: game.id,
+                maxWrongAttempts: maxWrongAttemptsController.text.isNotEmpty
+                    ? int.tryParse(maxWrongAttemptsController.text)
+                    : null,
+                timeLimitSeconds: timeLimitController.text.isNotEmpty
+                    ? int.tryParse(timeLimitController.text)
+                    : null,
+                maxLevel: maxLevelController.text.isNotEmpty
+                    ? int.tryParse(maxLevelController.text)
+                    : null,
+                targetScore: targetScoreController.text.isNotEmpty
+                    ? int.tryParse(targetScoreController.text)
+                    : null,
+              );
+              _saveConfig(game.id, newConfig);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+            ),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFE50914)),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          'Quản Lý Cấu Hình Minigame',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Chỉnh sửa số lần, thời gian và các thông số khác cho từng trò chơi',
+          style: TextStyle(color: Colors.grey[400], fontSize: 14),
+        ),
+        const SizedBox(height: 24),
+        ..._games.map((game) {
+          final config = _configs[game.id]!;
+          return Card(
+            color: const Color(0xFF1A1A1A),
+            margin: const EdgeInsets.only(bottom: 16),
+            child: ListTile(
+              leading: Icon(game.icon, color: const Color(0xFF2196F3)),
+              title: Text(
+                game.name,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(game.description, style: TextStyle(color: Colors.grey[400])),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      if (config.maxWrongAttempts != null)
+                        Chip(
+                          label: Text('Sai tối đa: ${config.maxWrongAttempts}'),
+                          backgroundColor: Colors.orange.withOpacity(0.2),
+                          labelStyle: const TextStyle(color: Colors.orange, fontSize: 12),
+                        ),
+                      if (config.timeLimitSeconds != null)
+                        Chip(
+                          label: Text('Thời gian: ${config.timeLimitSeconds}s'),
+                          backgroundColor: Colors.red.withOpacity(0.2),
+                          labelStyle: const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      if (config.maxLevel != null)
+                        Chip(
+                          label: Text('Level max: ${config.maxLevel}'),
+                          backgroundColor: Colors.blue.withOpacity(0.2),
+                          labelStyle: const TextStyle(color: Colors.blue, fontSize: 12),
+                        ),
+                      if (config.targetScore != null)
+                        Chip(
+                          label: Text('Mục tiêu: ${config.targetScore}'),
+                          backgroundColor: Colors.green.withOpacity(0.2),
+                          labelStyle: const TextStyle(color: Colors.green, fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit, color: Color(0xFF2196F3)),
+                onPressed: () => _editConfig(game),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// Tab 11: Create Snack
+class _CreateSnackTab extends StatefulWidget {
+  const _CreateSnackTab();
+
+  @override
+  State<_CreateSnackTab> createState() => _CreateSnackTabState();
+}
+
+class _CreateSnackTabState extends State<_CreateSnackTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  String _selectedCategory = 'popcorn';
+  bool _isCreating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tự động điền thông tin khi init
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoFillSnackInfo();
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
+  }
+
+  // Tự động điền thông tin cho snack
+  void _autoFillSnackInfo() {
+    final random = Random();
+    
+    // Danh sách snacks mẫu cho từng category
+    final snackTemplates = {
+      'popcorn': [
+        {'name': 'Bắp Rang Bơ Lớn', 'description': 'Bắp rang bơ thơm ngon, size lớn', 'price': [45000, 50000, 55000]},
+        {'name': 'Bắp Rang Bơ Vừa', 'description': 'Bắp rang bơ size vừa, đủ cho 1 người', 'price': [35000, 40000]},
+        {'name': 'Bắp Ngọt Caramel', 'description': 'Bắp rang bơ với vị caramel đặc biệt', 'price': [50000, 55000, 60000]},
+        {'name': 'Bắp Phô Mai', 'description': 'Bắp rang bơ phủ phô mai thơm ngon', 'price': [50000, 60000]},
+        {'name': 'Bắp Mix 2 Vị', 'description': 'Bắp rang bơ mix 2 vị theo yêu cầu', 'price': [55000, 60000]},
+      ],
+      'drink': [
+        {'name': 'Coca Cola', 'description': 'Nước ngọt Coca Cola lạnh', 'price': [25000, 30000]},
+        {'name': 'Pepsi', 'description': 'Nước ngọt Pepsi lạnh', 'price': [25000, 30000]},
+        {'name': 'Sprite', 'description': 'Nước ngọt Sprite mát lạnh', 'price': [25000, 30000]},
+        {'name': 'Nước Suối', 'description': 'Nước suối tinh khiết', 'price': [15000, 20000]},
+        {'name': 'Trà Đào', 'description': 'Trà đào thơm mát', 'price': [30000, 35000]},
+        {'name': 'Nước Cam', 'description': 'Nước cam ép tươi', 'price': [35000, 40000]},
+        {'name': 'Trà Sữa', 'description': 'Trà sữa thơm ngon', 'price': [35000, 40000]},
+      ],
+      'combo': [
+        {'name': 'Combo Đôi', 'description': '2 bắp lớn + 2 nước ngọt lớn', 'price': [120000, 130000, 140000]},
+        {'name': 'Combo Gia Đình', 'description': '3 bắp lớn + 4 nước ngọt', 'price': [180000, 200000]},
+        {'name': 'Combo VIP', 'description': '2 bắp lớn + 2 nước ngọt + 2 snack', 'price': [150000, 160000]},
+        {'name': 'Combo Nhỏ', 'description': '1 bắp vừa + 1 nước ngọt', 'price': [70000, 80000]},
+        {'name': 'Combo Tiết Kiệm', 'description': '1 bắp lớn + 1 nước ngọt', 'price': [85000, 90000]},
+      ],
+      'snack': [
+        {'name': 'Khoai Tây Chiên', 'description': 'Khoai tây chiên giòn, nóng hổi', 'price': [40000, 45000]},
+        {'name': 'Hot Dog', 'description': 'Xúc xích nóng trong bánh mì', 'price': [50000, 55000]},
+        {'name': 'Bánh Mì Kẹp', 'description': 'Bánh mì kẹp thịt thơm ngon', 'price': [45000, 50000]},
+        {'name': 'Gà Viên Chiên', 'description': 'Gà viên chiên giòn, thơm lừng', 'price': [55000, 60000]},
+        {'name': 'Bánh Ngọt', 'description': 'Bánh ngọt đa dạng hương vị', 'price': [30000, 35000]},
+      ],
+    };
+
+    // Chọn một snack template ngẫu nhiên từ category
+    final templates = snackTemplates[_selectedCategory] ?? snackTemplates['snack']!;
+    final template = templates[random.nextInt(templates.length)];
+    
+    final name = template['name'] as String;
+    final description = template['description'] as String;
+    final prices = template['price'] as List<int>;
+    final price = prices[random.nextInt(prices.length)];
+
+    // Generate image URL từ Unsplash với keyword phù hợp
+    final imageKeywords = {
+      'popcorn': 'popcorn',
+      'drink': 'soft+drink',
+      'combo': 'food+combo',
+      'snack': 'snack+food',
+    };
+    final keyword = imageKeywords[_selectedCategory] ?? 'food';
+    final imageUrl = 'https://source.unsplash.com/400x400/?$keyword&sig=${random.nextInt(1000)}';
+
+    setState(() {
+      _nameController.text = name;
+      _descriptionController.text = description;
+      _priceController.text = price.toString();
+      _imageUrlController.text = imageUrl;
+    });
+  }
+
+  Future<void> _createSnack() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isCreating = true);
+    try {
+      final snack = SnackModel(
+        id: '',
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        price: double.parse(_priceController.text.trim()),
+        imageUrl: _imageUrlController.text.trim(),
+        category: _selectedCategory,
+        isActive: true,
+      );
+
+      await DatabaseService().saveSnack(snack);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Đã tạo ${_nameController.text} thành công!'),
+          backgroundColor: const Color(0xFF4CAF50),
+        ),
+      );
+
+      // Tự động generate snack mới
+      _autoFillSnackInfo();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: const Color(0xFFE50914),
+        ),
+      );
+    } finally {
+      setState(() => _isCreating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryColors = {
+      'popcorn': const Color(0xFFFF9800),
+      'drink': const Color(0xFF2196F3),
+      'combo': const Color(0xFF9C27B0),
+      'snack': const Color(0xFF4CAF50),
+    };
+    final categoryNames = {
+      'popcorn': 'Bắp',
+      'drink': 'Nước',
+      'combo': 'Combo',
+      'snack': 'Đồ Ăn',
+    };
+    final categoryColor = categoryColors[_selectedCategory] ?? Colors.grey;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Info message
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2196F3).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Chọn danh mục và bấm "Tạo" - Hệ thống sẽ tự động điền thông tin',
+                      style: TextStyle(color: Colors.blue[200], fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Category Selection
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Danh Mục *',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: categoryColors.entries.map((entry) {
+                      final isSelected = _selectedCategory == entry.key;
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = entry.key;
+                            _autoFillSnackInfo();
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected ? entry.value.withOpacity(0.2) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected ? entry.value : const Color(0xFF2A2A2A),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                entry.key == 'popcorn'
+                                    ? Icons.agriculture
+                                    : entry.key == 'drink'
+                                        ? Icons.local_drink
+                                        : entry.key == 'combo'
+                                            ? Icons.set_meal
+                                            : Icons.fastfood,
+                                color: isSelected ? entry.value : Colors.grey[400],
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                categoryNames[entry.key] ?? entry.key,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.grey[400],
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Hidden fields for validation
+            TextFormField(
+              controller: _nameController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Vui lòng chọn danh mục' : null,
+            ),
+            TextFormField(
+              controller: _descriptionController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Lỗi hệ thống' : null,
+            ),
+            TextFormField(
+              controller: _priceController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) {
+                if (value?.isEmpty ?? true) return 'Lỗi hệ thống';
+                final price = double.tryParse(value!);
+                if (price == null || price <= 0) return 'Lỗi giá trị';
+                return null;
+              },
+            ),
+            TextFormField(
+              controller: _imageUrlController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 0, height: 0),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+              ),
+              validator: (value) => value?.isEmpty ?? true ? 'Lỗi hệ thống' : null,
+            ),
+
+            // Preview Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: categoryColor.withOpacity(0.3), width: 2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFF2A2A2A),
+                        ),
+                        child: _imageUrlController.text.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CachedNetworkImage(
+                                  imageUrl: _imageUrlController.text,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: const Color(0xFF2A2A2A),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xFF2196F3),
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => const Icon(
+                                    Icons.fastfood,
+                                    color: Colors.grey,
+                                    size: 40,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.fastfood, color: Colors.grey, size: 40),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: categoryColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                categoryNames[_selectedCategory] ?? _selectedCategory,
+                                style: TextStyle(
+                                  color: categoryColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _nameController.text.isEmpty ? '---' : _nameController.text,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _priceController.text.isEmpty
+                                  ? '---'
+                                  : '${NumberFormat('#,###', 'vi_VN').format(int.tryParse(_priceController.text) ?? 0)}đ',
+                              style: const TextStyle(
+                                color: Color(0xFFE50914),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_descriptionController.text.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFF2A2A2A)),
+                    const SizedBox(height: 12),
+                    Text(
+                      _descriptionController.text,
+                      style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Create Button
+            ElevatedButton.icon(
+              onPressed: _isCreating ? null : _createSnack,
+              icon: _isCreating
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.add_circle_outline),
+              label: Text(
+                _isCreating
+                    ? 'Đang tạo...'
+                    : 'TẠO ${categoryNames[_selectedCategory]?.toUpperCase() ?? "BẮP NƯỚC"}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: categoryColor,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Tab 12: Manage Snacks
+class _ManageSnacksTab extends StatelessWidget {
+  const _ManageSnacksTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<SnackModel>>(
+      future: DatabaseService().getAllSnacks(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE50914)),
+          );
+        }
+
+        final snacks = snapshot.data ?? [];
+
+        if (snacks.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.fastfood, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'Chưa có bắp nước nào',
+                    style: TextStyle(color: Colors.grey, fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Hãy tạo bắp nước mới ở tab "Tạo Bắp Nước"',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: snacks.length,
+          itemBuilder: (context, index) {
+            final snack = snacks[index];
+            final categoryColors = {
+              'popcorn': const Color(0xFFFF9800),
+              'drink': const Color(0xFF2196F3),
+              'combo': const Color(0xFF9C27B0),
+              'snack': const Color(0xFF4CAF50),
+            };
+            final categoryNames = {
+              'popcorn': 'Bắp',
+              'drink': 'Nước',
+              'combo': 'Combo',
+              'snack': 'Đồ Ăn',
+            };
+            final categoryColor = categoryColors[snack.category] ?? Colors.grey;
+
+            return Card(
+              color: const Color(0xFF1A1A1A),
+              margin: const EdgeInsets.only(bottom: 16),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: categoryColor.withOpacity(0.2),
+                  child: Icon(Icons.fastfood, color: categoryColor),
+                ),
+                title: Text(
+                  snack.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      snack.description,
+                      style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: categoryColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            categoryNames[snack.category] ?? snack.category,
+                            style: TextStyle(color: categoryColor, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${NumberFormat('#,###', 'vi_VN').format(snack.price.toInt())}đ',
+                          style: const TextStyle(
+                            color: Color(0xFFE50914),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      snack.isActive ? 'Đang hoạt động' : 'Đã tắt',
+                      style: TextStyle(
+                        color: snack.isActive ? Colors.green : Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Color(0xFF4CAF50)),
+                      onPressed: () => _showEditSnackDialog(context, snack),
+                      tooltip: 'Sửa',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Color(0xFFE50914)),
+                      onPressed: () => _showDeleteSnackConfirmDialog(context, snack),
+                      tooltip: 'Xóa',
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditSnackDialog(BuildContext context, SnackModel snack) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _EditSnackDialog(snack: snack),
+    );
+  }
+
+  void _showDeleteSnackConfirmDialog(BuildContext context, SnackModel snack) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Text(
+            'Xác nhận xóa',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            'Bạn có chắc chắn muốn xóa "${snack.name}"?\n\nHành động này không thể hoàn tác.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await DatabaseService().deleteSnack(snack.id);
+                  Navigator.pop(dialogContext);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✅ Đã xóa bắp nước'),
+                        backgroundColor: Color(0xFF4CAF50),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  Navigator.pop(dialogContext);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi: $e'),
+                        backgroundColor: const Color(0xFFE50914),
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE50914),
+              ),
+              child: const Text('Xóa'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// Edit Snack Dialog
+class _EditSnackDialog extends StatefulWidget {
+  final SnackModel snack;
+  const _EditSnackDialog({required this.snack});
+
+  @override
+  State<_EditSnackDialog> createState() => _EditSnackDialogState();
+}
+
+class _EditSnackDialogState extends State<_EditSnackDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  String _selectedCategory = 'snack';
+  bool _isActive = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.snack.name;
+    _descriptionController.text = widget.snack.description;
+    _priceController.text = widget.snack.price.toString();
+    _imageUrlController.text = widget.snack.imageUrl;
+    _selectedCategory = widget.snack.category;
+    _isActive = widget.snack.isActive;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      title: Row(
+        children: [
+          const Icon(Icons.fastfood, color: Color(0xFFE50914)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sửa: ${widget.snack.name}',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Tên *',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descriptionController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Mô tả *',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập mô tả' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Danh Mục *',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'popcorn', child: Text('Bắp')),
+                  DropdownMenuItem(value: 'drink', child: Text('Nước')),
+                  DropdownMenuItem(value: 'combo', child: Text('Combo')),
+                  DropdownMenuItem(value: 'snack', child: Text('Đồ Ăn')),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedCategory = value!);
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _priceController,
+                style: const TextStyle(color: Colors.white),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Giá (VND) *',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Vui lòng nhập giá';
+                  final price = double.tryParse(value!);
+                  if (price == null || price <= 0) return 'Giá phải lớn hơn 0';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _imageUrlController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'URL Hình Ảnh *',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập URL' : null,
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Đang hoạt động', style: TextStyle(color: Colors.white)),
+                value: _isActive,
+                onChanged: (value) {
+                  setState(() => _isActive = value);
+                },
+                activeColor: const Color(0xFF4CAF50),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : () async {
+            if (!_formKey.currentState!.validate()) return;
+            
+            setState(() => _isSaving = true);
+            try {
+              final updatedSnack = SnackModel(
+                id: widget.snack.id,
+                name: _nameController.text.trim(),
+                description: _descriptionController.text.trim(),
+                price: double.parse(_priceController.text.trim()),
+                imageUrl: _imageUrlController.text.trim(),
+                category: _selectedCategory,
+                isActive: _isActive,
+              );
+              
+              await DatabaseService().updateSnack(updatedSnack);
+              Navigator.pop(context);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Đã cập nhật bắp nước thành công!'),
+                    backgroundColor: Color(0xFF4CAF50),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Lỗi: $e'),
+                    backgroundColor: const Color(0xFFE50914),
+                  ),
+                );
+              }
+            } finally {
+              if (mounted) {
+                setState(() => _isSaving = false);
+              }
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4CAF50),
+          ),
+          child: _isSaving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : const Text('Lưu'),
         ),

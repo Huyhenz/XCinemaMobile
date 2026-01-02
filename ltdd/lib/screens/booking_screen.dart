@@ -7,7 +7,7 @@ import '../models/showtime.dart';
 import '../models/theater.dart';
 import '../services/database_services.dart';
 import '../widgets/auth_guard.dart';
-import 'payment_screen.dart';
+import 'snack_selection_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   final String showtimeId;
@@ -163,16 +163,15 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PaymentScreen(
+        builder: (context) => SnackSelectionScreen(
           showtimeId: widget.showtimeId,
           cinemaId: _cinemaId!,
           selectedSeats: _selectedSeats,
           totalPrice: _totalPrice,
-          voucherId: null, // Voucher sẽ được áp dụng ở payment screen
         ),
       ),
     ).then((_) {
-      // Reload data when coming back from payment
+      // Reload data when coming back from snack selection
       _loadData();
     });
   }

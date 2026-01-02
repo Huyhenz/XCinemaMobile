@@ -9,6 +9,8 @@ import '../blocs/profile/profile_bloc.dart';
 import '../blocs/profile/profile_event.dart';
 import '../blocs/profile/profile_state.dart';
 import '../services/database_services.dart';
+import '../models/snack.dart';
+import '../models/booking.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 import 'user_info_screen.dart';
@@ -795,6 +797,13 @@ class ProfileScreen extends StatelessWidget {
                             'Thanh toán: ${_getPaymentMethodName(booking.paymentMethod!)}',
                           ),
                         ],
+                        if (booking.snacks != null && booking.snacks!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _buildInfoRowStatic(
+                            Icons.fastfood,
+                            '${booking.snacks!.values.fold(0, (sum, qty) => sum + qty)} món bắp nước',
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -884,15 +893,20 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (context) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
             Container(
               width: 40,
               height: 4,
@@ -930,43 +944,89 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  _buildDetailRowStatic('Phim', detail.movieTitle),
-                  const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRowStatic('Rạp', detail.theaterName),
-                  const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRowStatic('Suất chiếu', dateFormat.format(detail.showtime)),
-                  const Divider(color: Color(0xFF3A3A3A)),
-                  _buildDetailRowStatic('Ghế', booking.seats.join(', ')),
-                  const Divider(color: Color(0xFF3A3A3A)),
-                  if (booking.bookedAt != null) ...[
-                    _buildDetailRowStatic(
-                      'Ngày giờ đặt vé',
-                      dateFormat.format(DateTime.fromMillisecondsSinceEpoch(booking.bookedAt!)),
-                    ),
-                    const Divider(color: Color(0xFF3A3A3A)),
-                  ],
-                  if (booking.paymentMethod != null) ...[
-                    _buildDetailRowStatic(
-                      'Cách thức thanh toán',
-                      _getPaymentMethodName(booking.paymentMethod!),
-                    ),
-                    const Divider(color: Color(0xFF3A3A3A)),
-                  ],
-                  _buildDetailRowStatic(
-                    'Tổng tiền',
-                    '${NumberFormat('#,###', 'vi_VN').format(booking.finalPrice ?? booking.totalPrice)}đ',
-                    isHighlight: true,
+            FutureBuilder<Map<String, SnackModel>>(
+              future: _loadSnacksForBooking(booking),
+              builder: (context, snackSnapshot) {
+                final snackMap = snackSnapshot.data ?? {};
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ],
-              ),
+                  child: Column(
+                    children: [
+                      _buildDetailRowStatic('Phim', detail.movieTitle),
+                      const Divider(color: Color(0xFF3A3A3A)),
+                      _buildDetailRowStatic('Rạp', detail.theaterName),
+                      const Divider(color: Color(0xFF3A3A3A)),
+                      _buildDetailRowStatic('Suất chiếu', dateFormat.format(detail.showtime)),
+                      const Divider(color: Color(0xFF3A3A3A)),
+                      _buildDetailRowStatic('Ghế', booking.seats.join(', ')),
+                      const Divider(color: Color(0xFF3A3A3A)),
+                      if (booking.bookedAt != null) ...[
+                        _buildDetailRowStatic(
+                          'Ngày giờ đặt vé',
+                          dateFormat.format(DateTime.fromMillisecondsSinceEpoch(booking.bookedAt!)),
+                        ),
+                        const Divider(color: Color(0xFF3A3A3A)),
+                      ],
+                      if (booking.paymentMethod != null) ...[
+                        _buildDetailRowStatic(
+                          'Cách thức thanh toán',
+                          _getPaymentMethodName(booking.paymentMethod!),
+                        ),
+                        const Divider(color: Color(0xFF3A3A3A)),
+                      ],
+                      if (booking.snacks != null && booking.snacks!.isNotEmpty && snackMap.isNotEmpty) ...[
+                        _buildDetailRowStatic(
+                          'Bắp nước',
+                          '',
+                        ),
+                        ...booking.snacks!.entries.map((entry) {
+                          final snack = snackMap[entry.key];
+                          if (snack == null) return const SizedBox.shrink();
+                          final quantity = entry.value;
+                          final snackTotal = snack.price * quantity;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 16),
+                                    child: Text(
+                                      '${snack.name} x$quantity',
+                                      style: TextStyle(
+                                        color: Colors.grey[300],
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${NumberFormat('#,###', 'vi_VN').format(snackTotal)}đ',
+                                  style: TextStyle(
+                                    color: Colors.grey[300],
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        const Divider(color: Color(0xFF3A3A3A)),
+                      ],
+                      _buildDetailRowStatic(
+                        'Tổng tiền',
+                        '${NumberFormat('#,###', 'vi_VN').format(booking.finalPrice ?? booking.totalPrice)}đ',
+                        isHighlight: true,
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
             ElevatedButton(
@@ -986,11 +1046,30 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
+                SizedBox(height: MediaQuery.of(context).padding.bottom),
+              ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  static Future<Map<String, SnackModel>> _loadSnacksForBooking(BookingModel booking) async {
+    Map<String, SnackModel> snackMap = {};
+    if (booking.snacks != null && booking.snacks!.isNotEmpty) {
+      try {
+        final allSnacks = await DatabaseService().getAllSnacks();
+        for (var snack in allSnacks) {
+          if (booking.snacks!.containsKey(snack.id)) {
+            snackMap[snack.id] = snack;
+          }
+        }
+      } catch (e) {
+        print('⚠️ Error loading snacks for booking detail: $e');
+      }
+    }
+    return snackMap;
   }
 
   static Widget _buildDetailRowStatic(String label, String value, {bool isHighlight = false}) {

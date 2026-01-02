@@ -1,0 +1,75 @@
+{
+  "rules": {
+    "cinemas": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "movies": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "showtimes": {
+      ".read": true,
+      ".write": "auth != null",
+      ".indexOn": ["movieId", "theaterId", "startTime"]
+    },
+    "theaters": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "movie_ratings": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "movie_comments": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "vouchers": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "snacks": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "user_vouchers": {
+      "$userId": {
+        ".read": "auth != null && $userId == auth.uid",
+        ".write": "auth != null && $userId == auth.uid"
+      }
+    },
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["email", "phone"]
+    },
+    "bookings": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "showtimeId", "status"]
+    },
+    "notifications": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "isRead"]
+    },
+    "temp_registrations": {
+      ".read": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid)",
+      ".write": "auth != null"
+    },
+    "temp_bookings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "payments": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "minigame_configs": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
+

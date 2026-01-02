@@ -10,6 +10,7 @@ import '../models/cinema.dart';
 import '../models/movie.dart';
 import '../models/showtime.dart';
 import '../models/theater.dart';
+import '../models/snack.dart';
 import 'database_services.dart';
 
 class EmailService {
@@ -40,6 +41,21 @@ class EmailService {
 
       TheaterModel? theater = await _dbService.getTheater(showtime.theaterId);
       CinemaModel? cinema = await _dbService.getCinema(booking.cinemaId);
+      
+      // Load snacks nếu có
+      Map<String, SnackModel> snackMap = {};
+      if (booking.snacks != null && booking.snacks!.isNotEmpty) {
+        try {
+          final allSnacks = await _dbService.getAllSnacks();
+          for (var snack in allSnacks) {
+            if (booking.snacks!.containsKey(snack.id)) {
+              snackMap[snack.id] = snack;
+            }
+          }
+        } catch (e) {
+          print('⚠️ Error loading snacks for email: $e');
+        }
+      }
 
       // Đọc cấu hình SMTP từ .env
       String smtpHost;
@@ -141,6 +157,34 @@ class EmailService {
           ? NumberFormat('#,###', 'vi_VN').format(booking.totalPrice - booking.finalPrice!)
           : null;
       
+      // Format snacks HTML
+      String snacksHtml = '';
+      if (booking.snacks != null && booking.snacks!.isNotEmpty && snackMap.isNotEmpty) {
+        final snacksList = booking.snacks!.entries.map((entry) {
+          final snack = snackMap[entry.key];
+          if (snack == null) return '';
+          final quantity = entry.value;
+          final snackTotal = snack.price * quantity;
+          final formattedPrice = NumberFormat('#,###', 'vi_VN').format(snackTotal);
+          return '''
+          <div class="info-row" style="padding-left: 20px;">
+            <span class="info-label">${snack.name} x$quantity</span>
+            <span class="info-value">${formattedPrice}đ</span>
+          </div>
+          ''';
+        }).where((html) => html.isNotEmpty).join('');
+        
+        if (snacksList.isNotEmpty) {
+          snacksHtml = '''
+        <div class="info-row" style="border-bottom: none;">
+          <span class="info-label">Bắp nước:</span>
+          <span class="info-value"></span>
+        </div>
+        $snacksList
+          ''';
+        }
+      }
+      
       // Generate QR code
       final qrCode = _generateQRCode(bookingId);
 
@@ -204,6 +248,7 @@ class EmailService {
           <span class="info-label">Số lượng vé:</span>
           <span class="info-value">${booking.seats.length} vé</span>
         </div>
+        $snacksHtml
         <div class="info-row">
           <span class="info-label">Tổng tiền:</span>
           <span class="info-value"><strong style="color: #E50914;">${totalPrice}₫</strong></span>

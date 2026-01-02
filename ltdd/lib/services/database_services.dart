@@ -14,6 +14,8 @@ import '../models/tempbooking.dart';
 import '../models/user.dart';
 import '../models/movie_rating.dart';
 import '../models/movie_comment.dart';
+import '../models/minigame_config.dart';
+import '../models/snack.dart';
 
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -2261,6 +2263,188 @@ class DatabaseService {
       await _db.child('movie_comments').child(commentId).remove();
     } catch (e) {
       print('Error deleting movie comment: $e');
+      rethrow;
+    }
+  }
+
+  //MINIGAME CONFIG
+  Future<void> saveMinigameConfig(MinigameConfig config) async {
+    try {
+      await _db.child('minigame_configs').child(config.gameId).set(config.toMap());
+    } catch (e) {
+      print('Error saving minigame config: $e');
+      rethrow;
+    }
+  }
+
+  Future<MinigameConfig?> getMinigameConfig(String gameId) async {
+    try {
+      DataSnapshot snapshot = await _db.child('minigame_configs').child(gameId).get();
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+        
+        // Kiểm tra nếu value là String (invalid data)
+        if (value is String) {
+          print('⚠️ Minigame config for $gameId is String instead of Map, skipping');
+          return null;
+        }
+        
+        // Kiểm tra nếu value không phải Map
+        if (value is! Map) {
+          print('⚠️ Minigame config for $gameId is ${value.runtimeType} instead of Map, skipping');
+          return null;
+        }
+        
+        final data = _convertMap(value);
+        if (data.isNotEmpty) {
+          return MinigameConfig.fromMap(data, gameId);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting minigame config: $e');
+      return null;
+    }
+  }
+
+  Future<List<MinigameConfig>> getAllMinigameConfigs() async {
+    try {
+      DataSnapshot snapshot = await _db.child('minigame_configs').get();
+      List<MinigameConfig> configs = [];
+
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+
+        // Kiểm tra nếu value là String (invalid data)
+        if (value is String) {
+          print('⚠️ Minigame configs node contains String instead of Map');
+          return configs;
+        }
+
+        if (value is Map) {
+          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+          data.forEach((key, itemValue) {
+            try {
+              // Bỏ qua nếu itemValue là String hoặc null
+              if (itemValue == null) {
+                print('⚠️ Skipping null minigame config: $key');
+                return;
+              }
+              
+              if (itemValue is String) {
+                print('⚠️ Skipping invalid minigame config (String): $key');
+                return;
+              }
+              
+              if (itemValue is Map) {
+                Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+                configs.add(MinigameConfig.fromMap(itemMap, key.toString()));
+              } else {
+                print('⚠️ Skipping invalid minigame config type: $key (${itemValue.runtimeType})');
+              }
+            } catch (e) {
+              print('⚠️ Error parsing minigame config $key: $e');
+            }
+          });
+        } else {
+          print('⚠️ Minigame configs data is ${value.runtimeType}, expected Map');
+        }
+      }
+      return configs;
+    } catch (e) {
+      print('Error getting all minigame configs: $e');
+      return [];
+    }
+  }
+
+  Future<void> updateMinigameConfig(MinigameConfig config) async {
+    try {
+      await _db.child('minigame_configs').child(config.gameId).update(config.toMap());
+    } catch (e) {
+      print('Error updating minigame config: $e');
+      rethrow;
+    }
+  }
+
+  //SNACK
+  Future<String> saveSnack(SnackModel snack) async {
+    try {
+      final ref = _db.child('snacks').push();
+      await ref.set(snack.toMap());
+      return ref.key!;
+    } on FirebaseException catch (e) {
+      print('❌ Firebase error saving snack: ${e.code} - ${e.message}');
+      if (e.code == 'PERMISSION_DENIED' || e.message?.contains('Permission denied') == true) {
+        print('⚠️ Permission denied: Vui lòng cập nhật Firebase rules để cho phép ghi snacks');
+        print('📝 Xem file FIREBASE_SNACKS_RULES.md để biết cách cập nhật rules');
+        print('📝 Rule cần: "snacks": { ".read": true, ".write": "auth != null" }');
+      }
+      rethrow;
+    } catch (e) {
+      print('❌ Error saving snack: $e');
+      rethrow;
+    }
+  }
+
+  Future<SnackModel?> getSnack(String snackId) async {
+    try {
+      DataSnapshot snapshot = await _db.child('snacks').child(snackId).get();
+      if (snapshot.exists && snapshot.value != null) {
+        final data = _convertMap(snapshot.value);
+        if (data.isNotEmpty) {
+          return SnackModel.fromMap(data, snackId);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting snack: $e');
+      return null;
+    }
+  }
+
+  Future<List<SnackModel>> getAllSnacks() async {
+    try {
+      DataSnapshot snapshot = await _db.child('snacks').get();
+      List<SnackModel> snacks = [];
+
+      if (snapshot.exists && snapshot.value != null) {
+        final value = snapshot.value;
+
+        if (value is Map) {
+          Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+          data.forEach((key, itemValue) {
+            try {
+              if (itemValue is Map) {
+                Map<dynamic, dynamic> itemMap = Map<dynamic, dynamic>.from(itemValue);
+                snacks.add(SnackModel.fromMap(itemMap, key.toString()));
+              }
+            } catch (e) {
+              print('⚠️ Error parsing snack $key: $e');
+            }
+          });
+        }
+      }
+      return snacks;
+    } catch (e) {
+      print('Error getting all snacks: $e');
+      return [];
+    }
+  }
+
+  Future<void> updateSnack(SnackModel snack) async {
+    try {
+      await _db.child('snacks').child(snack.id).update(snack.toMap());
+    } catch (e) {
+      print('Error updating snack: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSnack(String snackId) async {
+    try {
+      await _db.child('snacks').child(snackId).remove();
+    } catch (e) {
+      print('Error deleting snack: $e');
       rethrow;
     }
   }

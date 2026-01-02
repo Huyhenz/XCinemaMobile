@@ -12,6 +12,7 @@ class BookingModel {
   final int? bookedAt; // Timestamp
   final String status; // 'pending', 'confirmed', 'cancelled'
   final String? paymentMethod; // 'paypal', 'vnpay', 'zalopay'
+  final Map<String, int>? snacks; // snackId -> quantity
 
   BookingModel({
     required this.id,
@@ -25,6 +26,7 @@ class BookingModel {
     this.bookedAt,
     this.status = 'pending',
     this.paymentMethod,
+    this.snacks,
   });
 
   factory BookingModel.fromMap(Map<dynamic, dynamic> data, String key) {
@@ -83,6 +85,24 @@ class BookingModel {
       print('⚠️ Error parsing bookedAt in booking $key: $e');
     }
     
+    // Safely convert snacks
+    Map<String, int>? snacksMap;
+    try {
+      if (data['snacks'] != null && data['snacks'] is Map) {
+        final snacksData = Map<dynamic, dynamic>.from(data['snacks']);
+        snacksMap = {};
+        snacksData.forEach((key, value) {
+          if (value is num) {
+            snacksMap![key.toString()] = value.toInt();
+          } else if (value is String) {
+            snacksMap![key.toString()] = int.tryParse(value) ?? 0;
+          }
+        });
+      }
+    } catch (e) {
+      print('⚠️ Error parsing snacks in booking $key: $e');
+    }
+
     return BookingModel(
       id: key,
       userId: data['userId']?.toString() ?? '',
@@ -95,6 +115,7 @@ class BookingModel {
       bookedAt: bookedAtValue,
       status: data['status']?.toString() ?? 'pending',
       paymentMethod: data['paymentMethod']?.toString(),
+      snacks: snacksMap,
     );
   }
 
@@ -110,6 +131,7 @@ class BookingModel {
       'bookedAt': bookedAt ?? ServerValue.timestamp,
       'status': status,
       'paymentMethod': paymentMethod,
+      if (snacks != null && snacks!.isNotEmpty) 'snacks': snacks,
     };
   }
 }
