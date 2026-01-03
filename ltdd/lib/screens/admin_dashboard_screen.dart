@@ -17,6 +17,8 @@ import '../models/minigame.dart';
 import '../models/snack.dart';
 import '../games/minigame_factory.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
+import '../widgets/hamburger_menu_button.dart';
 import 'admin_cleanup_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -122,6 +124,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 );
               },
+            ),
+            const Padding(
+              padding: EdgeInsets.only(right: 8.0),
+              child: HamburgerMenuButton(),
             ),
           ],
         ),
@@ -272,19 +278,9 @@ class _CreateCinemaTabState extends State<_CreateCinemaTab> {
       // Reset form
       _formKey.currentState!.reset();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Đã tạo rạp chiếu thành công!'),
-          backgroundColor: Color(0xFF4CAF50),
-        ),
-      );
+      await DialogHelper.showSuccess(context, '✅ Đã tạo rạp chiếu thành công!');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi: $e'),
-          backgroundColor: const Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Lỗi: $e');
     } finally {
       setState(() => _isCreating = false);
     }
@@ -392,7 +388,7 @@ class _CreateCinemaTabState extends State<_CreateCinemaTab> {
                     )
                   : const Text(
                       'TẠO RẠP CHIẾU',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
             ),
           ],
@@ -547,20 +543,15 @@ class _ManageCinemasTab extends StatelessWidget {
                 child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   adminBloc.add(DeleteCinema(cinema.id));
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Đã xóa rạp chiếu'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
+                  await DialogHelper.showSuccess(context, '✅ Đã xóa rạp chiếu');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                 ),
-                child: const Text('Xóa'),
+                child: const Text('Xóa', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -752,19 +743,9 @@ class _EditCinemaDialogState extends State<_EditCinemaDialog> {
               context.read<AdminBloc>().add(UpdateCinema(updatedCinema));
               Navigator.pop(context);
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✅ Đã cập nhật rạp chiếu thành công!'),
-                  backgroundColor: Color(0xFF4CAF50),
-                ),
-              );
+              await DialogHelper.showSuccess(context, '✅ Đã cập nhật rạp chiếu thành công!');
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Lỗi: $e'),
-                  backgroundColor: const Color(0xFFE50914),
-                ),
-              );
+              await DialogHelper.showError(context, 'Lỗi: $e');
             } finally {
               setState(() => _isSaving = false);
             }
@@ -781,7 +762,7 @@ class _EditCinemaDialogState extends State<_EditCinemaDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Text('Lưu'),
+              : const Text('Lưu', style: TextStyle(color: Colors.white)),
         ),
       ],
     );
@@ -845,21 +826,11 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
   Future<void> _createMovie() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_createForAllCinemas && (_selectedCinemaId == null || _selectedCinemaId!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp');
       return;
     }
     if (_releaseDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn ngày phát hành'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn ngày phát hành');
       return;
     }
 
@@ -904,27 +875,12 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
       });
 
       if (failCount == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Đã tạo phim thành công cho ${successCount} rạp!'),
-            backgroundColor: const Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã tạo phim thành công cho ${successCount} rạp!');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⚠️ Đã tạo phim cho $successCount rạp, thất bại $failCount rạp'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        await DialogHelper.showWarning(context, '⚠️ Đã tạo phim cho $successCount rạp, thất bại $failCount rạp');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi: $e'),
-          backgroundColor: const Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Lỗi: $e');
     } finally {
       setState(() => _isCreating = false);
     }
@@ -1203,7 +1159,7 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
                         )
                       : const Text(
                           'TẠO PHIM',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                 ),
               ],
@@ -1238,6 +1194,10 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
   bool _isLoadingTheaters = false;
   bool _createForAllCinemas = false;
   bool _useRandomTime = false;
+  String? _selectedTheaterType; // Loại phòng chiếu khi tạo cho tất cả rạp: 'normal', 'couple', 'vip'
+  String? _selectedTheaterName; // Tên phòng chiếu khi tạo cho tất cả rạp (tùy chọn)
+  bool _useAllTheatersOfType = true; // true = tất cả phòng cùng loại, false = chỉ phòng cùng tên
+  List<String> _availableTheaterNames = []; // Danh sách tên phòng có sẵn
 
   @override
   void initState() {
@@ -1306,6 +1266,44 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
     if (cinemaId != null && cinemaId.isNotEmpty && !_createForAllCinemas) {
       _loadMoviesByCinema(cinemaId);
       _loadTheatersByCinema(cinemaId);
+    }
+  }
+
+  // Load danh sách tên phòng từ tất cả rạp có loại phòng đã chọn
+  Future<void> _loadTheaterNamesByType() async {
+    if (_selectedTheaterType == null || _selectedTheaterType!.isEmpty) {
+      setState(() {
+        _availableTheaterNames = [];
+        _selectedTheaterName = null;
+      });
+      return;
+    }
+
+    try {
+      Set<String> theaterNames = {};
+      
+      // Lấy tất cả phòng từ tất cả rạp có loại phòng đã chọn
+      for (final cinema in _cinemas) {
+        final theaters = await DatabaseService().getTheatersByCinema(cinema.id);
+        final theatersOfType = theaters.where((t) => t.theaterType == _selectedTheaterType).toList();
+        
+        for (var theater in theatersOfType) {
+          theaterNames.add(theater.name);
+        }
+      }
+      
+      setState(() {
+        _availableTheaterNames = theaterNames.toList()..sort();
+        // Reset tên phòng nếu không còn trong danh sách
+        if (_selectedTheaterName != null && !_availableTheaterNames.contains(_selectedTheaterName)) {
+          _selectedTheaterName = null;
+        }
+      });
+    } catch (e) {
+      print('Error loading theater names: $e');
+      setState(() {
+        _availableTheaterNames = [];
+      });
     }
   }
 
@@ -1396,30 +1394,23 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
 
   Future<void> _createShowtime() async {
     if (!_createForAllCinemas && (_selectedCinemaId == null || _selectedCinemaId!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp');
       return;
     }
     if (_selectedMovieId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn phim'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn phim');
       return;
     }
     if (!_createForAllCinemas && _selectedTheaterId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn phòng chiếu'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn phòng chiếu');
+      return;
+    }
+    if (_createForAllCinemas && (_selectedTheaterType == null || _selectedTheaterType!.isEmpty)) {
+      await DialogHelper.showError(context, 'Vui lòng chọn loại phòng chiếu');
+      return;
+    }
+    if (_createForAllCinemas && !_useAllTheatersOfType && (_selectedTheaterName == null || _selectedTheaterName!.isEmpty)) {
+      await DialogHelper.showError(context, 'Vui lòng chọn tên phòng chiếu');
       return;
     }
 
@@ -1429,27 +1420,107 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
       int failCount = 0;
 
       if (_createForAllCinemas) {
-        // Create showtimes for all cinemas
+        // Kiểm tra tất cả rạp có loại phòng chiếu đã chọn không
+        List<Map<String, String>> missingTheaterTypes = []; // [{cinemaName: '...', theaterType: '...'}]
+        
         for (final cinema in _cinemas) {
           try {
             // Get all theaters for this cinema
             final theaters = await DatabaseService().getTheatersByCinema(cinema.id);
-            if (theaters.isEmpty) {
-              print('No theaters found for cinema ${cinema.id}');
-              continue;
-            }
-
-            // Get movies for this cinema (to check if the selected movie exists in this cinema)
-            final cinemaMovies = await DatabaseService().getMoviesByCinemaForAdmin(cinema.id);
-            final movieExists = cinemaMovies.any((m) => m.id == _selectedMovieId);
             
-            if (!movieExists) {
-              print('Movie ${_selectedMovieId} does not exist in cinema ${cinema.id}');
+            // Kiểm tra xem rạp này có loại phòng đã chọn không
+            final hasTheaterType = theaters.any((theater) => theater.theaterType == _selectedTheaterType);
+            
+            if (!hasTheaterType) {
+              String theaterTypeName = _selectedTheaterType == 'normal' 
+                  ? 'Thường' 
+                  : _selectedTheaterType == 'couple' 
+                      ? 'Couple' 
+                      : 'VIP';
+              missingTheaterTypes.add({
+                'cinemaName': cinema.name,
+                'theaterType': theaterTypeName,
+              });
+            }
+          } catch (e) {
+            print('Error checking cinema ${cinema.id}: $e');
+          }
+        }
+        
+        // Nếu có rạp thiếu loại phòng, hiển thị thông báo và dừng
+        if (missingTheaterTypes.isNotEmpty) {
+          String theaterTypeName = _selectedTheaterType == 'normal' 
+              ? 'Thường' 
+              : _selectedTheaterType == 'couple' 
+                  ? 'Couple' 
+                  : 'VIP';
+          String message = 'Các rạp sau cần tạo phòng loại "$theaterTypeName" để có thể tạo lịch chiếu:\n\n';
+          for (var item in missingTheaterTypes) {
+            message += '• ${item['cinemaName']} - Cần tạo phòng ${item['theaterType']}\n';
+          }
+          await DialogHelper.showError(context, message);
+          setState(() => _isCreating = false);
+          return;
+        }
+        
+        // Nếu chọn tên phòng cụ thể, kiểm tra xem có rạp nào có phòng cùng tên không
+        if (!_useAllTheatersOfType && _selectedTheaterName != null) {
+          List<String> cinemasWithoutTheaterName = [];
+          for (final cinema in _cinemas) {
+            try {
+              final theaters = await DatabaseService().getTheatersByCinema(cinema.id);
+              final hasMatchingTheater = theaters.any((theater) => 
+                  theater.theaterType == _selectedTheaterType && 
+                  theater.name == _selectedTheaterName);
+              if (!hasMatchingTheater) {
+                cinemasWithoutTheaterName.add(cinema.name);
+              }
+            } catch (e) {
+              print('Error checking cinema ${cinema.id}: $e');
+            }
+          }
+          
+          if (cinemasWithoutTheaterName.isNotEmpty) {
+            String theaterTypeName = _selectedTheaterType == 'normal' 
+                ? 'Thường' 
+                : _selectedTheaterType == 'couple' 
+                    ? 'Couple' 
+                    : 'VIP';
+            String message = 'Các rạp sau không có phòng "$_selectedTheaterName" loại "$theaterTypeName":\n\n';
+            for (var cinemaName in cinemasWithoutTheaterName) {
+              message += '• $cinemaName\n';
+            }
+            message += '\nVui lòng tạo phòng "$_selectedTheaterName" loại "$theaterTypeName" cho các rạp trên hoặc chọn "Tất cả phòng cùng loại".';
+            await DialogHelper.showError(context, message);
+            setState(() => _isCreating = false);
+            return;
+          }
+        }
+        
+        // Create showtimes for all cinemas với loại phòng đã chọn
+        for (final cinema in _cinemas) {
+          try {
+            // Get all theaters for this cinema
+            final theaters = await DatabaseService().getTheatersByCinema(cinema.id);
+            
+            // Lọc các phòng theo loại và tên (nếu có chọn)
+            List<TheaterModel> filteredTheaters = theaters.where((theater) {
+              if (theater.theaterType != _selectedTheaterType) return false;
+              // Nếu chọn tên phòng cụ thể, chỉ lấy phòng cùng tên
+              if (!_useAllTheatersOfType && _selectedTheaterName != null) {
+                return theater.name == _selectedTheaterName;
+              }
+              return true;
+            }).toList();
+            
+            if (filteredTheaters.isEmpty) {
+              print('No matching theaters found for cinema ${cinema.id}');
               continue;
             }
 
-            // Create showtime for each theater in this cinema
-            for (final theater in theaters) {
+            // Tạo lịch chiếu cho mỗi phòng phù hợp trong rạp này
+            // Không cần kiểm tra phim có tồn tại trong rạp vì có thể tạo lịch chiếu cho phim ở bất kỳ rạp nào
+            for (final theater in filteredTheaters) {
               try {
                 // Generate time: use random if enabled, otherwise use selected time
                 final showtimeDateTime = _useRandomTime 
@@ -1463,10 +1534,12 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                   startTime: showtimeDateTime.millisecondsSinceEpoch,
                   availableSeats: theater.seats,
                 );
-                context.read<AdminBloc>().add(CreateShowtime(showtime));
+                // Tạo trực tiếp qua DatabaseService thay vì qua Bloc để tránh reload nhiều lần
+                await DatabaseService().saveShowtime(showtime);
+                print('✅ Created showtime for cinema ${cinema.name}, theater ${theater.name} (${theater.theaterType})');
                 successCount++;
               } catch (e) {
-                print('Error creating showtime for theater ${theater.id}: $e');
+                print('❌ Error creating showtime for theater ${theater.id} in cinema ${cinema.id}: $e');
                 failCount++;
               }
             }
@@ -1475,16 +1548,19 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
             failCount++;
           }
         }
+        
+        // Reload data một lần sau khi tạo tất cả showtime
+        if (successCount > 0) {
+          print('✅ Created $successCount showtimes successfully, $failCount failed');
+          context.read<AdminBloc>().add(LoadAdminData());
+        } else {
+          print('⚠️ No showtimes were created. Check if theaters match the criteria.');
+        }
       } else {
         // Create showtime for single cinema
         final theater = await DatabaseService().getTheater(_selectedTheaterId!);
         if (theater == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Không tìm thấy phòng chiếu'),
-              backgroundColor: Color(0xFFE50914),
-            ),
-          );
+          await DialogHelper.showError(context, 'Không tìm thấy phòng chiếu');
           return;
         }
 
@@ -1509,6 +1585,10 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
         _selectedCinemaId = null;
         _selectedMovieId = null;
         _selectedTheaterId = null;
+        _selectedTheaterType = null;
+        _selectedTheaterName = null;
+        _useAllTheatersOfType = true;
+        _availableTheaterNames = [];
         _movies = [];
         _theaters = [];
         _startTime = DateTime.now();
@@ -1518,27 +1598,12 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
       });
 
       if (failCount == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Đã tạo lịch chiếu thành công! (${successCount} lịch chiếu)'),
-            backgroundColor: const Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã tạo lịch chiếu thành công! (${successCount} lịch chiếu)');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⚠️ Đã tạo $successCount lịch chiếu, thất bại $failCount lịch chiếu'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        await DialogHelper.showWarning(context, '⚠️ Đã tạo $successCount lịch chiếu, thất bại $failCount lịch chiếu');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi: $e'),
-          backgroundColor: const Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Lỗi: $e');
     } finally {
       setState(() => _isCreating = false);
     }
@@ -1576,6 +1641,10 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                     _selectedCinemaId = null;
                     _selectedMovieId = null;
                     _selectedTheaterId = null;
+                    _selectedTheaterType = null;
+                    _selectedTheaterName = null;
+                    _useAllTheatersOfType = true;
+                    _availableTheaterNames = [];
                     _movies = [];
                     _theaters = [];
                   }
@@ -1737,28 +1806,91 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
               ),
             const SizedBox(height: 16),
 
-            // Theater Selection (chỉ hiển thị khi tạo cho 1 rạp, không hiển thị khi tạo cho tất cả rạp)
+            // Theater Selection
             if (_createForAllCinemas)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue),
+              // Dropdown chọn loại phòng chiếu khi tạo cho tất cả rạp
+              DropdownButtonFormField<String>(
+                value: _selectedTheaterType,
+                decoration: const InputDecoration(
+                  labelText: 'Chọn Loại Phòng Chiếu *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.meeting_room),
+                  helperText: 'Lịch chiếu sẽ được tạo cho tất cả phòng có loại này ở tất cả rạp',
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Lịch chiếu sẽ được tạo cho tất cả phòng chiếu của tất cả rạp',
-                        style: TextStyle(color: Colors.blue, fontSize: 14),
-                      ),
+                items: const [
+                  DropdownMenuItem<String>(
+                    value: 'normal',
+                    child: Text('Phòng Thường'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'couple',
+                    child: Text('Phòng Couple'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'vip',
+                    child: Text('Phòng VIP'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedTheaterType = value;
+                    _selectedTheaterName = null;
+                    _useAllTheatersOfType = true;
+                  });
+                  if (value != null) {
+                    _loadTheaterNamesByType();
+                  }
+                },
+                validator: (value) => value == null ? 'Vui lòng chọn loại phòng chiếu' : null,
+              ),
+              // Option chọn tất cả phòng cùng loại hoặc chọn tên phòng cụ thể
+              if (_selectedTheaterType != null && _availableTheaterNames.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  title: const Text(
+                    'Tất cả phòng cùng loại',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Tạo lịch chiếu cho tất cả phòng có loại đã chọn',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  value: _useAllTheatersOfType,
+                  onChanged: (value) {
+                    setState(() {
+                      _useAllTheatersOfType = value ?? true;
+                      if (_useAllTheatersOfType) {
+                        _selectedTheaterName = null;
+                      }
+                    });
+                  },
+                  activeColor: const Color(0xFFE50914),
+                ),
+                if (!_useAllTheatersOfType) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedTheaterName,
+                    decoration: const InputDecoration(
+                      labelText: 'Chọn Tên Phòng Chiếu *',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.label),
+                      helperText: 'Chỉ tạo lịch chiếu cho phòng có tên này ở tất cả rạp',
                     ),
-                  ],
-                ),
-              )
+                    items: _availableTheaterNames.map((name) {
+                      return DropdownMenuItem<String>(
+                        value: name,
+                        child: Text(name),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedTheaterName = value);
+                    },
+                    validator: (value) => !_useAllTheatersOfType && value == null 
+                        ? 'Vui lòng chọn tên phòng chiếu' 
+                        : null,
+                  ),
+                ],
+              ]
             else if (_isLoadingTheaters)
               const Center(child: Padding(
                 padding: EdgeInsets.all(16.0),
@@ -1869,7 +2001,7 @@ class _CreateShowtimeTabState extends State<_CreateShowtimeTab> {
                   )
                 : const Text(
                     'TẠO LỊCH CHIẾU',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
           ),
         ],
@@ -1916,10 +2048,26 @@ class _ManageShowtimesTab extends StatelessWidget {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: state.showtimes.length,
-          itemBuilder: (context, index) {
+        return Column(
+          children: [
+            // Nút xóa tất cả lịch chiếu
+            Container(
+              margin: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon(
+                onPressed: () => _showDeleteAllShowtimesDialog(context, state.showtimes.length),
+                icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                label: Text('Xóa Tất Cả Lịch Chiếu (${state.showtimes.length})'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: state.showtimes.length,
+                itemBuilder: (context, index) {
             final showtime = state.showtimes[index];
             return FutureBuilder<Map<String, dynamic>>(
               future: _getShowtimeDetails(showtime),
@@ -1952,7 +2100,17 @@ class _ManageShowtimesTab extends StatelessWidget {
                       children: [
                         const SizedBox(height: 4),
                         Text(
+                          'Rạp: ${details['cinemaName'] ?? 'N/A'}',
+                          style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
                           'Phòng: ${details['theaterName'] ?? 'N/A'}',
+                          style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Loại phòng: ${details['theaterType'] ?? 'N/A'}',
                           style: TextStyle(color: Colors.grey[400]),
                         ),
                         const SizedBox(height: 4),
@@ -1986,6 +2144,55 @@ class _ManageShowtimesTab extends StatelessWidget {
               },
             );
           },
+        ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteAllShowtimesDialog(BuildContext context, int count) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.red, size: 32),
+                SizedBox(width: 12),
+                Text('CẢNH BÁO!', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+            content: Text(
+              'Bạn có CHẮC CHẮN muốn XÓA TẤT CẢ $count lịch chiếu?\n\n'
+              '⚠️ Hành động này KHÔNG THỂ HOÀN TÁC!\n\n'
+              'Tất cả lịch chiếu sẽ bị xóa vĩnh viễn.',
+              style: const TextStyle(color: Colors.white),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteAllShowtimes());
+                  Navigator.pop(dialogContext);
+                  DialogHelper.showSuccess(context, '✅ Đã xóa tất cả lịch chiếu');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                ),
+                child: const Text('XÓA TẤT CẢ', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -1995,10 +2202,28 @@ class _ManageShowtimesTab extends StatelessWidget {
     final dbService = DatabaseService();
     final movie = await dbService.getMovie(showtime.movieId);
     final theater = await dbService.getTheater(showtime.theaterId);
+    final cinema = theater != null ? await dbService.getCinema(theater.cinemaId) : null;
+    
+    String theaterTypeName = 'N/A';
+    if (theater != null) {
+      switch (theater.theaterType) {
+        case 'normal':
+          theaterTypeName = 'Thường';
+          break;
+        case 'couple':
+          theaterTypeName = 'Couple';
+          break;
+        case 'vip':
+          theaterTypeName = 'VIP';
+          break;
+      }
+    }
     
     return {
       'movieTitle': movie?.title ?? 'N/A',
       'theaterName': theater?.name ?? 'N/A',
+      'theaterType': theaterTypeName,
+      'cinemaName': cinema?.name ?? 'N/A',
       'totalSeats': theater?.seats.length ?? 0,
       'time': DateFormat('dd/MM/yyyy HH:mm').format(
         DateTime.fromMillisecondsSinceEpoch(showtime.startTime),
@@ -2040,20 +2265,15 @@ class _ManageShowtimesTab extends StatelessWidget {
                 child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   adminBloc.add(DeleteShowtime(showtime.id));
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Đã xóa lịch chiếu'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
+                  await DialogHelper.showSuccess(context, '✅ Đã xóa lịch chiếu');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                 ),
-                child: const Text('Xóa'),
+                child: const Text('Xóa', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2279,19 +2499,9 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
                 );
                 context.read<AdminBloc>().add(UpdateShowtime(updatedShowtime));
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Đã cập nhật lịch chiếu'),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
+                await DialogHelper.showSuccess(context, '✅ Đã cập nhật lịch chiếu');
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Lỗi: $e'),
-                    backgroundColor: const Color(0xFFE50914),
-                  ),
-                );
+                await DialogHelper.showError(context, 'Lỗi: $e');
               } finally {
                 setState(() => _isSaving = false);
               }
@@ -2306,7 +2516,7 @@ class _EditShowtimeDialogState extends State<_EditShowtimeDialog> {
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Text('Lưu'),
+              : const Text('Lưu', style: TextStyle(color: Colors.white)),
         ),
       ],
     );
@@ -2351,10 +2561,26 @@ class _ManageTheatersTab extends StatelessWidget {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: state.theaters.length,
-          itemBuilder: (context, index) {
+        return Column(
+          children: [
+            // Nút xóa tất cả phòng chiếu
+            Container(
+              margin: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon(
+                onPressed: () => _showDeleteAllTheatersDialog(context, state.theaters.length),
+                icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                label: Text('Xóa Tất Cả Phòng Chiếu (${state.theaters.length})'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: state.theaters.length,
+                itemBuilder: (context, index) {
             final theater = state.theaters[index];
             return FutureBuilder<CinemaModel?>(
               future: DatabaseService().getCinema(theater.cinemaId),
@@ -2376,8 +2602,32 @@ class _ManageTheatersTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 4),
+                        if (snapshot.connectionState == ConnectionState.waiting)
+                          Row(
+                            children: [
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Đang tải thông tin rạp...',
+                                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                              ),
+                            ],
+                          )
+                        else
+                          Text(
+                            'Rạp: ${snapshot.data?.name ?? 'Không xác định'}',
+                            style: TextStyle(
+                              color: snapshot.data != null ? Colors.grey[400] : Colors.orange[300],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        const SizedBox(height: 4),
                         Text(
-                          'Rạp: ${snapshot.data?.name ?? 'N/A'}',
+                          'Loại phòng: ${theater.theaterType == 'normal' ? 'Thường' : theater.theaterType == 'couple' ? 'Couple' : 'VIP'}',
                           style: TextStyle(color: Colors.grey[400]),
                         ),
                         const SizedBox(height: 4),
@@ -2411,6 +2661,55 @@ class _ManageTheatersTab extends StatelessWidget {
               },
             );
           },
+        ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteAllTheatersDialog(BuildContext context, int count) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.red, size: 32),
+                SizedBox(width: 12),
+                Text('CẢNH BÁO!', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+            content: Text(
+              'Bạn có CHẮC CHẮN muốn XÓA TẤT CẢ $count phòng chiếu?\n\n'
+              '⚠️ Hành động này KHÔNG THỂ HOÀN TÁC!\n\n'
+              'Tất cả phòng chiếu sẽ bị xóa vĩnh viễn.',
+              style: const TextStyle(color: Colors.white),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteAllTheaters());
+                  Navigator.pop(dialogContext);
+                  DialogHelper.showSuccess(context, '✅ Đã xóa tất cả phòng chiếu');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                ),
+                child: const Text('XÓA TẤT CẢ', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -2450,20 +2749,15 @@ class _ManageTheatersTab extends StatelessWidget {
                 child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   adminBloc.add(DeleteTheater(theater.id));
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✅ Đã xóa phòng chiếu "${theater.name}"'),
-                      backgroundColor: const Color(0xFF4CAF50),
-                    ),
-                  );
+                  await DialogHelper.showSuccess(context, '✅ Đã xóa phòng chiếu "${theater.name}"');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                 ),
-                child: const Text('Xóa'),
+                child: const Text('Xóa', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -2491,11 +2785,18 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
   final _couplePriceController = TextEditingController();
   final _vipPriceController = TextEditingController();
   bool _isSaving = false;
+  List<CinemaModel> _cinemas = [];
+  String? _selectedCinemaId;
+  String? _selectedTheaterType;
+  bool _isLoadingCinemas = true;
 
   @override
   void initState() {
     super.initState();
     _nameController.text = widget.theater.name;
+    _selectedCinemaId = widget.theater.cinemaId;
+    _selectedTheaterType = widget.theater.theaterType;
+    
     // Tính số hàng và số ghế mỗi hàng từ seats hiện tại
     if (widget.theater.seats.isNotEmpty) {
       final rows = widget.theater.seats.map((seat) => seat[0]).toSet().length;
@@ -2510,6 +2811,22 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
     _singlePriceController.text = widget.theater.singleSeatPrice.toStringAsFixed(0);
     _couplePriceController.text = widget.theater.coupleSeatPrice.toStringAsFixed(0);
     _vipPriceController.text = widget.theater.vipSeatPrice.toStringAsFixed(0);
+    
+    // Load danh sách rạp
+    _loadCinemas();
+  }
+
+  Future<void> _loadCinemas() async {
+    try {
+      final cinemas = await DatabaseService().getAllCinemas();
+      setState(() {
+        _cinemas = cinemas;
+        _isLoadingCinemas = false;
+      });
+    } catch (e) {
+      print('Error loading cinemas: $e');
+      setState(() => _isLoadingCinemas = false);
+    }
   }
 
   @override
@@ -2627,23 +2944,66 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                 ),
                 validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên phòng chiếu' : null,
               ),
-              // Hiển thị loại phòng (read-only)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 16),
+              // Dropdown chọn rạp
+              if (_isLoadingCinemas)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(color: Color(0xFFE50914)),
+                  ),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _selectedCinemaId,
+                  decoration: const InputDecoration(
+                    labelText: 'Rạp Chiếu *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.theaters),
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  items: _cinemas.map((cinema) {
+                    return DropdownMenuItem<String>(
+                      value: cinema.id,
+                      child: Text(cinema.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedCinemaId = value);
+                  },
+                  validator: (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline, color: Colors.white70, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Loại phòng: ${widget.theater.theaterType == 'normal' ? 'Thường' : widget.theater.theaterType == 'couple' ? 'Couple' : 'VIP'}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
+              const SizedBox(height: 16),
+              // Dropdown chọn loại phòng
+              DropdownButtonFormField<String>(
+                value: _selectedTheaterType,
+                decoration: const InputDecoration(
+                  labelText: 'Loại Phòng Chiếu *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
+                  labelStyle: TextStyle(color: Colors.white),
                 ),
+                items: const [
+                  DropdownMenuItem<String>(
+                    value: 'normal',
+                    child: Text('Phòng Thường'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'couple',
+                    child: Text('Phòng Couple'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'vip',
+                    child: Text('Phòng VIP'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedTheaterType = value;
+                    // Khi đổi loại phòng, cần regenerate seats
+                  });
+                },
+                validator: (value) => value == null ? 'Vui lòng chọn loại phòng' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -2664,7 +3024,7 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                 },
               ),
               // Chỉ hiển thị số ghế mỗi hàng cho phòng normal
-              if (widget.theater.theaterType == 'normal') ...[
+              if (_selectedTheaterType == 'normal') ...[
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _seatsPerRowController,
@@ -2698,7 +3058,7 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Số ghế mỗi hàng: ${widget.theater.seats.isNotEmpty ? (widget.theater.seats.length ~/ widget.theater.seats.map((seat) => seat[0]).toSet().length) : 0} (tự động)',
+                          'Số ghế mỗi hàng: ${widget.theater.seats.isNotEmpty ? (widget.theater.seats.length ~/ widget.theater.seats.map((seat) => seat[0]).toSet().length) : (_selectedTheaterType == 'couple' ? 4 : 4)} (tự động)',
                           style: const TextStyle(color: Colors.white70, fontSize: 14),
                         ),
                       ),
@@ -2778,13 +3138,13 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                 int seatsPerRow;
                 
                 // Phòng Couple và VIP: tự động tính số ghế mỗi hàng từ seats hiện tại
-                if (widget.theater.theaterType == 'couple' || widget.theater.theaterType == 'vip') {
+                if (_selectedTheaterType == 'couple' || _selectedTheaterType == 'vip') {
                   if (widget.theater.seats.isNotEmpty) {
                     final currentRows = widget.theater.seats.map((seat) => seat[0]).toSet().length;
                     seatsPerRow = widget.theater.seats.length ~/ currentRows;
                   } else {
                     // Nếu không có seats, dùng giá trị mặc định
-                    seatsPerRow = widget.theater.theaterType == 'couple' ? 4 : 4;
+                    seatsPerRow = _selectedTheaterType == 'couple' ? 4 : 4;
                   }
                 } else {
                   // Phòng normal: lấy từ input
@@ -2792,12 +3152,7 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                 }
                 
                 if (rows <= 0 || seatsPerRow <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Số hàng và số ghế phải lớn hơn 0'),
-                      backgroundColor: Color(0xFFE50914),
-                    ),
-                  );
+                  await DialogHelper.showError(context, 'Số hàng và số ghế phải lớn hơn 0');
                   setState(() => _isSaving = false);
                   return;
                 }
@@ -2807,35 +3162,25 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                 final couplePrice = double.parse(_couplePriceController.text);
                 final vipPrice = double.parse(_vipPriceController.text);
                 
-                final config = _generateSeats(widget.theater.theaterType, rows, seatsPerRow);
+                final config = _generateSeats(_selectedTheaterType!, rows, seatsPerRow);
                 
                 final updatedTheater = TheaterModel(
                   id: widget.theater.id,
                   name: _nameController.text.trim(),
-                  cinemaId: widget.theater.cinemaId,
+                  cinemaId: _selectedCinemaId!,
                   capacity: config['capacity'] as int,
                   seats: config['seats'] as List<String>,
                   seatTypes: config['seatTypes'] as Map<String, String>,
-                  theaterType: widget.theater.theaterType, // Giữ nguyên loại phòng
+                  theaterType: _selectedTheaterType!,
                   singleSeatPrice: singlePrice,
                   coupleSeatPrice: couplePrice,
                   vipSeatPrice: vipPrice,
                 );
                 context.read<AdminBloc>().add(UpdateTheater(updatedTheater));
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Đã cập nhật phòng chiếu'),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
+                await DialogHelper.showSuccess(context, '✅ Đã cập nhật phòng chiếu');
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Lỗi: $e'),
-                    backgroundColor: const Color(0xFFE50914),
-                  ),
-                );
+                await DialogHelper.showError(context, 'Lỗi: $e');
               } finally {
                 setState(() => _isSaving = false);
               }
@@ -2850,7 +3195,7 @@ class _EditTheaterDialogState extends State<_EditTheaterDialog> {
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Text('Lưu'),
+              : const Text('Lưu', style: TextStyle(color: Colors.white)),
         ),
       ],
     );
@@ -2992,21 +3337,11 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
 
   Future<void> _createTheater() async {
     if (_selectedTheaterType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn loại phòng chiếu'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn loại phòng chiếu');
       return;
     }
     if (!_createForAllCinemas && (_selectedCinemaId == null || _selectedCinemaId!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn rạp chiếu hoặc chọn tạo cho tất cả rạp');
       return;
     }
 
@@ -3017,12 +3352,7 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
       final vipPrice = double.tryParse(_vipPriceController.text) ?? 0.0;
 
       if (singlePrice <= 0 || couplePrice <= 0 || vipPrice <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng nhập giá hợp lệ cho tất cả loại ghế'),
-            backgroundColor: Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Vui lòng nhập giá hợp lệ cho tất cả loại ghế');
         setState(() => _isCreating = false);
         return;
       }
@@ -3086,29 +3416,14 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
 
       if (mounted) {
         if (failCount == 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Đã tạo phòng chiếu thành công cho ${successCount} rạp!'),
-              backgroundColor: const Color(0xFF4CAF50),
-            ),
-          );
+          await DialogHelper.showSuccess(context, '✅ Đã tạo phòng chiếu thành công cho ${successCount} rạp!');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('⚠️ Đã tạo phòng chiếu cho $successCount rạp, thất bại $failCount rạp'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          await DialogHelper.showWarning(context, '⚠️ Đã tạo phòng chiếu cho $successCount rạp, thất bại $failCount rạp');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     } finally {
       if (mounted) {
@@ -3372,7 +3687,7 @@ class _CreateTheaterTabState extends State<_CreateTheaterTab> {
                       )
                     : const Text(
                         'TẠO PHÒNG CHIẾU',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
               ),
             ],
@@ -3421,10 +3736,26 @@ class _ManageMoviesTab extends StatelessWidget {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: state.movies.length,
-          itemBuilder: (context, index) {
+        return Column(
+          children: [
+            // Nút xóa tất cả phim
+            Container(
+              margin: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon(
+                onPressed: () => _showDeleteAllMoviesDialog(context, state.movies.length),
+                icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                label: Text('Xóa Tất Cả Phim (${state.movies.length})'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: state.movies.length,
+                itemBuilder: (context, index) {
             final movie = state.movies[index];
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -3493,6 +3824,55 @@ class _ManageMoviesTab extends StatelessWidget {
               ),
             );
           },
+        ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteAllMoviesDialog(BuildContext context, int count) {
+    final adminBloc = context.read<AdminBloc>();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return BlocProvider.value(
+          value: adminBloc,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.red, size: 32),
+                SizedBox(width: 12),
+                Text('CẢNH BÁO!', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+            content: Text(
+              'Bạn có CHẮC CHẮN muốn XÓA TẤT CẢ $count phim?\n\n'
+              '⚠️ Hành động này KHÔNG THỂ HOÀN TÁC!\n\n'
+              'Tất cả phim sẽ bị xóa vĩnh viễn.',
+              style: const TextStyle(color: Colors.white),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  adminBloc.add(DeleteAllMovies());
+                  Navigator.pop(dialogContext);
+                  DialogHelper.showSuccess(context, '✅ Đã xóa tất cả phim');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                ),
+                child: const Text('XÓA TẤT CẢ', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -3532,20 +3912,15 @@ class _ManageMoviesTab extends StatelessWidget {
               child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 adminBloc.add(DeleteMovie(movie.id));
                 Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✅ Đã xóa phim "${movie.title}"'),
-                    backgroundColor: const Color(0xFF4CAF50),
-                  ),
-                );
+                await DialogHelper.showSuccess(context, '✅ Đã xóa phim "${movie.title}"');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE50914),
               ),
-              child: const Text('Xóa'),
+              child: const Text('Xóa', style: TextStyle(color: Colors.white)),
             ),
           ],
           ),
@@ -3832,21 +4207,11 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
               onPressed: _isSaving ? null : () async {
                 if (!_formKey.currentState!.validate()) return;
                 if (_selectedCinemaId == null || _selectedCinemaId!.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vui lòng chọn rạp chiếu'),
-                      backgroundColor: Color(0xFFE50914),
-                    ),
-                  );
+                  await DialogHelper.showError(context, 'Vui lòng chọn rạp chiếu');
                   return;
                 }
                 if (_releaseDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Vui lòng chọn ngày phát hành'),
-                      backgroundColor: Color(0xFFE50914),
-                    ),
-                  );
+                  await DialogHelper.showError(context, 'Vui lòng chọn ngày phát hành');
                   return;
                 }
 
@@ -3868,19 +4233,9 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
                   context.read<AdminBloc>().add(UpdateMovie(updatedMovie));
                   Navigator.pop(context);
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Đã cập nhật phim thành công!'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
+                  await DialogHelper.showSuccess(context, '✅ Đã cập nhật phim thành công!');
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Lỗi: $e'),
-                      backgroundColor: const Color(0xFFE50914),
-                    ),
-                  );
+                  await DialogHelper.showError(context, 'Lỗi: $e');
                 } finally {
                   setState(() => _isSaving = false);
                 }
@@ -3897,7 +4252,7 @@ class _EditMovieDialogState extends State<_EditMovieDialog> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('Lưu'),
+                  : const Text('Lưu', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -4058,33 +4413,18 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
   Future<void> _createVoucher() async {
     if (!_formKey.currentState!.validate()) return;
     if (_expiryDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn ngày hết hạn'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn ngày hết hạn');
       return;
     }
 
     // Validate based on voucher type
     if (_voucherType == 'points' && (_pointsController.text.trim().isEmpty || int.tryParse(_pointsController.text.trim()) == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher điểm cần nhập số điểm hợp lệ'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Voucher điểm cần nhập số điểm hợp lệ');
       return;
     }
 
     if (_voucherType == 'task' && _taskIdController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher nhiệm vụ cần nhập ID nhiệm vụ'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Voucher nhiệm vụ cần nhập ID nhiệm vụ');
       return;
     }
 
@@ -4118,19 +4458,9 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
         _taskIdController.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Đã tạo voucher ${_voucherType == 'free' ? 'miễn phí' : _voucherType == 'task' ? 'nhiệm vụ' : 'điểm'} thành công!'),
-          backgroundColor: const Color(0xFF4CAF50),
-        ),
-      );
+      await DialogHelper.showSuccess(context, '✅ Đã tạo voucher ${_voucherType == 'free' ? 'miễn phí' : _voucherType == 'task' ? 'nhiệm vụ' : 'điểm'} thành công!');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi: $e'),
-          backgroundColor: const Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Lỗi: $e');
     } finally {
       setState(() => _isCreating = false);
     }
@@ -4430,7 +4760,7 @@ class _CreateVoucherTabState extends State<_CreateVoucherTab> {
                 _isCreating 
                     ? 'Đang tạo...'
                     : 'TẠO VOUCHER ${_voucherType == 'free' ? 'MIỄN PHÍ' : _voucherType == 'task' ? 'NHIỆM VỤ' : 'ĐIỂM'}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _voucherType == 'free'
@@ -4615,20 +4945,15 @@ class _ManageVouchersTab extends StatelessWidget {
                 child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   adminBloc.add(DeleteVoucher(voucher.id));
                   Navigator.pop(dialogContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Đã xóa voucher'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
+                  await DialogHelper.showSuccess(context, '✅ Đã xóa voucher');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
                 ),
-                child: const Text('Xóa'),
+                child: const Text('Xóa', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -4867,12 +5192,7 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
           onPressed: _isSaving ? null : () async {
             if (!_formKey.currentState!.validate()) return;
             if (_expiryDate == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Vui lòng chọn ngày hết hạn'),
-                  backgroundColor: Color(0xFFE50914),
-                ),
-              );
+              await DialogHelper.showError(context, 'Vui lòng chọn ngày hết hạn');
               return;
             }
 
@@ -4892,19 +5212,9 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
               context.read<AdminBloc>().add(UpdateVoucher(updatedVoucher));
               Navigator.pop(context);
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✅ Đã cập nhật voucher thành công!'),
-                  backgroundColor: Color(0xFF4CAF50),
-                ),
-              );
+              await DialogHelper.showSuccess(context, '✅ Đã cập nhật voucher thành công!');
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Lỗi: $e'),
-                  backgroundColor: const Color(0xFFE50914),
-                ),
-              );
+              await DialogHelper.showError(context, 'Lỗi: $e');
             } finally {
               setState(() => _isSaving = false);
             }
@@ -4921,7 +5231,7 @@ class _EditVoucherDialogState extends State<_EditVoucherDialog> {
                     color: Colors.white,
                   ),
                 )
-              : const Text('Lưu'),
+              : const Text('Lưu', style: TextStyle(color: Colors.white)),
         ),
       ],
     );
@@ -4980,21 +5290,11 @@ class _ManageMinigameConfigTabState extends State<_ManageMinigameConfigTab> {
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã lưu cấu hình thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã lưu cấu hình thành công!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     }
   }
@@ -5106,7 +5406,7 @@ class _ManageMinigameConfigTabState extends State<_ManageMinigameConfigTab> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF4CAF50),
             ),
-            child: const Text('Lưu'),
+            child: const Text('Lưu', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -5315,22 +5615,12 @@ class _CreateSnackTabState extends State<_CreateSnackTab> {
 
       await DatabaseService().saveSnack(snack);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Đã tạo ${_nameController.text} thành công!'),
-          backgroundColor: const Color(0xFF4CAF50),
-        ),
-      );
+      await DialogHelper.showSuccess(context, '✅ Đã tạo ${_nameController.text} thành công!');
 
       // Tự động generate snack mới
       _autoFillSnackInfo();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi: $e'),
-          backgroundColor: const Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Lỗi: $e');
     } finally {
       setState(() => _isCreating = false);
     }
@@ -5809,29 +6099,19 @@ class _ManageSnacksTab extends StatelessWidget {
                   await DatabaseService().deleteSnack(snack.id);
                   Navigator.pop(dialogContext);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Đã xóa bắp nước'),
-                        backgroundColor: Color(0xFF4CAF50),
-                      ),
-                    );
+                    await DialogHelper.showSuccess(context, '✅ Đã xóa bắp nước');
                   }
                 } catch (e) {
                   Navigator.pop(dialogContext);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Lỗi: $e'),
-                        backgroundColor: const Color(0xFFE50914),
-                      ),
-                    );
+                    await DialogHelper.showError(context, 'Lỗi: $e');
                   }
                 }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE50914),
               ),
-              child: const Text('Xóa'),
+              child: const Text('Xóa', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -6008,21 +6288,11 @@ class _EditSnackDialogState extends State<_EditSnackDialog> {
               await DatabaseService().updateSnack(updatedSnack);
               Navigator.pop(context);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Đã cập nhật bắp nước thành công!'),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
+                await DialogHelper.showSuccess(context, '✅ Đã cập nhật bắp nước thành công!');
               }
             } catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Lỗi: $e'),
-                    backgroundColor: const Color(0xFFE50914),
-                  ),
-                );
+                await DialogHelper.showError(context, 'Lỗi: $e');
               }
             } finally {
               if (mounted) {
@@ -6039,7 +6309,7 @@ class _EditSnackDialogState extends State<_EditSnackDialog> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Text('Lưu'),
+              : const Text('Lưu', style: TextStyle(color: Colors.white)),
         ),
       ],
     );

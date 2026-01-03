@@ -13,6 +13,7 @@ import '../models/snack.dart';
 import '../models/booking.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
+import '../widgets/hamburger_menu_button.dart';
 import 'user_info_screen.dart';
 import 'notification_screen.dart';
 import 'chatbot_screen.dart';
@@ -126,19 +127,7 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
-              ),
-              child: const Icon(
-                Icons.settings,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
+            const HamburgerMenuButton(),
           ],
         ),
       ),

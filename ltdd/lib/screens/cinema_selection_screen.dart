@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/cinema.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
 import '../blocs/movies/movies_bloc.dart';
 import '../blocs/movies/movies_event.dart';
 import 'home_screen.dart';
@@ -36,12 +37,7 @@ class _CinemaSelectionScreenState extends State<CinemaSelectionScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi tải danh sách rạp: ${e.toString()}'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi tải danh sách rạp: ${e.toString()}');
       }
     }
   }

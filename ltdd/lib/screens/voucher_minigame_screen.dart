@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import '../services/database_services.dart';
 import '../services/points_service.dart';
+import '../utils/dialog_helper.dart';
 import '../models/user.dart';
 import '../models/minigame.dart';
 import '../models/minigame_config.dart';
@@ -226,12 +227,7 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
         print('Error saving admin game selection: $e');
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Đã đổi sang trò chơi: ${selectedGame.name}'),
-          backgroundColor: const Color(0xFF4CAF50),
-        ),
-      );
+      await DialogHelper.showSuccess(context, '✅ Đã đổi sang trò chơi: ${selectedGame.name}');
     }
   }
 
@@ -258,24 +254,13 @@ class _VoucherMinigameScreenState extends State<VoucherMinigameScreen> {
         await _loadUser();
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('🎉 Chúc mừng! Bạn đã nhận $rewardPoints điểm!'),
-              backgroundColor: const Color(0xFF4CAF50),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          await DialogHelper.showSuccess(context, '🎉 Chúc mừng! Bạn đã nhận $rewardPoints điểm!');
         }
       }
     } catch (e) {
       print('Error claiming reward: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: ${e.toString()}');
       }
     } finally {
       if (mounted) {

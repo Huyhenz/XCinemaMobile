@@ -7,6 +7,7 @@ import '../models/voucher.dart';
 import '../models/user.dart';
 import '../services/points_service.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
 
 class RedeemVoucherScreen extends StatefulWidget {
   const RedeemVoucherScreen({super.key});
@@ -50,12 +51,7 @@ class _RedeemVoucherScreenState extends State<RedeemVoucherScreen> {
 
     if (_user == null || _user!.points < (voucher.points ?? 0)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không đủ điểm để đổi voucher. Cần ${voucher.points} điểm, bạn có ${_user?.points ?? 0} điểm'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Không đủ điểm để đổi voucher. Cần ${voucher.points} điểm, bạn có ${_user?.points ?? 0} điểm');
       }
       return;
     }
@@ -94,22 +90,12 @@ class _RedeemVoucherScreenState extends State<RedeemVoucherScreen> {
     try {
       await _pointsService.redeemVoucherWithPoints(userId, voucher.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã đổi voucher thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã đổi voucher thành công!');
         await _loadData();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     }
   }

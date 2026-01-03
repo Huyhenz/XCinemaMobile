@@ -3,6 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -73,27 +74,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           }
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Xác thực thành công! Đang vào ứng dụng...'),
-                backgroundColor: Color(0xFF4CAF50),
-              ),
-            );
+            await DialogHelper.showSuccess(context, 'Xác thực thành công! Đang vào ứng dụng...');
           }
           // AuthChecker (lắng nghe userChanges) sẽ tự động chuyển màn hình
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Vẫn chưa xác thực. Vui lòng kiểm tra email của bạn.')),
-            );
+            await DialogHelper.showInfo(context, 'Vẫn chưa xác thực. Vui lòng kiểm tra email của bạn.');
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -107,9 +99,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       // AuthChecker ở main.dart sẽ tự động điều hướng về LoginScreen
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi đăng xuất: $e')),
-        );
+        await DialogHelper.showError(context, 'Lỗi đăng xuất: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -124,21 +114,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
          // sendEmailVerification() tự động tạo link mới
          await user.sendEmailVerification();
          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Đã gửi lại link xác thực mới vào email của bạn.')),
-            );
+            await DialogHelper.showSuccess(context, 'Đã gửi lại link xác thực mới vào email của bạn.');
          }
        } catch (e) {
          if (mounted) {
              // Kiểm tra lỗi too-many-requests
              if (e.toString().contains('too-many-requests')) {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Gửi quá nhiều lần. Vui lòng đợi một chút rồi thử lại.')),
-                );
+                 await DialogHelper.showWarning(context, 'Gửi quá nhiều lần. Vui lòng đợi một chút rồi thử lại.');
              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Lỗi gửi mail: $e')),
-                );
+                await DialogHelper.showError(context, 'Lỗi gửi mail: $e');
              }
          }
        } finally {

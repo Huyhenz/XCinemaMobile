@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/voucher.dart';
 import '../services/points_service.dart';
+import '../utils/dialog_helper.dart';
 
 class RandomVoucherScreen extends StatefulWidget {
   const RandomVoucherScreen({super.key});
@@ -34,22 +35,12 @@ class _RandomVoucherScreenState extends State<RandomVoucherScreen> {
         });
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Hiện không có voucher miễn phí nào'),
-              backgroundColor: Color(0xFFE50914),
-            ),
-          );
+          await DialogHelper.showError(context, 'Hiện không có voucher miễn phí nào');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     } finally {
       setState(() => _isLoading = false);
@@ -62,12 +53,7 @@ class _RandomVoucherScreenState extends State<RandomVoucherScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng đăng nhập'),
-            backgroundColor: Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Vui lòng đăng nhập');
       }
       return;
     }
@@ -76,21 +62,11 @@ class _RandomVoucherScreenState extends State<RandomVoucherScreen> {
       await _pointsService.addRandomVoucherToUser(userId, _voucher!.id);
       setState(() => _hasReceived = true);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã nhận voucher thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã nhận voucher thành công!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     }
   }

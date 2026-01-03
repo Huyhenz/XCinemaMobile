@@ -81,6 +81,15 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       }
     });
 
+    on<DeleteAllMovies>((event, emit) async {
+      try {
+        await _dbService.deleteAllMovies();
+        add(LoadAdminData()); // Reload sau khi delete
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
     on<CreateShowtime>((event, emit) async {
       try {
         await _dbService.saveShowtime(event.showtime);
@@ -117,6 +126,15 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       }
     });
 
+    on<DeleteAllShowtimes>((event, emit) async {
+      try {
+        await _dbService.deleteAllShowtimes();
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
     on<UpdateTheater>((event, emit) async {
       try {
         await _dbService.updateTheater(event.theater);
@@ -129,6 +147,15 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<DeleteTheater>((event, emit) async {
       try {
         await _dbService.deleteTheater(event.theaterId);
+        add(LoadAdminData());
+      } catch (e) {
+        emit(AdminState(error: e.toString()));
+      }
+    });
+
+    on<DeleteAllTheaters>((event, emit) async {
+      try {
+        await _dbService.deleteAllTheaters();
         add(LoadAdminData());
       } catch (e) {
         emit(AdminState(error: e.toString()));

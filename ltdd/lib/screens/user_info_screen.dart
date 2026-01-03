@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
 import '../utils/validators.dart';
+import '../utils/dialog_helper.dart';
 
 class UserInfoScreen extends StatefulWidget {
   const UserInfoScreen({super.key});
@@ -105,14 +106,12 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
     }
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFFE50914) : const Color(0xFF4CAF50),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _showSnackBar(String message, {bool isError = false}) async {
+    if (isError) {
+      await DialogHelper.showError(context, message);
+    } else {
+      await DialogHelper.showSuccess(context, message);
+    }
   }
 
   @override

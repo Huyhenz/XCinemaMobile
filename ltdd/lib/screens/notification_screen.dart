@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/notification.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 
@@ -74,13 +75,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
       setState(() {
         _notifications.removeWhere((n) => n.id == notificationId);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã xóa thông báo'),
-          backgroundColor: Color(0xFF4CAF50),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        await DialogHelper.showSuccess(context, 'Đã xóa thông báo');
+      }
     } catch (e) {
       print('Error deleting notification: $e');
     }

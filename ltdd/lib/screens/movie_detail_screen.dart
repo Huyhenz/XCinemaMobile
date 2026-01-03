@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/movie.dart';
 import '../models/movie_rating.dart';
 import '../models/movie_comment.dart';
@@ -11,6 +10,7 @@ import '../models/cinema.dart';
 import '../services/database_services.dart';
 import '../services/points_service.dart';
 import '../utils/age_utils.dart';
+import '../utils/dialog_helper.dart';
 import '../widgets/age_restriction_dialog.dart';
 import '../widgets/auth_guard.dart';
 import 'showtimes_screen.dart';
@@ -32,12 +32,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   double _averageRating = 0.0;
   int _ratingCount = 0;
   double? _userRating;
-  List<MovieComment> _comments = [];
-  final TextEditingController _commentController = TextEditingController();
   bool _isLoading = true;
   String? _userId;
   UserModel? _user;
   bool _hasShowtimes = false;
+  List<MovieComment> _comments = [];
+  Map<String, double> _userRatingsMap = {}; // Map userId -> rating
+  final TextEditingController _commentController = TextEditingController();
+  bool _isSubmittingComment = false;
 
   @override
   void initState() {
@@ -80,15 +82,108 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       if (ratings.isNotEmpty) {
         _averageRating = ratings.fold(0.0, (sum, r) => sum + r.rating) / ratings.length;
       }
-      _comments = await DatabaseService().getCommentsByMovie(widget.movieId);
       
       // Kiểm tra xem phim có lịch chiếu không
       final showtimes = await DatabaseService().getShowtimesByMovie(widget.movieId);
       _hasShowtimes = showtimes.isNotEmpty;
+      
+      // Load comments
+      _comments = await DatabaseService().getCommentsByMovie(widget.movieId);
+      
+      // Load ratings và tạo map userId -> rating
+      _userRatingsMap = {};
+      for (var rating in ratings) {
+        _userRatingsMap[rating.userId] = rating.rating;
+      }
     } catch (e) {
       print('Error loading data: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+  
+  Future<void> _loadComments() async {
+    try {
+      final comments = await DatabaseService().getCommentsByMovie(widget.movieId);
+      // Load ratings để cập nhật map
+      final ratings = await DatabaseService().getRatingsByMovie(widget.movieId);
+      final ratingsMap = <String, double>{};
+      for (var rating in ratings) {
+        ratingsMap[rating.userId] = rating.rating;
+      }
+      
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _userRatingsMap = ratingsMap;
+        });
+      }
+    } catch (e) {
+      print('Error loading comments: $e');
+    }
+  }
+  
+  Future<void> _submitComment() async {
+    if (_userId == null) {
+      // Yêu cầu đăng nhập
+      final isAuthenticated = await AuthGuard.requireAuth(
+        context,
+        returnPath: 'movie:${widget.movieId}',
+      );
+      if (!isAuthenticated || !mounted) return;
+      
+      _userId = FirebaseAuth.instance.currentUser?.uid;
+      if (_userId == null) return;
+      
+      try {
+        _user = await DatabaseService().getUser(_userId!);
+      } catch (e) {
+        print('Error loading user after login: $e');
+      }
+    }
+    
+    final content = _commentController.text.trim();
+    if (content.isEmpty) {
+      if (mounted) {
+        await DialogHelper.showError(context, 'Vui lòng nhập nội dung bình luận');
+      }
+      return;
+    }
+    
+    if (_user == null || _userId == null) {
+      if (mounted) {
+        await DialogHelper.showError(context, 'Không thể lấy thông tin người dùng');
+      }
+      return;
+    }
+    
+    setState(() => _isSubmittingComment = true);
+    
+    try {
+      final comment = MovieComment(
+        id: '',
+        movieId: widget.movieId,
+        userId: _userId!,
+        userName: _user!.name ?? 'Người dùng',
+        content: content,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      
+      await DatabaseService().saveMovieComment(comment);
+      _commentController.clear();
+      await _loadComments();
+      
+      if (mounted) {
+        await DialogHelper.showSuccess(context, 'Đã gửi bình luận thành công!');
+      }
+    } catch (e) {
+      if (mounted) {
+        await DialogHelper.showError(context, 'Lỗi khi gửi bình luận: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingComment = false);
+      }
     }
   }
 
@@ -115,7 +210,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 _buildTrailerSection(),
                 _buildUserRatingSection(),
                 _buildDescription(),
-                _buildCommentsSection(),
+                _buildCommentSection(),
                 _buildBookButton(),
                 const SizedBox(height: 20),
               ],
@@ -142,30 +237,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.share, color: Colors.white),
-            onPressed: () {},
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.white),
-            onPressed: () {},
-          ),
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -403,53 +474,52 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               allowHalfRating: true,
               itemCount: 5,
               itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+              ignoreGestures: _userRating != null, // Disable nếu đã đánh giá
               itemBuilder: (context, _) => const Icon(
                 Icons.star,
                 color: Colors.amber,
               ),
               onRatingUpdate: (rating) async {
-                if (_userId != null) {
+                // Chỉ cho phép đánh giá nếu chưa đánh giá
+                if (_userId == null || _userRating != null) {
+                  return;
+                }
+                
+                try {
+                  // Kiểm tra lại để đảm bảo user chưa đánh giá
+                  final existingRatings = await DatabaseService().getRatingsByMovieAndUser(widget.movieId, _userId!);
+                  if (existingRatings.isNotEmpty) {
+                    // Đã có rating rồi, không cho phép đánh giá lại
+                    await _loadData(); // Reload để cập nhật UI
+                    if (mounted) {
+                      await DialogHelper.showError(context, 'Bạn đã đánh giá phim này rồi!');
+                    }
+                    return;
+                  }
+                  
+                  final movieRating = MovieRating(
+                    id: '',
+                    movieId: widget.movieId,
+                    userId: _userId!,
+                    rating: rating,
+                    createdAt: DateTime.now().millisecondsSinceEpoch,
+                  );
+                  await DatabaseService().saveMovieRating(movieRating);
+                  
+                  // Tích điểm khi đánh giá phim lần đầu (1-2 điểm ngẫu nhiên)
                   try {
-                    // Kiểm tra xem đã đánh giá chưa
-                    final existingRatings = await DatabaseService().getRatingsByMovieAndUser(widget.movieId, _userId!);
-                    final isNewRating = existingRatings.isEmpty;
-                    
-                    final movieRating = MovieRating(
-                      id: '',
-                      movieId: widget.movieId,
-                      userId: _userId!,
-                      rating: rating,
-                      createdAt: DateTime.now().millisecondsSinceEpoch,
-                    );
-                    await DatabaseService().saveMovieRating(movieRating);
-                    
-                    // Tích điểm khi đánh giá phim lần đầu (1-2 điểm ngẫu nhiên)
-                    if (isNewRating) {
-                      try {
-                        await PointsService().addPointsForRating(_userId!);
-                      } catch (e) {
-                        print('⚠️ Error adding points for rating: $e');
-                      }
-                    }
-                    
-                    await _loadData();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(isNewRating ? 'Đã lưu đánh giá và nhận điểm thưởng!' : 'Đã cập nhật đánh giá của bạn'),
-                          backgroundColor: const Color(0xFF4CAF50),
-                        ),
-                      );
-                    }
+                    await PointsService().addPointsForRating(_userId!);
                   } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Lỗi: $e'),
-                          backgroundColor: const Color(0xFFE50914),
-                        ),
-                      );
-                    }
+                    print('⚠️ Error adding points for rating: $e');
+                  }
+                  
+                  await _loadData();
+                  if (mounted) {
+                    await DialogHelper.showSuccess(context, 'Đã lưu đánh giá và nhận điểm thưởng!');
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    await DialogHelper.showError(context, 'Lỗi: $e');
                   }
                 }
               },
@@ -501,231 +571,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  Widget _buildCommentsSection() {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Bình Luận',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Comment input
-          if (_userId != null) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Viết bình luận...',
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      filled: true,
-                      fillColor: const Color(0xFF2A2A2A),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    maxLines: null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: _commentController.text.trim().isEmpty ? null : _submitComment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE50914),
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Icon(Icons.send, color: Colors.white),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
-          // Comments list
-          if (_comments.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Center(
-                child: Text(
-                  'Chưa có bình luận nào',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _comments.length,
-              itemBuilder: (context, index) {
-                final comment = _comments[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2A2A2A)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: const Color(0xFFE50914),
-                            radius: 20,
-                            child: Text(
-                              comment.userName.isNotEmpty
-                                  ? comment.userName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  comment.userName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  _formatDate(comment.createdAt),
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_userId == comment.userId)
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                              onPressed: () => _deleteComment(comment.id),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        comment.content,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 365) {
-      return '${(difference.inDays / 365).floor()} năm trước';
-    } else if (difference.inDays > 30) {
-      return '${(difference.inDays / 30).floor()} tháng trước';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} ngày trước';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} giờ trước';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} phút trước';
-    } else {
-      return 'Vừa xong';
-    }
-  }
-
-  Future<void> _submitComment() async {
-    if (_userId == null || _user == null) return;
-    if (_commentController.text.trim().isEmpty) return;
-
-    try {
-      final comment = MovieComment(
-        id: '',
-        movieId: widget.movieId,
-        userId: _userId!,
-        userName: _user!.name,
-        content: _commentController.text.trim(),
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-      );
-      await DatabaseService().saveMovieComment(comment);
-      _commentController.clear();
-      await _loadData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã thêm bình luận'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteComment(String commentId) async {
-    try {
-      await DatabaseService().deleteMovieComment(commentId);
-      await _loadData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã xóa bình luận'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
-      }
-    }
-  }
 
   Widget _buildDescription() {
     return Container(
@@ -785,6 +630,359 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCommentSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2A2A2A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Bình Luận',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (_comments.isNotEmpty)
+                Text(
+                  '${_comments.length} bình luận',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Comment input
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Viết bình luận...',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    filled: true,
+                    fillColor: const Color(0xFF2A2A2A),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  maxLines: 3,
+                  minLines: 1,
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _isSubmittingComment ? null : _submitComment,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE50914),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isSubmittingComment
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send, color: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // View comments button - chỉ hiển thị khi có bình luận hoặc để người dùng xem
+          InkWell(
+            onTap: () => _showAllCommentsDialog(),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A2A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.comment_outlined,
+                    color: Color(0xFFE50914),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _comments.isEmpty
+                        ? 'Xem bình luận'
+                        : 'Xem ${_comments.length} bình luận',
+                    style: const TextStyle(
+                      color: Color(0xFFE50914),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Color(0xFFE50914),
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommentItem(MovieComment comment) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : 'A',
+                    style: const TextStyle(
+                      color: Color(0xFFE50914),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            comment.userName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        // Hiển thị rating nếu có
+                        if (_userRatingsMap.containsKey(comment.userId) && 
+                            _userRatingsMap[comment.userId]! > 0) ...[
+                          RatingBarIndicator(
+                            rating: _userRatingsMap[comment.userId]!,
+                            itemBuilder: (context, index) => const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                            ),
+                            itemCount: 5,
+                            itemSize: 14.0,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _userRatingsMap[comment.userId]!.toStringAsFixed(1),
+                            style: TextStyle(
+                              color: Colors.amber[300],
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(comment.createdAt),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            comment.content,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(int timestamp) {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 7) {
+      return '${date.day}/${date.month}/${date.year}';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} ngày trước';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} giờ trước';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} phút trước';
+    } else {
+      return 'Vừa xong';
+    }
+  }
+
+  Future<void> _showAllCommentsDialog() async {
+    // Reload comments trước khi hiển thị dialog
+    await _loadComments();
+    
+    // Sắp xếp bình luận theo thời gian mới nhất trước
+    final sortedComments = List<MovieComment>.from(_comments)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tất Cả Bình Luận',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (sortedComments.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${sortedComments.length} bình luận',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: sortedComments.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            color: Colors.grey[600],
+                            size: 64,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Chưa có bình luận nào',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Hãy là người đầu tiên bình luận về phim này!',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(20),
+                      itemCount: sortedComments.length,
+                      itemBuilder: (context, index) {
+                        return _buildCommentItem(sortedComments[index]);
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -984,12 +1182,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       
       if (cinemas.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Hiện chưa có rạp chiếu nào. Vui lòng thử lại sau.'),
-              backgroundColor: Color(0xFFE50914),
-            ),
-          );
+          await DialogHelper.showError(context, 'Hiện chưa có rạp chiếu nào. Vui lòng thử lại sau.');
         }
         return null;
       }
@@ -1006,12 +1199,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     } catch (e) {
       print('Error loading cinemas: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi tải danh sách rạp: ${e.toString()}'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi tải danh sách rạp: ${e.toString()}');
       }
       return null;
     }

@@ -7,6 +7,7 @@ import 'package:ltdd/screens/profile_screen.dart';
 import 'package:ltdd/screens/home_screen.dart';
 import 'package:ltdd/blocs/movies/movies_bloc.dart';
 import 'package:ltdd/services/database_services.dart';
+import 'package:ltdd/widgets/navigation_provider.dart';
 
 
 class MainWrapper extends StatefulWidget {
@@ -89,6 +90,12 @@ class _MainWrapperState extends State<MainWrapper> {
     }
   }
 
+  void _navigateTo(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -105,121 +112,14 @@ class _MainWrapperState extends State<MainWrapper> {
     final maxIndex = currentScreens.length - 1;
     final safeIndex = _currentIndex > maxIndex ? 0 : _currentIndex;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: safeIndex,
-        children: currentScreens,
-      ),
-      bottomNavigationBar: _buildBottomNavBar(),
-    );
-  }
-
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: _isAdmin ? _buildAdminNavItems() : _buildUserNavItems(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildUserNavItems() {
-    return [
-      _buildNavItem(
-        icon: Icons.home_outlined,
-        activeIcon: Icons.home,
-        label: 'Trang Chủ',
-        index: 0,
-      ),
-      _buildNavItem(
-        icon: Icons.person_outline,
-        activeIcon: Icons.person,
-        label: 'Hồ Sơ',
-        index: 1,
-      ),
-    ];
-  }
-
-  List<Widget> _buildAdminNavItems() {
-    return [
-      _buildNavItem(
-        icon: Icons.home_outlined,
-        activeIcon: Icons.home,
-        label: 'Trang Chủ',
-        index: 0,
-      ),
-      _buildNavItem(
-        icon: Icons.dashboard_outlined,
-        activeIcon: Icons.dashboard,
-        label: 'Quản Lý',
-        index: 1,
-      ),
-      _buildNavItem(
-        icon: Icons.person_outline,
-        activeIcon: Icons.person,
-        label: 'Hồ Sơ',
-        index: 2,
-      ),
-    ];
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required int index,
-  }) {
-    bool isActive = _currentIndex == index;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() => _currentIndex = index);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            gradient: isActive
-                ? const LinearGradient(
-              colors: [Color(0xFFE50914), Color(0xFFB20710)],
-            )
-                : null,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                color: isActive ? Colors.white : Colors.grey[600],
-                size: 26,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? Colors.white : Colors.grey[600],
-                  fontSize: 12,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
+    return NavigationProvider(
+      navigateTo: _navigateTo,
+      currentIndex: safeIndex,
+      isAdmin: _isAdmin,
+      child: Scaffold(
+        body: IndexedStack(
+          index: safeIndex,
+          children: currentScreens,
         ),
       ),
     );

@@ -9,6 +9,7 @@ import '../models/voucher.dart';
 import '../services/database_services.dart';
 import '../models/user.dart';
 import '../services/points_service.dart';
+import '../utils/dialog_helper.dart';
 import 'redeem_voucher_screen.dart';
 import 'voucher_tasks_screen.dart';
 
@@ -153,24 +154,13 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
       await _pointsService.addUserVoucher(userId, voucher.id, source: source);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã nhận voucher ${voucher.id}!'),
-            backgroundColor: const Color(0xFF4CAF50),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        await DialogHelper.showSuccess(context, 'Đã nhận voucher ${voucher.id}!');
         // Reload data to refresh UI
         await _loadData();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi nhận voucher: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi khi nhận voucher: $e');
       }
     }
   }

@@ -3,6 +3,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/youtube_utils.dart';
+import '../utils/dialog_helper.dart';
 
 class TrailerScreen extends StatefulWidget {
   final String trailerUrl;
@@ -201,12 +202,7 @@ class _TrailerScreenState extends State<TrailerScreen> {
                         }
                       } catch (e) {
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Không thể mở: $e'),
-                              backgroundColor: const Color(0xFFE50914),
-                            ),
-                          );
+                          await DialogHelper.showError(context, 'Không thể mở: $e');
                         }
                       }
                     }

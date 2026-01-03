@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
 import 'dart:async';
 import '../models/minigame_config.dart';
+import '../utils/dialog_helper.dart';
 
 class SlotMachineGame extends StatefulWidget {
   final Function(int points) onComplete;
@@ -187,13 +188,11 @@ class _SlotMachineGameState extends State<SlotMachineGame> with TickerProviderSt
     }
     
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: roundScore > 0 ? const Color(0xFF4CAF50) : Colors.grey,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (roundScore > 0) {
+        await DialogHelper.showSuccess(context, message);
+      } else {
+        await DialogHelper.showInfo(context, message);
+      }
     }
     
     // Kiểm tra đã hết lượt

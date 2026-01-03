@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dialog_helper.dart';
 
 class ErrorHandler {
   // Get user-friendly error message
@@ -48,47 +49,19 @@ class ErrorHandler {
     }
   }
 
-  // Show error snackbar
-  static void showError(BuildContext context, dynamic error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(getErrorMessage(error)),
-        backgroundColor: const Color(0xFFE50914),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        action: SnackBarAction(
-          label: 'Đóng',
-          textColor: Colors.white,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
-      ),
-    );
+  // Show error dialog
+  static Future<void> showError(BuildContext context, dynamic error) {
+    return DialogHelper.showError(context, getErrorMessage(error));
   }
 
-  // Show success snackbar
-  static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF4CAF50),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+  // Show success dialog
+  static Future<void> showSuccess(BuildContext context, String message) {
+    return DialogHelper.showSuccess(context, message);
   }
 
-  // Show info snackbar
-  static void showInfo(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.blue,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+  // Show info dialog
+  static Future<void> showInfo(BuildContext context, String message) {
+    return DialogHelper.showInfo(context, message);
   }
 }
 

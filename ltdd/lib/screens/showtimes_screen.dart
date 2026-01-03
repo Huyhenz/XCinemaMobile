@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/showtime.dart';
 import '../models/cinema.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
 import '../widgets/auth_guard.dart';
 import 'booking_screen.dart';
 
@@ -67,13 +68,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     } catch (e) {
       print('❌ Error loading showtimes: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi tải lịch chiếu: ${e.toString()}'),
-            backgroundColor: const Color(0xFFE50914),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi tải lịch chiếu: ${e.toString()}');
       }
       setState(() {
         _allShowtimes = [];

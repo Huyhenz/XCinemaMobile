@@ -11,6 +11,7 @@ import '../models/movie.dart';
 import '../services/database_services.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
+import '../widgets/hamburger_menu_button.dart';
 import '../models/cinema.dart';
 import 'movie_detail_screen.dart';
 import 'chatbot_screen.dart';
@@ -365,6 +366,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1A1A1A),
                         borderRadius: BorderRadius.circular(10),
@@ -400,6 +402,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
                   ),
+                  // Hamburger menu button
+                  const HamburgerMenuButton(),
                   ],
                 ),
               ],
@@ -1106,10 +1110,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildBottomPromoBanner() {
-    // Get bottom padding for navigation bar
+    // Get bottom padding for safe area
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     return SliverPadding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20), // Dynamic bottom padding for navbar
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20), // Dynamic bottom padding for safe area
       sliver: SliverToBoxAdapter(
         child: Container(
           padding: const EdgeInsets.all(20),

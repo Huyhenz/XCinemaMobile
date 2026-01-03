@@ -6,6 +6,7 @@ import 'dart:async';
 import '../models/showtime.dart';
 import '../models/theater.dart';
 import '../services/database_services.dart';
+import '../utils/dialog_helper.dart';
 import '../widgets/auth_guard.dart';
 import 'snack_selection_screen.dart';
 
@@ -61,20 +62,9 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
           // Xóa các ghế đã chọn nếu không còn available
           _selectedSeats.removeWhere((seat) => !updatedShowtime.availableSeats.contains(seat));
 
-          // Hiện thông báo nếu có ghế bị mở lại
-          final newlyAvailable = updatedShowtime.availableSeats
-              .where((seat) => !oldAvailableSeats.contains(seat))
-              .toList();
-
-          if (newlyAvailable.isNotEmpty && oldAvailableSeats.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${newlyAvailable.length} ghế vừa được mở lại!'),
-                backgroundColor: const Color(0xFF4CAF50),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
+          // Xóa các ghế đã chọn nếu không còn available (đã được xử lý ở trên)
+          // Ghế sẽ được mở lại tự động khi thanh toán thất bại hoặc người dùng quay lại
+          // Không cần thông báo
 
           _calculateTotal();
         });
@@ -100,12 +90,7 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     } catch (e) {
       print('Error loading data: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lỗi tải dữ liệu'),
-            backgroundColor: Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi tải dữ liệu');
       }
     } finally {
       setState(() => _isLoading = false);
@@ -152,12 +137,7 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     }
 
     if (_cinemaId == null || _cinemaId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lỗi: Không tìm thấy thông tin rạp chiếu'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Lỗi: Không tìm thấy thông tin rạp chiếu');
       return;
     }
     Navigator.push(

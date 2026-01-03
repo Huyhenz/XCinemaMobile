@@ -30,6 +30,7 @@ class DeleteMovie extends AdminEvent {
   final String movieId;
   DeleteMovie(this.movieId);
 }
+class DeleteAllMovies extends AdminEvent {}
 class CreateShowtime extends AdminEvent {
   final ShowtimeModel showtime;
   CreateShowtime(this.showtime);
@@ -46,6 +47,7 @@ class DeleteShowtime extends AdminEvent {
   final String showtimeId;
   DeleteShowtime(this.showtimeId);
 }
+class DeleteAllShowtimes extends AdminEvent {}
 class UpdateTheater extends AdminEvent {
   final TheaterModel theater;
   UpdateTheater(this.theater);
@@ -54,6 +56,7 @@ class DeleteTheater extends AdminEvent {
   final String theaterId;
   DeleteTheater(this.theaterId);
 }
+class DeleteAllTheaters extends AdminEvent {}
 class CreateVoucher extends AdminEvent {
   final VoucherModel voucher;
   CreateVoucher(this.voucher);

@@ -131,6 +131,10 @@ class DatabaseService {
     await _db.child('movies').child(movieId).remove();
   }
 
+  Future<void> deleteAllMovies() async {
+    await _db.child('movies').remove();
+  }
+
   Future<MovieModel?> getMovie(String movieId) async {
     try {
       DataSnapshot snapshot = await _db.child('movies').child(movieId).get();
@@ -441,6 +445,10 @@ class DatabaseService {
 
   Future<void> deleteShowtime(String showtimeId) async {
     await _db.child('showtimes').child(showtimeId).remove();
+  }
+
+  Future<void> deleteAllShowtimes() async {
+    await _db.child('showtimes').remove();
   }
 
   Future<List<ShowtimeModel>> getAllShowtimes() async {
@@ -973,6 +981,10 @@ class DatabaseService {
 
   Future<void> deleteTheater(String theaterId) async {
     await _db.child('theaters').child(theaterId).remove();
+  }
+
+  Future<void> deleteAllTheaters() async {
+    await _db.child('theaters').remove();
   }
 
   Future<List<TheaterModel>> getTheatersByCinema(String cinemaId) async {

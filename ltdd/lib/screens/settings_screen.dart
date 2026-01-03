@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:ltdd/providers/locale_provider.dart';
 import 'package:ltdd/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/dialog_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -37,14 +38,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     
     if (mounted) {
       final l10n = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(locale.languageCode == 'vi' 
-              ? (l10n?.switchedToVietnamese ?? 'Đã chuyển sang tiếng Việt')
-              : (l10n?.switchedToEnglish ?? 'Switched to English')),
-          backgroundColor: const Color(0xFF4CAF50),
-          duration: const Duration(seconds: 2),
-        ),
+      await DialogHelper.showSuccess(
+        context,
+        locale.languageCode == 'vi' 
+            ? (l10n?.switchedToVietnamese ?? 'Đã chuyển sang tiếng Việt')
+            : (l10n?.switchedToEnglish ?? 'Switched to English'),
       );
     }
   }
@@ -56,13 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _isDarkMode = isDark;
     });
     final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isDark ? l10n.switchedToDark : l10n.switchedToLight),
-        backgroundColor: const Color(0xFF4CAF50),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    await DialogHelper.showSuccess(context, isDark ? l10n.switchedToDark : l10n.switchedToLight);
   }
 
   @override

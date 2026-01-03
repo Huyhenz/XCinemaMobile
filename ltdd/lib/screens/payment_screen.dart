@@ -13,6 +13,7 @@ import '../services/payment_service.dart';
 import '../services/email_service.dart';
 import '../services/points_service.dart';
 import '../utils/booking_helper.dart';
+import '../utils/dialog_helper.dart';
 import 'payment_success_screen.dart';
 import 'payment_failure_screen.dart';
 
@@ -162,12 +163,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     } catch (e) {
       print('Error creating temp booking: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lỗi tạo booking tạm thời'),
-            backgroundColor: Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi tạo booking tạm thời');
         Navigator.pop(context);
       }
     }
@@ -229,34 +225,19 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     }
 
     if (voucher == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng chọn voucher hoặc nhập mã voucher'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng chọn voucher hoặc nhập mã voucher');
       return;
     }
 
     // Kiểm tra voucher còn hạn không
     final now = DateTime.now().millisecondsSinceEpoch;
     if (voucher.expiryDate < now) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher đã hết hạn!'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Voucher đã hết hạn!');
       return;
     }
 
     if (!voucher.isActive) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Voucher không còn hoạt động!'),
-          backgroundColor: Color(0xFFE50914),
-        ),
-      );
+      await DialogHelper.showError(context, 'Voucher không còn hoạt động!');
       return;
     }
 
@@ -280,12 +261,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
       if (_finalPrice < 0) _finalPrice = 0; // Đảm bảo giá không âm
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Áp dụng voucher thành công!'),
-        backgroundColor: Color(0xFF4CAF50),
-      ),
-    );
+    await DialogHelper.showSuccess(context, 'Áp dụng voucher thành công!');
   }
 
   Future<void> _handlePayment() async {
@@ -915,7 +891,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                     ),
                   ),
                   TextButton(
-                    onPressed: () {
+                    onPressed: () async {
                       // Xóa voucher đã áp dụng
                       setState(() {
                         _discount = 0.0;
@@ -925,12 +901,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                         _voucherCode = null;
                         _selectedVoucher = null;
                       });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Đã xóa voucher'),
-                          backgroundColor: Color(0xFF4CAF50),
-                        ),
-                      );
+                      await DialogHelper.showSuccess(context, 'Đã xóa voucher');
                     },
                     child: const Text(
                       'Xóa',

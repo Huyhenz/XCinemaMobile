@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import '../utils/firebase_cleanup.dart';
 import '../utils/complete_database_fix.dart';
+import '../utils/dialog_helper.dart';
 
 class AdminCleanupScreen extends StatefulWidget {
   const AdminCleanupScreen({super.key});
@@ -77,12 +78,7 @@ class _AdminCleanupScreenState extends State<AdminCleanupScreen> {
           _status = '✅ Đã xóa hết dữ liệu!';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã xóa hết dữ liệu cũ!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã xóa hết dữ liệu cũ!');
       }
     } catch (e) {
       if (mounted) {
@@ -90,12 +86,7 @@ class _AdminCleanupScreenState extends State<AdminCleanupScreen> {
           _status = '❌ Lỗi: $e';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, '❌ Lỗi: $e');
       }
     } finally {
       if (mounted) {
@@ -118,12 +109,7 @@ class _AdminCleanupScreenState extends State<AdminCleanupScreen> {
           _status = '✅ Đã tạo dữ liệu mẫu!';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã tạo dữ liệu mẫu thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã tạo dữ liệu mẫu thành công!');
       }
     } catch (e) {
       if (mounted) {
@@ -131,12 +117,7 @@ class _AdminCleanupScreenState extends State<AdminCleanupScreen> {
           _status = '❌ Lỗi: $e';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Lỗi: $e'),
-            backgroundColor: const Color(0xFFE50914),
-          ),
-        );
+        await DialogHelper.showError(context, '❌ Lỗi: $e');
       }
     } finally {
       if (mounted) {
@@ -159,12 +140,7 @@ class _AdminCleanupScreenState extends State<AdminCleanupScreen> {
           _status = '✅ Kiểm tra hoàn tất! Xem logs.';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã kiểm tra xong! Xem logs trong console.'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã kiểm tra xong! Xem logs trong console.');
       }
     } catch (e) {
       if (mounted) {
@@ -296,12 +272,7 @@ class _AdminCleanupScreenState extends State<AdminCleanupScreen> {
           _status = '✅ Xem chi tiết trong console logs';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã chẩn đoán xong! Xem logs.'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã chẩn đoán xong! Xem logs.');
       }
     } catch (e) {
       if (mounted) {

@@ -4,6 +4,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/minigame_config.dart';
+import '../utils/dialog_helper.dart';
 
 class WordGuessGame extends StatefulWidget {
   final Function(int points) onComplete;
@@ -107,7 +108,7 @@ class _WordGuessGameState extends State<WordGuessGame> {
     });
   }
 
-  void _checkAnswer() {
+  Future<void> _checkAnswer() async {
     if (_userGuess.toUpperCase().trim() == _currentPuzzle.answer.toUpperCase()) {
       setState(() {
         _score += 10;
@@ -128,22 +129,10 @@ class _WordGuessGameState extends State<WordGuessGame> {
       
       if (_wrongAttempts >= _maxWrongAttempts) {
         // Thua vì sai quá nhiều lần
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Bạn đã sai quá $_maxWrongAttempts lần! Trò chơi kết thúc.'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        await DialogHelper.showError(context, 'Bạn đã sai quá $_maxWrongAttempts lần! Trò chơi kết thúc.');
         _endGame();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sai rồi! Bạn còn ${_maxWrongAttempts - _wrongAttempts} lần thử.'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        await DialogHelper.showWarning(context, 'Sai rồi! Bạn còn ${_maxWrongAttempts - _wrongAttempts} lần thử.');
       }
     }
   }

@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_services.dart';
 import '../services/points_service.dart';
+import '../utils/dialog_helper.dart';
 import '../models/user.dart';
 import '../models/booking.dart';
 import '../models/showtime.dart';
@@ -337,23 +338,12 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Đã reset nhiệm vụ thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        await DialogHelper.showSuccess(context, '✅ Đã reset nhiệm vụ thành công!');
       }
     } catch (e) {
       print('Error resetting tasks: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: $e');
       }
     }
   }
@@ -610,12 +600,7 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đăng nhập để nhận phần thưởng'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      await DialogHelper.showError(context, 'Vui lòng đăng nhập để nhận phần thưởng');
       return;
     }
 
@@ -626,16 +611,11 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       await _loadTaskProgress(userId);
       final updatedProgress = _taskProgress[task.id];
       if (updatedProgress == null || !updatedProgress.isCompleted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              task.requirementType == 'manual'
-                  ? 'Vui lòng hoàn thành nhiệm vụ trước khi nhận thưởng'
-                  : 'Bạn chưa đáp ứng đủ điều kiện! (${updatedProgress?.current ?? 0}/${updatedProgress?.required ?? task.requirementValue})',
-            ),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
-          ),
+        await DialogHelper.showWarning(
+          context,
+          task.requirementType == 'manual'
+              ? 'Vui lòng hoàn thành nhiệm vụ trước khi nhận thưởng'
+              : 'Bạn chưa đáp ứng đủ điều kiện! (${updatedProgress?.current ?? 0}/${updatedProgress?.required ?? task.requirementValue})',
         );
         return;
       }
@@ -644,16 +624,11 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       await _loadTaskProgress(userId);
       final updatedProgress = _taskProgress[task.id];
       if (updatedProgress == null || !updatedProgress.isCompleted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              task.requirementType == 'manual'
-                  ? 'Vui lòng hoàn thành nhiệm vụ trước khi nhận thưởng'
-                  : 'Bạn chưa đáp ứng đủ điều kiện! (${updatedProgress?.current ?? 0}/${updatedProgress?.required ?? task.requirementValue})',
-            ),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
-          ),
+        await DialogHelper.showWarning(
+          context,
+          task.requirementType == 'manual'
+              ? 'Vui lòng hoàn thành nhiệm vụ trước khi nhận thưởng'
+              : 'Bạn chưa đáp ứng đủ điều kiện! (${updatedProgress?.current ?? 0}/${updatedProgress?.required ?? task.requirementValue})',
         );
         return;
       }
@@ -681,27 +656,17 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       await _loadTaskVouchers(userId);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              task.rewardType == 'points'
-                  ? '🎉 Chúc mừng! Bạn đã nhận ${task.rewardValue} điểm!'
-                  : '🎉 Chúc mừng! Bạn đã nhận phần thưởng!',
-            ),
-            backgroundColor: const Color(0xFF4CAF50),
-            duration: const Duration(seconds: 2),
-          ),
+        await DialogHelper.showSuccess(
+          context,
+          task.rewardType == 'points'
+              ? '🎉 Chúc mừng! Bạn đã nhận ${task.rewardValue} điểm!'
+              : '🎉 Chúc mừng! Bạn đã nhận phần thưởng!',
         );
       }
     } catch (e) {
       print('Error claiming reward: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        await DialogHelper.showError(context, 'Lỗi: ${e.toString()}');
       }
     } finally {
       setState(() => _isLoading = false);

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
 import '../utils/validators.dart';
+import '../utils/dialog_helper.dart';
 import 'booking_screen.dart';
 import 'showtimes_screen.dart';
 import 'movie_detail_screen.dart';
@@ -354,15 +355,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFFE50914) : const Color(0xFF4CAF50),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+  Future<void> _showSnackBar(String message, {bool isError = false}) async {
+    if (isError) {
+      await DialogHelper.showError(context, message);
+    } else {
+      await DialogHelper.showSuccess(context, message);
+    }
   }
 
   @override
