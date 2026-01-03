@@ -197,27 +197,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
       if (mounted) {
         if (value.isEmpty || value.trim().isEmpty) {
-          // Nếu xóa từ khóa, reload lại phim theo tab hiện tại
-          // Không cần gọi SearchMovies('') trước, chỉ cần gọi FilterMoviesByCategory
-          // FilterMoviesByCategory sẽ tự động clear searchQuery
-          String category = 'nowShowing';
-          switch (_tabController.index) {
-            case 0:
-              category = 'nowShowing';
-              break;
-            case 1:
-              category = 'comingSoon';
-              break;
-            case 2:
-              category = 'popular';
-              break;
-          }
+          // Nếu xóa từ khóa, chuyển về tab "Đang Chiếu" và reload lại phim
           // Reload carousel movies khi xóa search
           _carouselMovies = [];
-          // Gọi FilterMoviesByCategory để reload lại tất cả phim
+          // Chuyển về tab "Đang Chiếu" (index 0)
+          if (_tabController.index != 0) {
+            _tabController.animateTo(0);
+          }
+          // Gọi FilterMoviesByCategory để reload lại tất cả phim ở tab "Đang Chiếu"
           // Bloc sẽ tự động clear searchQuery và reload phim theo category
           context.read<MovieBloc>().add(
-            FilterMoviesByCategory(category, cinemaId: null),
+            FilterMoviesByCategory('nowShowing', cinemaId: null),
           );
         } else {
           context.read<MovieBloc>().add(SearchMovies(value));
@@ -260,12 +250,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return BlocListener<MovieBloc, MovieState>(
       listener: (context, state) {
-        // Tự động chuyển tab khi category thay đổi do search
+        // Tự động chuyển tab khi search tìm thấy phim ở "Sắp Chiếu"
         if (state.category != null && 
             state.searchQuery != null && 
             state.searchQuery!.isNotEmpty &&
             mounted &&
-            !state.isLoading) {
+            !state.isLoading &&
+            state.movies.isNotEmpty) {
           int targetIndex = 0;
           if (state.category == 'nowShowing') {
             targetIndex = 0;
@@ -277,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           
           // Chỉ chuyển tab nếu index khác với index hiện tại và không đang trong quá trình chuyển tab
           if (_tabController.index != targetIndex && !_tabController.indexIsChanging) {
-            print('🔄 Auto-switching tab: ${_tabController.index} -> $targetIndex (category: ${state.category})');
+            print('🔄 Auto-switching tab: ${_tabController.index} -> $targetIndex (category: ${state.category}, search: "${state.searchQuery}")');
             _tabController.animateTo(targetIndex);
           }
         }
@@ -548,27 +539,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         setState(() {
                           _searchController.clear();
                         });
-                        // Reload lại phim theo tab hiện tại khi xóa search
-                        // Không cần gọi SearchMovies('') trước, chỉ cần gọi FilterMoviesByCategory
-                        // FilterMoviesByCategory sẽ tự động clear searchQuery
-                        String category = 'nowShowing';
-                        switch (_tabController.index) {
-                          case 0:
-                            category = 'nowShowing';
-                            break;
-                          case 1:
-                            category = 'comingSoon';
-                            break;
-                          case 2:
-                            category = 'popular';
-                            break;
-                        }
+                        // Khi xóa từ khóa, chuyển về tab "Đang Chiếu" và reload lại phim
                         // Reload carousel movies khi xóa search
                         _carouselMovies = [];
-                        // Gọi FilterMoviesByCategory để reload lại tất cả phim
+                        // Chuyển về tab "Đang Chiếu" (index 0)
+                        if (_tabController.index != 0) {
+                          _tabController.animateTo(0);
+                        }
+                        // Gọi FilterMoviesByCategory để reload lại tất cả phim ở tab "Đang Chiếu"
                         // Bloc sẽ tự động clear searchQuery và reload phim theo category
                         context.read<MovieBloc>().add(
-                          FilterMoviesByCategory(category, cinemaId: null),
+                          FilterMoviesByCategory('nowShowing', cinemaId: null),
                         );
                       },
                     )
@@ -631,9 +612,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           String emptyTitle = 'Chưa có phim';
           String emptySubtitle = 'Hãy quay lại sau';
           
-          if (state.searchQuery != null) {
+          if (state.searchQuery != null && state.searchQuery!.isNotEmpty) {
             emptyTitle = 'Không tìm thấy phim';
-            emptySubtitle = 'Thử tìm kiếm với từ khóa khác';
+            emptySubtitle = 'Không có phim nào phù hợp với từ khóa "${state.searchQuery}"';
           } else if (state.category == 'nowShowing') {
             emptyTitle = 'Chưa có phim hôm nay';
             emptySubtitle = 'Không có phim nào có lịch chiếu hôm nay';

@@ -45,50 +45,80 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       final cinemaId = state.cinemaId;
       final lowerQuery = event.query.toLowerCase().trim();
       
-      // Tìm trong cả phim đang chiếu và sắp chiếu
-      List<MovieModel> nowShowingMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
-      List<MovieModel> comingSoonMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
-      
-      // Filter theo search query
-      final nowShowingFiltered = nowShowingMovies.where((movie) {
-        return movie.title.toLowerCase().contains(lowerQuery) ||
-               movie.genre.toLowerCase().contains(lowerQuery);
-      }).toList();
-      
-      final comingSoonFiltered = comingSoonMovies.where((movie) {
-        return movie.title.toLowerCase().contains(lowerQuery) ||
-               movie.genre.toLowerCase().contains(lowerQuery);
-      }).toList();
-      
-      // Xác định category dựa trên kết quả tìm được
-      // Ưu tiên: nếu tìm thấy ở cả 2, ưu tiên category hiện tại
-      // Nếu chỉ tìm thấy ở 1 category, chuyển sang category đó
-      String? newCategory = state.category;
-      List<MovieModel> resultMovies = [];
-      
-      if (nowShowingFiltered.isNotEmpty && comingSoonFiltered.isNotEmpty) {
-        // Tìm thấy ở cả 2 category
-        // Nếu đang ở "đang chiếu", ưu tiên "đang chiếu"
-        // Nếu đang ở "sắp chiếu", ưu tiên "sắp chiếu"
-        if (state.category == 'comingSoon') {
-          newCategory = 'comingSoon';
-          resultMovies = comingSoonFiltered;
-        } else {
-          // Mặc định ưu tiên "đang chiếu"
-          newCategory = 'nowShowing';
-          resultMovies = nowShowingFiltered;
-        }
-      } else if (nowShowingFiltered.isNotEmpty) {
-        // Chỉ tìm thấy trong "đang chiếu"
-        newCategory = 'nowShowing';
-        resultMovies = nowShowingFiltered;
-      } else if (comingSoonFiltered.isNotEmpty) {
-        // Chỉ tìm thấy trong "sắp chiếu"
-        newCategory = 'comingSoon';
-        resultMovies = comingSoonFiltered;
+      // Tìm trong TẤT CẢ phim (đang chiếu, sắp chiếu, và phổ biến)
+      // Load tất cả phim để tìm kiếm trong toàn bộ danh sách
+      List<MovieModel> allMovies = [];
+      if (cinemaId != null && cinemaId.isNotEmpty) {
+        allMovies = await _dbService.getMoviesByCinema(cinemaId);
       } else {
-        // Không tìm thấy, giữ category hiện tại và hiển thị empty
-        resultMovies = [];
+        // Load tất cả phim từ database
+        allMovies = await _dbService.getAllMovies();
+        
+        // Nếu getAllMovies() filter quá nhiều, load từ cả đang chiếu và sắp chiếu
+        if (allMovies.isEmpty) {
+          final nowShowingMovies = await _dbService.getMoviesShowingToday(cinemaId: null);
+          final comingSoonMovies = await _dbService.getMoviesComingSoon(cinemaId: null);
+          
+          // Kết hợp và loại bỏ trùng lặp
+          final allMovieIds = <String>{};
+          allMovies = [];
+          
+          for (var movie in nowShowingMovies) {
+            if (!allMovieIds.contains(movie.id)) {
+              allMovies.add(movie);
+              allMovieIds.add(movie.id);
+            }
+          }
+          
+          for (var movie in comingSoonMovies) {
+            if (!allMovieIds.contains(movie.id)) {
+              allMovies.add(movie);
+              allMovieIds.add(movie.id);
+            }
+          }
+        }
+      }
+      
+      // Filter theo search query - tìm trong tên phim hoặc thể loại
+      final resultMovies = allMovies.where((movie) {
+        return movie.title.toLowerCase().contains(lowerQuery) ||
+               movie.genre.toLowerCase().contains(lowerQuery);
+      }).toList();
+      
+      // Xác định category dựa trên phim tìm được
+      // Kiểm tra phim tìm được thuộc category nào (đang chiếu hay sắp chiếu)
+      String? newCategory = state.category;
+      
+      if (resultMovies.isNotEmpty) {
+        // Lấy danh sách phim đang chiếu và sắp chiếu để so sánh
+        final nowShowingMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
+        final comingSoonMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
+        
+        final nowShowingIds = nowShowingMovies.map((m) => m.id).toSet();
+        final comingSoonIds = comingSoonMovies.map((m) => m.id).toSet();
+        
+        // Đếm số phim tìm được trong mỗi category
+        int foundInNowShowing = 0;
+        int foundInComingSoon = 0;
+        
+        for (var movie in resultMovies) {
+          if (nowShowingIds.contains(movie.id)) {
+            foundInNowShowing++;
+          }
+          if (comingSoonIds.contains(movie.id)) {
+            foundInComingSoon++;
+          }
+        }
+        
+        // Nếu tìm thấy phim ở "Sắp Chiếu" → chuyển sang tab "Sắp Chiếu"
+        // Nếu chỉ tìm thấy ở "Đang Chiếu" → giữ tab "Đang Chiếu"
+        // Nếu tìm thấy ở cả 2 → ưu tiên "Sắp Chiếu" nếu có phim ở đó
+        if (foundInComingSoon > 0) {
+          newCategory = 'comingSoon';
+        } else if (foundInNowShowing > 0) {
+          newCategory = 'nowShowing';
+        }
+        // Nếu không tìm thấy ở cả 2, giữ category hiện tại
       }
       
       emit(state.copyWith(
@@ -98,7 +128,8 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         isLoading: false,
       ));
       
-      print('🔍 SearchMovies: Query="${event.query}", Found ${nowShowingFiltered.length} in nowShowing, ${comingSoonFiltered.length} in comingSoon, CurrentCategory=${state.category}, NewCategory=$newCategory');
+      print('🔍 SearchMovies: Query="${event.query}", Found ${resultMovies.length} movies');
+      print('🔍   - Category changed to: $newCategory');
     });
 
     on<FilterMoviesByCategory>((event, emit) async {
@@ -115,16 +146,26 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       
       List<MovieModel> filteredMovies = [];
       
-      // Reload movies from DB based on category - filter by cinemaId if specified
+      // Reload movies from DB based on category
+      // Note: In home_screen, cinemaId is always null to show all movies
+      // Logic: 
+      // - Tab "Đang Chiếu": Phim có lịch chiếu hôm nay
+      // - Tab "Sắp Chiếu": Phim không có lịch chiếu hôm nay (bao gồm phim không có lịch chiếu + phim có lịch chiếu từ ngày mai)
+      // - Tab "Phổ Biến": Phim được đặt >= 5 lần
       if (event.category == 'nowShowing') {
-        // Load movies showing today - filter by cinema if selected
+        // Tab "Đang Chiếu": Hiển thị tất cả phim có lịch chiếu hôm nay
+        // Use cinemaId from event/state (null in home_screen to show all movies)
         filteredMovies = await _dbService.getMoviesShowingToday(cinemaId: cinemaId);
-        print('🎬 FilterMoviesByCategory (nowShowing): Loaded ${filteredMovies.length} movies');
+        print('🎬 FilterMoviesByCategory (nowShowing): Loaded ${filteredMovies.length} movies with showtimes today (cinemaId: $cinemaId)');
       } else if (event.category == 'comingSoon') {
-        // Load movies coming soon (from tomorrow onwards) - filter by cinema if selected
+        // Tab "Sắp Chiếu": Hiển thị tất cả phim không có lịch chiếu hôm nay
+        // Bao gồm: phim không có lịch chiếu + phim có lịch chiếu từ ngày mai trở đi
+        // Use cinemaId from event/state (null in home_screen to show all movies)
         filteredMovies = await _dbService.getMoviesComingSoon(cinemaId: cinemaId);
+        print('🎬 FilterMoviesByCategory (comingSoon): Loaded ${filteredMovies.length} movies (no showtimes today or showtimes from tomorrow) (cinemaId: $cinemaId)');
       } else if (event.category == 'popular') {
-        // Load movies by cinema if specified, then filter by booking count
+        // Tab "Phổ Biến": Hiển thị phim được đặt >= 5 lần
+        // Load movies by cinema if specified, otherwise load all movies
         List<MovieModel> allMovies;
         if (cinemaId != null && cinemaId.isNotEmpty) {
           allMovies = await _dbService.getMoviesByCinema(cinemaId);
@@ -134,18 +175,19 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         // Reload booking counts
         _movieBookingCounts = await _dbService.getBookingCountsByMovie();
         // Filter by booking count >= 5
-        // Note: Expired movies are already filtered in getMoviesByCinema/getAllMovies
         filteredMovies = allMovies.where((movie) {
           final bookingCount = _movieBookingCounts[movie.id] ?? 0;
           return bookingCount >= 5;
         }).toList();
+        print('🎬 FilterMoviesByCategory (popular): Loaded ${filteredMovies.length} popular movies (cinemaId: $cinemaId)');
       } else {
-        // Default: load movies by cinema if specified
+        // Default: load movies by cinema if specified, otherwise load all movies
         if (cinemaId != null && cinemaId.isNotEmpty) {
           filteredMovies = await _dbService.getMoviesByCinema(cinemaId);
         } else {
           filteredMovies = await _dbService.getAllMovies();
         }
+        print('🎬 FilterMoviesByCategory (default): Loaded ${filteredMovies.length} movies (cinemaId: $cinemaId)');
       }
       
       // Apply search query if exists (chỉ khi searchQuery không rỗng sau khi trim)

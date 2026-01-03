@@ -1,0 +1,11 @@
+#!/bin/bash
+# Fix secret in current commit
+if [ -f "STRIPE_PAYMENT_SETUP.md" ]; then
+    sed -i 's/sk_test_51SkM1bF20g1EMWhN9IkmSiRMEHQJbM0HUr6nYa6vz7IXfbWHfmmROrw1mbzjivS3989mn3zNUKdan8Q6sbFGfRob00TkydFF7A/sk_test_YOUR_STRIPE_SECRET_KEY_HERE/g' STRIPE_PAYMENT_SETUP.md
+    git add STRIPE_PAYMENT_SETUP.md
+fi
+if [ -f "GOOGLE_PAY_CONFIGURATION_COMPLETE.md" ]; then
+    sed -i 's/sk_test_51SkM1bF20g1EMWhN9IkmSiRMEHQJbM0HUr6nYa6vz7IXfbWHfmmROrw1mbzjivS3989mn3zNUKdan8Q6sbFGfRob00TkydFF7A/sk_test_YOUR_STRIPE_SECRET_KEY_HERE/g' GOOGLE_PAY_CONFIGURATION_COMPLETE.md
+    git add GOOGLE_PAY_CONFIGURATION_COMPLETE.md
+fi
+

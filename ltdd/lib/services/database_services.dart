@@ -178,9 +178,13 @@ class DatabaseService {
         }
       }
       
+      print('🎬 getAllMovies: Loaded ${movies.length} movies from database');
+      
       // Filter out expired movies (all showtimes have passed)
       try {
+        final moviesBeforeFilter = movies.length;
         movies = await _filterExpiredMovies(movies, null);
+        print('🎬 getAllMovies: After filtering expired movies: ${movies.length} movies (filtered out ${moviesBeforeFilter - movies.length})');
       } catch (e) {
         print('⚠️ Error filtering expired movies: $e');
         // Return movies without filtering if filter fails
@@ -1257,11 +1261,37 @@ class DatabaseService {
       final tomorrowStartMillis = tomorrowStart.millisecondsSinceEpoch;
 
       // Get all movies of this cinema first
+      // IMPORTANT: Load movies directly from database, don't use getAllMovies() 
+      // because it filters expired movies, and we want to include movies without showtimes
       List<MovieModel> allCinemaMovies = [];
       if (cinemaId != null && cinemaId.isNotEmpty) {
         allCinemaMovies = await getMoviesByCinema(cinemaId);
       } else {
-        allCinemaMovies = await getAllMovies();
+        // Load all movies directly from database without filtering expired
+        try {
+          DataSnapshot snapshot = await _db.child('movies').get();
+          if (snapshot.exists && snapshot.value != null) {
+            final value = snapshot.value;
+            if (value is Map) {
+              Map<dynamic, dynamic> data = Map<dynamic, dynamic>.from(value);
+              data.forEach((key, itemValue) {
+                try {
+                  if (itemValue is Map) {
+                    final itemMap = Map<dynamic, dynamic>.from(itemValue);
+                    allCinemaMovies.add(MovieModel.fromMap(itemMap, key.toString()));
+                  }
+                } catch (e) {
+                  print('⚠️ Error parsing movie $key: $e');
+                }
+              });
+            }
+          }
+          print('🎬 getMoviesComingSoon: Loaded ${allCinemaMovies.length} movies directly from database');
+        } catch (e) {
+          print('⚠️ Error loading movies directly: $e');
+          // Fallback to getAllMovies if direct load fails
+          allCinemaMovies = await getAllMovies();
+        }
       }
 
       // Get theaters of this cinema if cinemaId is specified
@@ -1272,12 +1302,14 @@ class DatabaseService {
       }
 
       // Get all showtimes to find which movies have showtimes
-      DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
       Set<String> moviesWithShowtimesToday = {}; // Movies with showtimes today
       Set<String> moviesWithShowtimesFuture = {}; // Movies with showtimes from tomorrow onwards
       Set<String> allMoviesWithShowtimes = {}; // All movies that have any showtimes
-
-      if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
+      
+      try {
+        DataSnapshot showtimesSnapshot = await _db.child('showtimes').get();
+        
+        if (showtimesSnapshot.exists && showtimesSnapshot.value != null) {
         final showtimesValue = showtimesSnapshot.value;
         Map<dynamic, dynamic> showtimesData = {};
         
@@ -1327,28 +1359,72 @@ class DatabaseService {
             print('⚠️ Error parsing showtime $key: $e');
           }
         });
+        } else {
+          print('🎬 getMoviesComingSoon: No showtimes found in database (all movies will be considered as coming soon)');
+        }
+      } catch (e) {
+        print('⚠️ Error reading showtimes in getMoviesComingSoon: $e');
+        print('⚠️ Continuing with empty showtimes list - all movies will be considered as coming soon');
+        // Continue with empty sets - all movies will be included in coming soon
       }
 
       // Filter movies: All movies of cinema EXCEPT those with showtimes today
       // This includes:
-      // 1. Movies with no showtimes at all
-      // 2. Movies with showtimes from tomorrow onwards
-      // 3. Movies with showtimes but not today (past showtimes)
+      // 1. Movies with no showtimes at all (ALWAYS include these)
+      // 2. Movies with showtimes from tomorrow onwards (ALWAYS include these)
+      // 3. Movies with showtimes but not today (only include if not all expired)
       List<MovieModel> movies = [];
+      int moviesWithShowtimesTodayCount = 0;
+      int moviesWithoutShowtimesCount = 0;
+      int moviesWithFutureShowtimesCount = 0;
+      int moviesWithPastShowtimesCount = 0;
+      
       for (var movie in allCinemaMovies) {
         // If movie has showtimes today, skip it (it's in "now showing")
-        if (!moviesWithShowtimesToday.contains(movie.id)) {
+        if (moviesWithShowtimesToday.contains(movie.id)) {
+          moviesWithShowtimesTodayCount++;
+          continue; // Skip movies with showtimes today
+        }
+        
+        // Check if movie has no showtimes at all - ALWAYS include
+        if (!allMoviesWithShowtimes.contains(movie.id)) {
+          moviesWithoutShowtimesCount++;
           movies.add(movie);
+          continue;
+        }
+        
+        // Movie has showtimes - check if it has future showtimes
+        if (moviesWithShowtimesFuture.contains(movie.id)) {
+          // Movie has showtimes from tomorrow onwards - ALWAYS include
+          moviesWithFutureShowtimesCount++;
+          movies.add(movie);
+        } else {
+          // Movie has showtimes but not today and not future
+          // This means it only has past showtimes - we'll filter these out later
+          moviesWithPastShowtimesCount++;
+          // Don't add yet - will be filtered by _filterExpiredMovies
         }
       }
 
+      print('🎬 getMoviesComingSoon: Before filtering expired movies: ${movies.length} movies');
+      print('🎬   - Total movies from DB: ${allCinemaMovies.length}');
+      print('🎬   - Movies with showtimes today: $moviesWithShowtimesTodayCount (excluded)');
+      print('🎬   - Movies with no showtimes: $moviesWithoutShowtimesCount (included)');
+      print('🎬   - Movies with future showtimes: $moviesWithFutureShowtimesCount (included)');
+      print('🎬   - Movies with only past showtimes: $moviesWithPastShowtimesCount (will be filtered)');
+      print('🎬   - Movies with showtimes (any): ${allMoviesWithShowtimes.length}');
+
       // Filter out expired movies (all showtimes have passed)
+      // Note: This will only filter movies that have showtimes but ALL are expired
+      // Movies with no showtimes are already added and will be kept
+      // Movies with future showtimes are already added and will be kept
+      final moviesBeforeExpiredFilter = movies.length;
       movies = await _filterExpiredMovies(movies, cinemaId);
+      final moviesAfterExpiredFilter = movies.length;
       
+      print('🎬 getMoviesComingSoon: After filtering expired movies: ${movies.length} movies');
+      print('🎬   - Filtered out ${moviesBeforeExpiredFilter - moviesAfterExpiredFilter} expired movies');
       print('🎬 getMoviesComingSoon: Returning ${movies.length} movies for cinema ${cinemaId ?? "all"}');
-      print('🎬   - Movies with showtimes today: ${moviesWithShowtimesToday.length} (excluded)');
-      print('🎬   - Movies with showtimes future: ${moviesWithShowtimesFuture.length}');
-      print('🎬   - Movies with no showtimes: ${allCinemaMovies.length - allMoviesWithShowtimes.length}');
 
       return movies;
     } on FirebaseException catch (e) {
@@ -1435,12 +1511,15 @@ class DatabaseService {
       // Filter movies: Remove movies that have showtimes but ALL are expired
       List<MovieModel> filteredMovies = [];
       int expiredCount = 0;
+      int noShowtimesCount = 0;
+      int hasFutureShowtimesCount = 0;
       
       for (var movie in movies) {
         final movieShowtimesList = movieShowtimes[movie.id] ?? [];
         
         if (movieShowtimesList.isEmpty) {
           // Movie has no showtimes - not expired, keep it
+          noShowtimesCount++;
           filteredMovies.add(movie);
         } else {
           // Movie has showtimes - check if ALL are expired
@@ -1448,17 +1527,21 @@ class DatabaseService {
           
           if (hasFutureShowtime) {
             // Has at least one future showtime - not expired, keep it
+            hasFutureShowtimesCount++;
             filteredMovies.add(movie);
           } else {
             // All showtimes are expired - remove it
             expiredCount++;
-            print('🗑️ Filtering out expired movie: ${movie.title} (all showtimes have passed)');
+            print('🗑️ Filtering out expired movie: ${movie.title} (all ${movieShowtimesList.length} showtimes have passed)');
           }
         }
       }
       
+      print('🎬 _filterExpiredMovies: Input ${movies.length} movies, Output ${filteredMovies.length} movies');
+      print('🎬   - Movies with no showtimes: $noShowtimesCount (kept)');
+      print('🎬   - Movies with future showtimes: $hasFutureShowtimesCount (kept)');
       if (expiredCount > 0) {
-        print('🎬 _filterExpiredMovies: Filtered out $expiredCount expired movies');
+        print('🎬   - Expired movies filtered out: $expiredCount');
       }
       
       return filteredMovies;
