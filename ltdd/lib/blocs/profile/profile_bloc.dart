@@ -88,10 +88,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     add(LoadProfile(event.userId));
   }
 
-  // Tạo mã QR ngẫu nhiên dựa trên booking ID
+  // Tạo mã QR - sử dụng bookingId làm mã QR (giống với mã đặt vé)
   String _generateQRCode(String bookingId) {
-    final random = Random(bookingId.hashCode);
-    final chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    return List.generate(12, (index) => chars[random.nextInt(chars.length)]).join();
+    // Trả về chính bookingId làm mã QR (giống với mã đặt vé)
+    return bookingId;
   }
 }

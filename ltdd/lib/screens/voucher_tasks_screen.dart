@@ -4,6 +4,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/database_services.dart';
 import '../services/points_service.dart';
@@ -24,6 +25,7 @@ class VoucherTasksScreen extends StatefulWidget {
 class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
   final DatabaseService _dbService = DatabaseService();
   final PointsService _pointsService = PointsService();
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
   
   UserModel? _user;
   bool _isLoading = true;
@@ -324,6 +326,11 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       // Xóa ngày update để force refresh
       await prefs.remove(lastUpdateKey);
       
+      // Xóa completed tasks từ database
+      if (userId != 'anonymous') {
+        await _dbRef.child('users/$userId/completedTasks').remove();
+      }
+      
       // Chọn nhiệm vụ mới
       _selectRandomTasks();
       
@@ -355,6 +362,8 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       if (userId != null) {
         _user = await _dbService.getUser(userId);
         _isAdmin = _user?.role == 'admin'; // Check admin role
+        // Load completed tasks from database
+        await _loadCompletedTasks(userId);
         // Load task progress
         await _loadTaskProgress(userId);
         // Load task vouchers
@@ -364,6 +373,34 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
       print('Error loading data: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  // Load completed tasks from database
+  Future<void> _loadCompletedTasks(String userId) async {
+    try {
+      final snapshot = await _dbRef.child('users/$userId/completedTasks').get();
+      if (snapshot.exists && snapshot.value != null) {
+        final completedTasks = snapshot.value;
+        if (completedTasks is Map) {
+          setState(() {
+            _claimedTaskIds = Set<String>.from(
+              completedTasks.keys.map((key) => key.toString()),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading completed tasks: $e');
+    }
+  }
+
+  // Save completed task to database
+  Future<void> _saveCompletedTask(String userId, String taskId) async {
+    try {
+      await _dbRef.child('users/$userId/completedTasks/$taskId').set(ServerValue.timestamp);
+    } catch (e) {
+      print('Error saving completed task: $e');
     }
   }
 
@@ -646,6 +683,9 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
         _claimedTaskIds.add(task.id);
       });
 
+      // Save completed task to database
+      await _saveCompletedTask(userId, task.id);
+
       // Reload user data to update points
       _user = await _dbService.getUser(userId);
       
@@ -746,7 +786,7 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ..._tasks.map((task) => _buildTaskCard(task)),
+                  ..._tasks.where((task) => !_claimedTaskIds.contains(task.id)).map((task) => _buildTaskCard(task)),
                 ],
               ),
             ),

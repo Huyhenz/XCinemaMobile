@@ -145,7 +145,11 @@ class EmailService {
         }
       }
       
-      final seats = booking.seats.join(', ');
+      // Format danh sách ghế - đảm bảo có giá trị
+      final seats = booking.seats.isNotEmpty 
+          ? booking.seats.join(', ')
+          : 'Chưa có thông tin';
+      final seatCount = booking.seats.length;
       
       // Sử dụng finalPrice nếu có (sau khi áp dụng voucher), nếu không thì dùng totalPrice
       final displayPrice = booking.finalPrice ?? booking.totalPrice;
@@ -245,8 +249,12 @@ class EmailService {
           <span class="info-value"><strong>${seats}</strong></span>
         </div>
         <div class="info-row">
+          <span class="info-label">Số lượng ghế:</span>
+          <span class="info-value"><strong>${seatCount} ghế</strong></span>
+        </div>
+        <div class="info-row">
           <span class="info-label">Số lượng vé:</span>
-          <span class="info-value">${booking.seats.length} vé</span>
+          <span class="info-value"><strong>${seatCount} vé</strong></span>
         </div>
         $snacksHtml
         <div class="info-row">
@@ -306,7 +314,8 @@ Chi tiết đặt vé:
 - Phòng chiếu: ${theater?.name ?? 'N/A'}
 - Suất chiếu: ${showtimeDate}
 - Ghế đã chọn: ${seats}
-- Số lượng vé: ${booking.seats.length} vé
+- Số lượng ghế: ${seatCount} ghế
+- Số lượng vé: ${seatCount} vé
 - Tổng tiền: ${totalPrice}₫
 - Ngày giờ đặt vé: ${bookingDateStr}
 - Cách thức thanh toán: ${paymentMethodStr}
@@ -345,17 +354,10 @@ XCinema
     }
   }
   
-  /// Generate random QR code for booking
+  /// Generate QR code - sử dụng bookingId làm mã QR (giống với mã đặt vé)
   static String _generateQRCode(String bookingId) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = DateTime.now().millisecondsSinceEpoch;
-    final buffer = StringBuffer();
-    buffer.write(bookingId.substring(0, bookingId.length > 4 ? 4 : bookingId.length));
-    buffer.write('-');
-    for (int i = 0; i < 8; i++) {
-      buffer.write(chars[(random + i) % chars.length]);
-    }
-    return buffer.toString();
+    // Trả về chính bookingId làm mã QR (giống với mã đặt vé)
+    return bookingId;
   }
 }
 

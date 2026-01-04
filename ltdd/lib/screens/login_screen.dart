@@ -225,10 +225,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       }
     } on FirebaseAuthException catch (e) {
       String message = 'Có lỗi xảy ra: ${e.code}';
-      if (e.code == 'user-not-found') message = 'Email không tồn tại';
-      else if (e.code == 'wrong-password') message = 'Mật khẩu không đúng';
-      else if (e.code == 'email-already-in-use') message = 'Email đã được sử dụng';
-      else if (e.code == 'weak-password') message = 'Mật khẩu quá yếu';
+      // Khi đăng nhập sai email hoặc mật khẩu -> hiển thị thông báo chung
+      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+        message = 'Sai tài khoản hoặc mật khẩu. Vui lòng nhập lại';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'Email đã được sử dụng';
+      } else if (e.code == 'weak-password') {
+        message = 'Mật khẩu quá yếu';
+      }
       
       _showSnackBar(message, isError: true);
       
