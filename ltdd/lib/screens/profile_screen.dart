@@ -250,18 +250,50 @@ class ProfileScreen extends StatelessWidget {
                 color: Color(0xFF1A1A1A),
                 shape: BoxShape.circle,
               ),
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: const Color(0xFF2A2A2A),
-                child: Text(
-                  state.user!.name[0].toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              child: state.user!.avatarUrl != null && state.user!.avatarUrl!.isNotEmpty
+                  ? ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: state.user!.avatarUrl!,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          width: 100,
+                          height: 100,
+                          color: const Color(0xFF2A2A2A),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFE50914),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => CircleAvatar(
+                          radius: 50,
+                          backgroundColor: const Color(0xFF2A2A2A),
+                          child: Text(
+                            state.user!.name[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 40,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(0xFF2A2A2A),
+                      child: Text(
+                        state.user!.name[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 40,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 16),
@@ -569,8 +601,6 @@ class ProfileScreen extends StatelessWidget {
             },
           ),
           _buildDividerStatic(),
-          _buildMenuItemStatic(Icons.help_outline, 'Trợ Giúp', () {}),
-          _buildDividerStatic(),
           _buildMenuItemStatic(
             Icons.logout,
             'Đăng Xuất',
@@ -706,7 +736,7 @@ class ProfileScreen extends StatelessWidget {
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm', 'vi_VN');
 
     return GestureDetector(
-      onTap: () => _showBookingDetailStatic(context, detail),
+      onTap: () => showBookingDetailStatic(context, detail),
       child: Container(
         margin: EdgeInsets.only(bottom: removeBottomMargin ? 0 : 16),
         decoration: BoxDecoration(
@@ -847,8 +877,6 @@ class ProfileScreen extends StatelessWidget {
         return 'PayPal';
       case 'vnpay':
         return 'VNPay';
-      case 'zalopay':
-        return 'ZaloPay';
       default:
         return paymentMethod;
     }
@@ -874,7 +902,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  static void _showBookingDetailStatic(BuildContext context, BookingDetailModel detail) {
+  static void showBookingDetailStatic(BuildContext context, BookingDetailModel detail) {
     final booking = detail.booking;
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm', 'vi_VN');
 

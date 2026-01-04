@@ -8,6 +8,7 @@ import '../models/user.dart';
 import '../services/database_services.dart';
 import '../utils/validators.dart';
 import '../utils/dialog_helper.dart';
+import '../widgets/navigation_provider.dart';
 import 'booking_screen.dart';
 import 'showtimes_screen.dart';
 import 'movie_detail_screen.dart';
@@ -196,8 +197,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             if (mounted && widget.returnPath != null) {
               _handleReturnPath(context, widget.returnPath!);
             } else if (mounted) {
-              // Quay lại màn hình trước
-              Navigator.pop(context, true);
+              // Điều hướng về HomeScreen
+              _navigateToHome(context);
             }
           } else {
             // --- TRƯỜNG HỢP 2: CHƯA XÁC THỰC ---
@@ -278,8 +279,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (mounted && widget.returnPath != null) {
         _handleReturnPath(context, widget.returnPath!);
       } else if (mounted) {
-        // Quay lại màn hình trước
-        Navigator.pop(context, true);
+        // Điều hướng về HomeScreen
+        _navigateToHome(context);
       }
     } catch (e) {
       _showSnackBar('Lỗi đăng nhập Google: $e', isError: true);
@@ -350,9 +351,28 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         }
       });
     } else {
-      // Mặc định quay lại
-      Navigator.pop(context, true);
+      // Mặc định điều hướng về HomeScreen
+      _navigateToHome(context);
     }
+  }
+
+  void _navigateToHome(BuildContext context) {
+    // Pop login screen trước
+    Navigator.pop(context);
+    
+    // Điều hướng về HomeScreen (tab index 0) thông qua NavigationProvider
+    Future.microtask(() {
+      if (context.mounted) {
+        final navigationProvider = NavigationProvider.of(context);
+        if (navigationProvider != null) {
+          // Nếu có NavigationProvider, navigate về tab 0 (HomeScreen)
+          navigationProvider.navigateTo(0);
+        } else {
+          // Nếu không có NavigationProvider, pop về MainWrapper (root)
+          Navigator.popUntil(context, (route) => route.isFirst);
+        }
+      }
+    });
   }
 
   Future<void> _showSnackBar(String message, {bool isError = false}) async {

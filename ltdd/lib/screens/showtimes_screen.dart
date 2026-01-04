@@ -22,12 +22,14 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
   int _selectedDateIndex = 0;
   List<DateTime> _dates = [];
   CinemaModel? _cinema;
+  List<CinemaModel> _allCinemas = [];
 
   @override
   void initState() {
     super.initState();
     _generateDates();
     _loadCinema();
+    _loadAllCinemas();
     _loadShowtimes();
   }
 
@@ -44,6 +46,17 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     }
   }
 
+  Future<void> _loadAllCinemas() async {
+    try {
+      final cinemas = await DatabaseService().getAllCinemas();
+      setState(() {
+        _allCinemas = cinemas;
+      });
+    } catch (e) {
+      print('❌ Error loading all cinemas: $e');
+    }
+  }
+
   void _generateDates() {
     DateTime now = DateTime.now();
     for (int i = 0; i < 7; i++) {
@@ -53,11 +66,14 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
   Future<void> _loadShowtimes() async {
     try {
-      if (widget.cinemaId != null && widget.cinemaId!.isNotEmpty) {
+      // Sử dụng _cinema?.id nếu có, nếu không thì dùng widget.cinemaId
+      final cinemaIdToUse = _cinema?.id ?? widget.cinemaId;
+      
+      if (cinemaIdToUse != null && cinemaIdToUse.isNotEmpty) {
         // Load showtimes by movie and cinema
         _allShowtimes = await DatabaseService().getShowtimesByMovieAndCinema(
           widget.movieId,
-          widget.cinemaId!,
+          cinemaIdToUse,
         );
       } else {
         // Load all showtimes by movie
@@ -237,56 +253,203 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
   }
 
   Widget _buildTheaterInfo() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: _showCinemaSelectionDialog,
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A2A),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.location_on,
+                color: Color(0xFFE50914),
+                size: 30,
+              ),
             ),
-            child: const Icon(
-              Icons.location_on,
-              color: Color(0xFFE50914),
-              size: 30,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _cinema?.name ?? 'Đang tải...',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _cinema?.name ?? 'Chọn rạp chiếu',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.swap_horiz, color: Color(0xFFE50914), size: 20),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _cinema?.address ?? '',
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
+                  const SizedBox(height: 4),
+                  Text(
+                    _cinema?.address ?? 'Bấm để đổi rạp',
+                    style: TextStyle(
+                      color: _cinema != null ? Colors.grey : Colors.grey[600],
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _showCinemaSelectionDialog() async {
+    if (_allCinemas.isEmpty) {
+      await DialogHelper.showError(context, 'Không có rạp chiếu nào');
+      return;
+    }
+
+    final selectedCinema = await showModalBottomSheet<CinemaModel>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const Icon(Icons.theaters, color: Color(0xFFE50914), size: 28),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Chọn Rạp Chiếu',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: _allCinemas.length,
+                itemBuilder: (context, index) {
+                  final cinema = _allCinemas[index];
+                  final isSelected = _cinema?.id == cinema.id;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFFE50914).withOpacity(0.2)
+                          : const Color(0xFF2A2A2A),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFFE50914)
+                            : const Color(0xFF2A2A2A),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      leading: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A2A),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Color(0xFFE50914),
+                          size: 24,
+                        ),
+                      ),
+                      title: Text(
+                        cinema.name,
+                        style: TextStyle(
+                          color: isSelected ? const Color(0xFFE50914) : Colors.white,
+                          fontSize: 16,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        cinema.address,
+                        style: TextStyle(
+                          color: isSelected ? Colors.grey[300] : Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFFE50914),
+                              size: 24,
+                            )
+                          : const Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.grey,
+                              size: 16,
+                            ),
+                      onTap: () {
+                        Navigator.pop(context, cinema);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
+          ],
+        ),
+      ),
+    );
+
+    if (selectedCinema != null && selectedCinema.id != _cinema?.id) {
+      setState(() {
+        _cinema = selectedCinema;
+      });
+      // Reload showtimes với rạp mới
+      await _loadShowtimes();
+    }
   }
 
 
@@ -384,66 +547,39 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.movie, color: Color(0xFFE50914), size: 18),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    '2D Phụ Đề',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
                               if (theater != null) ...[
                                 Row(
                                   children: [
-                                    const Icon(Icons.meeting_room, color: Colors.grey, size: 14),
-                                    const SizedBox(width: 4),
+                                    const Icon(Icons.meeting_room, color: Color(0xFFE50914), size: 18),
+                                    const SizedBox(width: 8),
                                     Text(
                                       theater.name,
                                       style: const TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 12,
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 12),
                               ],
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2A2A2A),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      '${showtime.availableSeats.length} ghế trống',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2A2A2A),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${showtime.availableSeats.length} ghế trống',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
                                   ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Giá theo loại ghế',
-                                    style: TextStyle(
-                                      color: Color(0xFFE50914),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           );

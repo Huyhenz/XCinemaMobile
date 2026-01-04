@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/notification.dart';
+import '../blocs/profile/profile_state.dart';
 import '../services/database_services.dart';
 import '../utils/dialog_helper.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
+import 'profile_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -152,7 +154,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _deleteNotification(notification.id);
       },
       child: GestureDetector(
-        onTap: () => _markAsRead(notification),
+        onTap: () => _showNotificationDetail(notification),
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
@@ -259,6 +261,431 @@ class _NotificationScreenState extends State<NotificationScreen> {
         return const Color(0xFFE50914);
       default:
         return const Color(0xFF2196F3);
+    }
+  }
+
+  void _showNotificationDetail(NotificationModel notification) async {
+    // Đánh dấu là đã đọc khi mở chi tiết
+    await _markAsRead(notification);
+
+    // Hiển thị dialog chi tiết
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => _NotificationDetailDialog(notification: notification),
+    );
+  }
+}
+
+class _NotificationDetailDialog extends StatelessWidget {
+  final NotificationModel notification;
+
+  const _NotificationDetailDialog({required this.notification});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'vi_VN');
+    final date = DateTime.fromMillisecondsSinceEpoch(notification.createdAt);
+    
+    Color notificationColor;
+    IconData notificationIcon;
+    
+    switch (notification.type) {
+      case 'booking_success':
+        notificationColor = const Color(0xFF4CAF50);
+        notificationIcon = Icons.check_circle;
+        break;
+      case 'booking_cancelled':
+        notificationColor = const Color(0xFFE50914);
+        notificationIcon = Icons.cancel;
+        break;
+      default:
+        notificationColor = const Color(0xFF2196F3);
+        notificationIcon = Icons.notifications;
+    }
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF1A1A1A),
+              const Color(0xFF2A2A2A),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: notificationColor.withOpacity(0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header với icon
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    notificationColor.withOpacity(0.2),
+                    notificationColor.withOpacity(0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: notificationColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: notificationColor.withOpacity(0.5),
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      notificationIcon,
+                      color: notificationColor,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notification.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dateFormat.format(date),
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: notificationColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Loại thông báo',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: notificationColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: notificationColor.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              _getTypeLabel(notification.type),
+                              style: TextStyle(
+                                color: notificationColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Nội dung',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        notification.message,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    if (notification.bookingId != null && notification.bookingId!.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              notificationColor.withOpacity(0.2),
+                              notificationColor.withOpacity(0.1),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: notificationColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.receipt_long,
+                              color: notificationColor,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Mã đặt vé',
+                                    style: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    notification.bookingId!,
+                                    style: TextStyle(
+                                      color: notificationColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Footer buttons
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (notification.bookingId != null && notification.bookingId!.isNotEmpty)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _showBookingDetail(context, notification.bookingId!);
+                        },
+                        icon: const Icon(Icons.receipt_long, size: 18),
+                        label: const Text('Xem chi tiết đặt vé'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: notificationColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (notification.bookingId != null && notification.bookingId!.isNotEmpty)
+                    const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Đóng'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getTypeLabel(String type) {
+    switch (type) {
+      case 'booking_success':
+        return 'Đặt vé thành công';
+      case 'booking_cancelled':
+        return 'Hủy đặt vé';
+      case 'email_confirmation':
+        return 'Xác nhận email';
+      default:
+        return 'Thông báo hệ thống';
+    }
+  }
+
+  Future<void> _showBookingDetail(BuildContext context, String bookingId) async {
+    try {
+      // Load booking
+      final booking = await DatabaseService().getBooking(bookingId);
+      if (booking == null) {
+        if (context.mounted) {
+          await DialogHelper.showError(context, 'Không tìm thấy thông tin đặt vé');
+        }
+        return;
+      }
+
+      // Load showtime
+      final showtime = await DatabaseService().getShowtime(booking.showtimeId);
+      if (showtime == null) {
+        if (context.mounted) {
+          await DialogHelper.showError(context, 'Không tìm thấy thông tin suất chiếu');
+        }
+        return;
+      }
+
+      // Load movie
+      final movie = await DatabaseService().getMovie(showtime.movieId);
+      if (movie == null) {
+        if (context.mounted) {
+          await DialogHelper.showError(context, 'Không tìm thấy thông tin phim');
+        }
+        return;
+      }
+
+      // Load theater
+      final theater = await DatabaseService().getTheater(showtime.theaterId);
+      if (theater == null) {
+        if (context.mounted) {
+          await DialogHelper.showError(context, 'Không tìm thấy thông tin phòng chiếu');
+        }
+        return;
+      }
+
+      // Create BookingDetailModel
+      final qrCode = booking.id; // Use booking ID as QR code
+      final bookingDetail = BookingDetailModel(
+        booking: booking,
+        movieTitle: movie.title,
+        moviePoster: movie.posterUrl,
+        theaterName: theater.name,
+        showtime: DateTime.fromMillisecondsSinceEpoch(showtime.startTime),
+        qrCode: qrCode,
+      );
+
+      // Show booking detail using ProfileScreen's static method
+      if (context.mounted) {
+        ProfileScreen.showBookingDetailStatic(context, bookingDetail);
+      }
+    } catch (e) {
+      print('Error loading booking detail: $e');
+      if (context.mounted) {
+        await DialogHelper.showError(context, 'Lỗi khi tải thông tin đặt vé: $e');
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ltdd/widgets/navigation_provider.dart';
+import 'package:ltdd/screens/get_voucher_screen.dart';
 
 class HamburgerMenuButton extends StatelessWidget {
   const HamburgerMenuButton({super.key});
@@ -50,6 +51,22 @@ class HamburgerMenuButton extends StatelessWidget {
       ),
       _buildMenuItem(
         context: context,
+        icon: Icons.card_giftcard,
+        label: 'Voucher',
+        index: -1,
+        currentIndex: currentIndex,
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GetVoucherScreen(),
+            ),
+          );
+        },
+      ),
+      _buildMenuItem(
+        context: context,
         icon: Icons.person,
         label: 'Hồ Sơ',
         index: 1,
@@ -86,6 +103,22 @@ class HamburgerMenuButton extends StatelessWidget {
         onTap: () {
           provider.navigateTo(1);
           Navigator.pop(context);
+        },
+      ),
+      _buildMenuItem(
+        context: context,
+        icon: Icons.card_giftcard,
+        label: 'Voucher',
+        index: -1,
+        currentIndex: currentIndex,
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GetVoucherScreen(),
+            ),
+          );
         },
       ),
       _buildMenuItem(

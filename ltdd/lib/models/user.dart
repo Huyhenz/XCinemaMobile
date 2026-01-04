@@ -10,6 +10,7 @@ class UserModel {
   final int? createdAt; // Timestamp (milliseconds)
   final String? fcmToken; // Cho Firebase Messaging (push notifications)
   final int points; // Điểm tích lũy
+  final String? avatarUrl; // URL của avatar
 
   UserModel({
     required this.id,
@@ -21,6 +22,7 @@ class UserModel {
     this.createdAt,
     this.fcmToken,
     this.points = 0,
+    this.avatarUrl,
   });
 
   factory UserModel.fromMap(Map<dynamic, dynamic> data, String key) {
@@ -34,6 +36,7 @@ class UserModel {
       createdAt: data['createdAt'],
       fcmToken: data['fcmToken'],
       points: (data['points'] is num) ? (data['points'] as num).toInt() : (int.tryParse(data['points']?.toString() ?? '0') ?? 0),
+      avatarUrl: data['avatarUrl'],
     );
   }
 
@@ -47,6 +50,7 @@ class UserModel {
       'createdAt': ServerValue.timestamp,
       'fcmToken': fcmToken,
       'points': points,
+      'avatarUrl': avatarUrl,
     };
   }
 }

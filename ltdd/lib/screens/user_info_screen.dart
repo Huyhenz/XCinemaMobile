@@ -1,6 +1,10 @@
 // File: lib/screens/user_info_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../services/database_services.dart';
@@ -17,10 +21,13 @@ class UserInfoScreen extends StatefulWidget {
 class _UserInfoScreenState extends State<UserInfoScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _avatarUrlController = TextEditingController();
   DateTime? _selectedDateOfBirth;
   UserModel? _user;
   bool _isLoading = true;
   bool _isEditing = false;
+  File? _selectedImageFile;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -32,6 +39,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _avatarUrlController.dispose();
     super.dispose();
   }
 
@@ -43,6 +51,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
       if (_user != null) {
         _nameController.text = _user!.name;
         _phoneController.text = _user!.phone ?? '';
+        _avatarUrlController.text = _user!.avatarUrl ?? '';
         if (_user!.dateOfBirth != null) {
           _selectedDateOfBirth = DateTime.fromMillisecondsSinceEpoch(_user!.dateOfBirth!);
         }
@@ -89,15 +98,36 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
           ? null 
           : _phoneController.text.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
 
+      // Xử lý avatar: ưu tiên URL nếu có, nếu không thì upload file
+      String? avatarUrl = _user?.avatarUrl;
+      
+      // Nếu có URL mới nhập, sử dụng URL đó
+      if (_avatarUrlController.text.trim().isNotEmpty) {
+        avatarUrl = _avatarUrlController.text.trim();
+      } else if (_selectedImageFile != null) {
+        // Nếu không có URL nhưng có file, upload file
+        try {
+          avatarUrl = await _uploadAvatar(_selectedImageFile!, userId);
+        } catch (e) {
+          _showSnackBar('Lỗi upload ảnh đại diện: $e', isError: true);
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
       // Update user info
       await DatabaseService().updateUser(userId, {
         'name': _nameController.text.trim(),
         'phone': phoneValue,
         'dateOfBirth': _selectedDateOfBirth?.millisecondsSinceEpoch,
+        'avatarUrl': avatarUrl,
       });
 
       _showSnackBar('Cập nhật thành công!');
-      setState(() => _isEditing = false);
+      setState(() {
+        _isEditing = false;
+        _selectedImageFile = null; // Reset selected image
+      });
       await _loadUserInfo();
     } catch (e) {
       _showSnackBar('Lỗi cập nhật: $e', isError: true);
@@ -151,33 +181,156 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
     );
   }
 
+  Future<String> _uploadAvatar(File imageFile, String userId) async {
+    try {
+      // Tạo reference đến Firebase Storage
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('avatars')
+          .child('$userId.jpg');
+
+      // Upload file
+      await storageRef.putFile(imageFile);
+
+      // Lấy download URL
+      final downloadUrl = await storageRef.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print('Error uploading avatar: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImageFile = File(image.path);
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Lỗi chọn ảnh: $e', isError: true);
+    }
+  }
+
   Widget _buildAvatar() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE50914), Color(0xFFB20710)],
+    // Hiển thị ảnh đã chọn hoặc ảnh từ URL hoặc initial
+    Widget avatarWidget;
+    
+    // Ưu tiên: file đã chọn > URL mới nhập > URL hiện tại > initial
+    String? avatarUrlToShow = _selectedImageFile != null 
+        ? null // Sẽ hiển thị file
+        : (_avatarUrlController.text.trim().isNotEmpty 
+            ? _avatarUrlController.text.trim() 
+            : _user?.avatarUrl);
+    
+    if (_selectedImageFile != null) {
+      // Hiển thị ảnh vừa chọn từ file
+      avatarWidget = ClipOval(
+        child: Image.file(
+          _selectedImageFile!,
+          width: 120,
+          height: 120,
+          fit: BoxFit.cover,
         ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A1A),
-          shape: BoxShape.circle,
-        ),
-        child: CircleAvatar(
-          radius: 60,
-          backgroundColor: const Color(0xFF2A2A2A),
-          child: Text(
-            _user?.name[0].toUpperCase() ?? 'U',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
+      );
+    } else if (avatarUrlToShow != null && avatarUrlToShow.isNotEmpty) {
+      // Hiển thị avatar từ URL
+      avatarWidget = ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: avatarUrlToShow!,
+          width: 120,
+          height: 120,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            width: 120,
+            height: 120,
+            color: const Color(0xFF2A2A2A),
+            child: const Center(
+              child: CircularProgressIndicator(color: Color(0xFFE50914)),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            width: 120,
+            height: 120,
+            color: const Color(0xFF2A2A2A),
+            child: Text(
+              _user?.name[0].toUpperCase() ?? 'U',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
+      );
+    } else {
+      // Hiển thị initial
+      avatarWidget = CircleAvatar(
+        radius: 60,
+        backgroundColor: const Color(0xFF2A2A2A),
+        child: Text(
+          _user?.name[0].toUpperCase() ?? 'U',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _isEditing ? _pickImage : null,
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+              ),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1A1A1A),
+                shape: BoxShape.circle,
+              ),
+              child: avatarWidget,
+            ),
+          ),
+          if (_isEditing)
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE50914),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF1A1A1A),
+                    width: 3,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.camera_alt,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -215,6 +368,16 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
           ),
           const SizedBox(height: 20),
           _buildDateOfBirthField(),
+          if (_isEditing) ...[
+            const SizedBox(height: 20),
+            _buildInfoField(
+              'Link Avatar (URL)',
+              _avatarUrlController,
+              Icons.image_outlined,
+              enabled: _isEditing,
+              keyboardType: TextInputType.url,
+            ),
+          ],
           const SizedBox(height: 20),
           _buildReadOnlyInfo(
             'Vai Trò',
@@ -394,10 +557,12 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
             onPressed: () {
               setState(() {
                 _isEditing = false;
+                _selectedImageFile = null; // Reset selected image
                 // Reset to original values
                 if (_user != null) {
                   _nameController.text = _user!.name;
                   _phoneController.text = _user!.phone ?? '';
+                  _avatarUrlController.text = _user!.avatarUrl ?? '';
                   _selectedDateOfBirth = _user!.dateOfBirth != null
                       ? DateTime.fromMillisecondsSinceEpoch(_user!.dateOfBirth!)
                       : null;
@@ -406,12 +571,21 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2A2A2A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Hủy', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 16),
@@ -420,12 +594,21 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
             onPressed: _updateUserInfo,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE50914),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Lưu', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Lưu',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ],

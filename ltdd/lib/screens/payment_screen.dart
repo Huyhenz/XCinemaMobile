@@ -277,9 +277,6 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         case 'vnpay':
           paymentMethod = PaymentMethod.vnpay;
           break;
-        case 'zalopay':
-          paymentMethod = PaymentMethod.zaloPay;
-          break;
         default:
           paymentMethod = PaymentMethod.paypal;
       }
@@ -305,7 +302,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               : null;
           
           // Convert selected payment method string to string for database
-          // _selectedPaymentMethod is already a string ('paypal', 'vnpay', 'zalopay')
+          // _selectedPaymentMethod is already a string ('paypal', 'vnpay')
           String paymentMethodStr = _selectedPaymentMethod;
           
           BookingModel booking = BookingModel(
@@ -841,11 +838,21 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 onPressed: _applyVoucher,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE50914),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  minimumSize: const Size(100, 48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Áp dụng'),
+                child: const Text(
+                  'Áp dụng',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -982,13 +989,6 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             'Thanh toán qua VNPay',
             Icons.qr_code,
             const Color(0xFFEE2D24), // VNPay red
-          ),
-          _buildPaymentMethodTile(
-            'zalopay',
-            'ZaloPay',
-            'Thanh toán qua ZaloPay',
-            Icons.phone_android,
-            const Color(0xFF0068FF), // ZaloPay blue
           ),
         ],
       ),

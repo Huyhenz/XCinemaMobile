@@ -19,7 +19,6 @@ import '../screens/google_pay_screen.dart';
 enum PaymentMethod {
   paypal,
   vnpay, // VNPay - Cổng thanh toán Việt Nam
-  zaloPay,
 }
 
 class PaymentService {
@@ -2086,12 +2085,6 @@ class PaymentService {
         );
       case PaymentMethod.vnpay:
         return await processVNPayPayment(
-          amount: amount,
-          description: description,
-          context: context,
-        );
-      case PaymentMethod.zaloPay:
-        return await processZaloPayPayment(
           amount: amount,
           description: description,
           context: context,

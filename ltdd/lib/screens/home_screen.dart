@@ -12,6 +12,7 @@ import '../services/database_services.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/loading_widgets.dart';
 import '../widgets/hamburger_menu_button.dart';
+import '../widgets/navigation_provider.dart';
 import '../models/cinema.dart';
 import 'movie_detail_screen.dart';
 import 'chatbot_screen.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Timer? _searchDebounce;
   int _unreadNotificationCount = 0;
   Timer? _notificationRefreshTimer;
+  Timer? _movieRefreshTimer; // Timer để refresh phim mỗi 30 giây
   PageController? _carouselController;
   Timer? _carouselTimer;
   int _currentCarouselIndex = 0;
@@ -39,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<CinemaModel> _allCinemas = [];
   bool _moviesLoaded = false;
   bool _cinemasLoaded = false;
+  bool _isInitialLoad = true; // Flag để track lần load đầu tiên
   List<MovieModel> _carouselMovies = []; // Danh sách phim cho carousel (đang chiếu + sắp chiếu)
   
   @override
@@ -58,6 +61,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // Refresh notification count every 30 seconds
     _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadNotificationCount();
+    });
+    
+    // Refresh movies every 30 seconds (chỉ khi không đang search)
+    _movieRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _refreshMoviesIfNotSearching();
     });
   }
 
@@ -180,6 +188,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
+  // Refresh movies mỗi 30 giây, chỉ khi không đang search
+  void _refreshMoviesIfNotSearching() {
+    if (!mounted) return;
+    
+    try {
+      final movieBloc = context.read<MovieBloc>();
+      final currentState = movieBloc.state;
+      
+      // Chỉ refresh nếu không đang search (searchQuery null hoặc empty)
+      if (currentState.searchQuery == null || currentState.searchQuery!.isEmpty) {
+        String category = 'nowShowing';
+        switch (_tabController.index) {
+          case 0:
+            category = 'nowShowing';
+            break;
+          case 1:
+            category = 'comingSoon';
+            break;
+          case 2:
+            category = 'popular';
+            break;
+        }
+        
+        print('🔄 Auto-refresh movies: category=$category (every 30s)');
+        movieBloc.add(
+          FilterMoviesByCategory(category, cinemaId: null),
+        );
+      } else {
+        print('⏸️ Skip auto-refresh: user is searching (query: "${currentState.searchQuery}")');
+      }
+    } catch (e) {
+      print('Error in _refreshMoviesIfNotSearching: $e');
+    }
+  }
+
   @override
   void dispose() {
     _tabController.removeListener(_onTabChanged);
@@ -187,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _searchController.dispose();
     _searchDebounce?.cancel();
     _notificationRefreshTimer?.cancel();
+    _movieRefreshTimer?.cancel();
     _carouselTimer?.cancel();
     _carouselController?.dispose();
     super.dispose();
@@ -221,37 +265,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     
-    // Load movies mỗi khi vào trang chủ (MovieBloc is guaranteed to be available)
-    // Reset flag để load lại mỗi lần widget được rebuild
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        try {
-          // Load với tab hiện tại, không filter theo rạp
-          String category = 'nowShowing';
-          switch (_tabController.index) {
-            case 0:
-              category = 'nowShowing';
-              break;
-            case 1:
-              category = 'comingSoon';
-              break;
-            case 2:
-              category = 'popular';
-              break;
+    // Load movies chỉ khi vào trang chủ lần đầu (không reload khi carousel thay đổi)
+    if (_isInitialLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isInitialLoad) {
+          try {
+            // Load với tab hiện tại, không filter theo rạp
+            String category = 'nowShowing';
+            switch (_tabController.index) {
+              case 0:
+                category = 'nowShowing';
+                break;
+              case 1:
+                category = 'comingSoon';
+                break;
+              case 2:
+                category = 'popular';
+                break;
+            }
+            context.read<MovieBloc>().add(
+              FilterMoviesByCategory(category, cinemaId: null), // Luôn null để load tất cả phim
+            );
+            _isInitialLoad = false; // Đánh dấu đã load lần đầu
+          } catch (e) {
+            print('Error accessing MovieBloc: $e');
           }
-          context.read<MovieBloc>().add(
-            FilterMoviesByCategory(category, cinemaId: null), // Luôn null để load tất cả phim
-          );
-          // Không set _moviesLoaded = true để luôn load lại mỗi lần vào tab
-        } catch (e) {
-          print('Error accessing MovieBloc: $e');
         }
-      }
-    });
+      });
+    }
 
     return BlocListener<MovieBloc, MovieState>(
       listener: (context, state) {
-        // Tự động chuyển tab khi search tìm thấy phim ở "Sắp Chiếu"
+        // Tự động chuyển tab khi search tìm thấy phim
+        // Ưu tiên chuyển sang tab "Sắp Chiếu" nếu có phim ở đó
         if (state.category != null && 
             state.searchQuery != null && 
             state.searchQuery!.isNotEmpty &&
@@ -262,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           if (state.category == 'nowShowing') {
             targetIndex = 0;
           } else if (state.category == 'comingSoon') {
-            targetIndex = 1;
+            targetIndex = 1; // Tự động chuyển sang tab "Sắp Chiếu"
           } else if (state.category == 'popular') {
             targetIndex = 2;
           }
@@ -270,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           // Chỉ chuyển tab nếu index khác với index hiện tại và không đang trong quá trình chuyển tab
           if (_tabController.index != targetIndex && !_tabController.indexIsChanging) {
             print('🔄 Auto-switching tab: ${_tabController.index} -> $targetIndex (category: ${state.category}, search: "${state.searchQuery}")');
+            print('🔍 Found ${state.movies.length} movies, first movie: ${state.movies.isNotEmpty ? state.movies.first.title : "N/A"}');
             _tabController.animateTo(targetIndex);
           }
         }
@@ -282,11 +329,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             slivers: [
               _buildHeader(),
               _buildSearchBar(),
-              _buildPromoBanner(),
               _buildMovieCarousel(),
               _buildTabBar(),
               _buildMovieGrid(),
-              _buildBottomPromoBanner(),
             ],
           ),
         ),
@@ -303,28 +348,65 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFE50914).withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                GestureDetector(
+                  onTap: () {
+                    // Navigate về HomeScreen (index 0) nếu đang ở screen khác trong MainWrapper
+                    final navigationProvider = NavigationProvider.of(context);
+                    if (navigationProvider != null && navigationProvider.currentIndex != 0) {
+                      navigationProvider.navigateTo(0);
+                    } else {
+                      // Nếu đang ở screen được push lên stack, pop về HomeScreen
+                      // Chỉ pop nếu có thể (nếu đang ở HomeScreen thì không làm gì)
+                      if (Navigator.canPop(context)) {
+                        Navigator.popUntil(context, (route) {
+                          // Pop đến khi gặp MainWrapper hoặc root
+                          return route.isFirst || route.settings.name == '/';
+                        });
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                  child: const Text(
-                    'CINEMA',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 3,
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.5),
+                          blurRadius: 15,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.movie_filter,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Colors.white, Color(0xFFFFD700)],
+                          ).createShader(bounds),
+                          child: const Text(
+                            'CINEMA',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 3,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -339,17 +421,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF2A2A2A)),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE50914).withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Icons.smart_toy,
                       color: Color(0xFFE50914),
-                      size: 20,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -368,25 +464,48 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF4A90E2).withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4A90E2).withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
                             Icons.notifications_outlined,
-                            color: Colors.white,
-                            size: 20,
+                            color: Color(0xFF4A90E2),
+                            size: 22,
                           ),
                           if (_unreadNotificationCount > 0) ...[
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE50914),
-                                borderRadius: BorderRadius.circular(10),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFE50914).withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                               child: Text(
                                 _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
@@ -448,9 +567,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<CinemaModel?>(
@@ -516,9 +649,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF2A2A2A),
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF2A2A2A),
+                const Color(0xFF1A1A1A),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.2),
+              width: 1.5,
+            ),
             boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.2),
+                blurRadius: 15,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
               BoxShadow(
                 color: Colors.black.withOpacity(0.3),
                 blurRadius: 10,
@@ -534,10 +684,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             decoration: InputDecoration(
               hintText: 'Tìm kiếm theo tên phim hoặc thể loại...',
               hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
-              prefixIcon: const Icon(Icons.search, color: Color(0xFFE50914)),
+              prefixIcon: Container(
+                padding: const EdgeInsets.all(12),
+                child: const Icon(
+                  Icons.search_rounded,
+                  color: Color(0xFFE50914),
+                  size: 24,
+                ),
+              ),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.grey),
+                      icon: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE50914).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded, color: Color(0xFFE50914), size: 18),
+                      ),
                       tooltip: 'Xóa tìm kiếm',
                       onPressed: () {
                         setState(() {
@@ -572,26 +736,83 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF2A2A2A),
+              const Color(0xFF1A1A1A),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: const Color(0xFF2A2A2A).withOpacity(0.5),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: TabBar(
           controller: _tabController,
           indicator: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFFE50914), Color(0xFFB20710)],
+              colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.5),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           indicatorSize: TabBarIndicatorSize.tab,
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.grey,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           tabs: const [
-            Tab(text: 'Đang Chiếu'),
-            Tab(text: 'Sắp Chiếu'),
-            Tab(text: 'Phổ Biến'),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.play_circle_outline, size: 16),
+                  SizedBox(width: 4),
+                  Text('Đang Chiếu', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.schedule, size: 16),
+                  SizedBox(width: 4),
+                  Text('Sắp Chiếu', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.trending_up, size: 16),
+                  SizedBox(width: 4),
+                  Text('Phổ Biến', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -644,8 +865,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         }
 
         // Movie grid
+        // Get bottom padding for safe area
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
         return SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20), // Removed bottom padding - handled by bottom banner
+          padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPadding + 20), // Dynamic bottom padding for safe area
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -732,18 +955,45 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   top: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE50914),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      movie.ageRating!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.6),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.verified_user,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          movie.ageRating!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -768,23 +1018,46 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        movie.genre,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE50914).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFFE50914).withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        child: Text(
+                          movie.genre,
+                          style: const TextStyle(
+                            color: Color(0xFFE50914),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.access_time, color: Colors.grey, size: 14),
-                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.access_time, color: Colors.white70, size: 14),
+                          ),
+                          const SizedBox(width: 6),
                           Text(
                             '${movie.duration} phút',
-                            style: const TextStyle(color: Colors.grey, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -794,93 +1067,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPromoBanner() {
-    return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        height: 120,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFF6B9D), Color(0xFFC44569)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFF6B9D).withOpacity(0.4),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFFF6B9D).withOpacity(0.8),
-                        const Color(0xFFC44569).withOpacity(0.9),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'ƯU ĐÃI ĐẶC BIỆT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Giá vé chỉ từ 50.000₫',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Áp dụng cho tất cả phim',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.local_offer,
-                    color: Colors.white,
-                    size: 60,
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -1071,29 +1257,64 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         children: [
                           if (movie.ageRating != null && movie.ageRating!.isNotEmpty)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE50914),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                movie.ageRating!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFE50914).withOpacity(0.6),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.verified_user,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    movie.ageRating!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           if (movie.ageRating != null && movie.ageRating!.isNotEmpty)
                             const SizedBox(width: 12),
-                          const Icon(Icons.access_time, color: Colors.white70, size: 16),
-                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.access_time, color: Colors.white70, size: 16),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             '${movie.duration} phút',
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -1109,65 +1330,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildBottomPromoBanner() {
-    // Get bottom padding for safe area
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    return SliverPadding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding + 20), // Dynamic bottom padding for safe area
-      sliver: SliverToBoxAdapter(
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF4A90E2).withOpacity(0.4),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'TẶNG NGAY 30.000₫',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Khi mua combo bắp nước',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.card_giftcard,
-                color: Colors.white,
-                size: 50,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
 
 }

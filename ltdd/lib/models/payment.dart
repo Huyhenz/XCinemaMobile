@@ -6,8 +6,8 @@ class PaymentModel {
   final String cinemaId; // ID của rạp chiếu (để biết thanh toán ở rạp nào)
   final double amount; // Số tiền cuối cùng (sau voucher)
   final String status; // 'success', 'failed', 'pending'
-  final String? transactionId; // Từ PayPal, Google Pay, ZaloPay hoặc gateway khác
-  final String? paymentMethod; // 'paypal', 'googlepay', 'zalopay'
+  final String? transactionId; // Từ PayPal, Google Pay hoặc gateway khác
+  final String? paymentMethod; // 'paypal', 'googlepay', 'vnpay'
   final int? paidAt; // Timestamp
 
   PaymentModel({

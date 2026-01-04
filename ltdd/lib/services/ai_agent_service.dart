@@ -5,6 +5,7 @@ import '../models/movie.dart';
 import '../models/showtime.dart';
 import '../models/cinema.dart';
 import 'database_services.dart';
+import 'gemini_service.dart';
 import 'package:intl/intl.dart';
 
 /// Context để lưu trữ trạng thái conversation (tương tự như trong chatbot_service)
@@ -1127,7 +1128,39 @@ class AIAgentService {
       }
     }
 
-    // Nếu không hiểu, đưa ra gợi ý dựa trên history
+    // Thử dùng Google Gemini API nếu có API key (FREE)
+    try {
+      // Convert history messages thành format cho Gemini
+      final historyMessages = history.messages
+          .map((m) => {
+                'text': m.text,
+                'isUser': m.isUser,
+              })
+          .toList();
+      
+      final aiResponse = await GeminiService.generateResponse(
+        userMessage: userMessage,
+        context: historyMessages,
+        systemPrompt: 'Bạn là một chatbot hỗ trợ của hệ thống đặt vé xem phim Cinema. '
+            'Bạn giúp người dùng tìm phim, xem lịch chiếu, và trả lời các câu hỏi về hệ thống. '
+            'Hãy trả lời bằng tiếng Việt một cách thân thiện và hữu ích. '
+            'Nếu người dùng hỏi về phim, lịch chiếu, hoặc đặt vé, hãy hướng dẫn họ sử dụng các chức năng trong app.',
+      );
+
+      if (aiResponse != null && aiResponse.isNotEmpty) {
+        print('✅ Using Gemini AI response for unknown intent');
+        return ChatBotResponse(
+          text: aiResponse,
+          type: ChatBotResponseType.text,
+          suggestions: ['Phim đang chiếu', 'Có phim gì', 'Lịch chiếu', 'Giúp'],
+        );
+      }
+    } catch (e) {
+      print('⚠️ Error calling Gemini API: $e');
+      // Fallback to rule-based response
+    }
+
+    // Fallback: Nếu không hiểu, đưa ra gợi ý dựa trên history
     final recentIntents = history.messages
         .where((m) => m.intent != null)
         .map((m) => m.intent!)

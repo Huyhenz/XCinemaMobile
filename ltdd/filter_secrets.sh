@@ -8,3 +8,5 @@ if [ -f GOOGLE_PAY_CONFIGURATION_COMPLETE.md ]; then
     rm -f GOOGLE_PAY_CONFIGURATION_COMPLETE.md.bak
 fi
 
+
+

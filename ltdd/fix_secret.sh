@@ -9,3 +9,5 @@ if [ -f "GOOGLE_PAY_CONFIGURATION_COMPLETE.md" ]; then
     git add GOOGLE_PAY_CONFIGURATION_COMPLETE.md
 fi
 
+
+

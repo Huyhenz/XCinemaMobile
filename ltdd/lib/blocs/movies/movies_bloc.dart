@@ -80,10 +80,44 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
       }
       
       // Filter theo search query - tìm trong tên phim hoặc thể loại
-      final resultMovies = allMovies.where((movie) {
-        return movie.title.toLowerCase().contains(lowerQuery) ||
-               movie.genre.toLowerCase().contains(lowerQuery);
-      }).toList();
+      // Và tính điểm match để sort (match title có điểm cao hơn match genre)
+      final resultMoviesWithScore = allMovies.map((movie) {
+        final titleLower = movie.title.toLowerCase();
+        final genreLower = movie.genre.toLowerCase();
+        
+        bool titleMatch = titleLower.contains(lowerQuery);
+        bool genreMatch = genreLower.contains(lowerQuery);
+        
+        if (!titleMatch && !genreMatch) {
+          return null; // Không match
+        }
+        
+        // Tính điểm: match title = 2 điểm, match genre = 1 điểm
+        // Nếu title bắt đầu bằng query = thêm 1 điểm
+        int score = 0;
+        if (titleMatch) {
+          score += 2;
+          if (titleLower.startsWith(lowerQuery)) {
+            score += 1; // Bonus cho title bắt đầu bằng query
+          }
+        }
+        if (genreMatch) {
+          score += 1;
+        }
+        
+        return MapEntry(movie, score);
+      }).where((entry) => entry != null).cast<MapEntry<MovieModel, int>>().toList();
+      
+      // Sort theo điểm (cao nhất lên đầu), sau đó theo tên phim
+      resultMoviesWithScore.sort((a, b) {
+        if (b.value != a.value) {
+          return b.value.compareTo(a.value); // Sort theo điểm giảm dần
+        }
+        return a.key.title.compareTo(b.key.title); // Nếu điểm bằng nhau, sort theo tên
+      });
+      
+      // Lấy danh sách phim đã sort
+      final resultMovies = resultMoviesWithScore.map((entry) => entry.key).toList();
       
       // Xác định category dựa trên phim tìm được
       // Kiểm tra phim tìm được thuộc category nào (đang chiếu hay sắp chiếu)
@@ -96,6 +130,12 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
         
         final nowShowingIds = nowShowingMovies.map((m) => m.id).toSet();
         final comingSoonIds = comingSoonMovies.map((m) => m.id).toSet();
+        
+        // Kiểm tra phim đầu tiên (match nhất) thuộc category nào
+        // Ưu tiên category của phim đầu tiên trong kết quả
+        final firstMovie = resultMovies.first;
+        bool firstInComingSoon = comingSoonIds.contains(firstMovie.id);
+        bool firstInNowShowing = nowShowingIds.contains(firstMovie.id);
         
         // Đếm số phim tìm được trong mỗi category
         int foundInNowShowing = 0;
@@ -110,15 +150,21 @@ class MovieBloc extends Bloc<MovieEvent, MovieState> {
           }
         }
         
-        // Nếu tìm thấy phim ở "Sắp Chiếu" → chuyển sang tab "Sắp Chiếu"
-        // Nếu chỉ tìm thấy ở "Đang Chiếu" → giữ tab "Đang Chiếu"
-        // Nếu tìm thấy ở cả 2 → ưu tiên "Sắp Chiếu" nếu có phim ở đó
-        if (foundInComingSoon > 0) {
+        // Nếu phim đầu tiên (match nhất) ở "Sắp Chiếu" → chuyển sang tab "Sắp Chiếu"
+        // Nếu phim đầu tiên ở "Đang Chiếu" → chuyển sang tab "Đang Chiếu"
+        // Nếu phim đầu tiên không ở cả 2 → ưu tiên category có nhiều phim hơn
+        if (firstInComingSoon) {
           newCategory = 'comingSoon';
-        } else if (foundInNowShowing > 0) {
+        } else if (firstInNowShowing) {
           newCategory = 'nowShowing';
+        } else {
+          // Nếu phim đầu tiên không ở cả 2 category, ưu tiên category có nhiều phim hơn
+          if (foundInComingSoon > foundInNowShowing) {
+            newCategory = 'comingSoon';
+          } else if (foundInNowShowing > 0) {
+            newCategory = 'nowShowing';
+          }
         }
-        // Nếu không tìm thấy ở cả 2, giữ category hiện tại
       }
       
       emit(state.copyWith(

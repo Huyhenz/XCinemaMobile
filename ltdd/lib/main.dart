@@ -48,6 +48,17 @@ void main() async {
       print('⚠️ SMTP credentials not found in .env (email confirmation will be skipped)');
       print('💡 To enable email confirmation, add SMTP config to .env file');
     }
+    
+    // Check Gemini config (FREE AI API)
+    final geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    if (geminiApiKey.isNotEmpty) {
+      print('✅ Google Gemini API key found in .env');
+      print('📝 Gemini API Key: ${geminiApiKey.substring(0, geminiApiKey.length > 10 ? 10 : geminiApiKey.length)}...');
+    } else {
+      print('⚠️ Gemini API key not found in .env (chatbot will use rule-based responses)');
+      print('💡 To enable AI-powered chatbot (FREE), add GEMINI_API_KEY to .env file');
+      print('💡 Get FREE API key at: https://aistudio.google.com/app/apikey');
+    }
   } catch (e) {
     print('⚠️ Warning: Could not load .env file: $e');
     print('💡 Tip: Make sure .env file exists and is added to pubspec.yaml assets');
