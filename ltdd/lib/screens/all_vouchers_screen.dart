@@ -202,12 +202,43 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFF0F0F0F),
+        elevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF9C27B0).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF9C27B0).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
         title: const Text(
           'Tất Cả Voucher',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 0.5,
+          ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isLoading
           ? const Center(
@@ -239,26 +270,72 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                     // User points display
                     if (_user != null)
                       Container(
-                        margin: const EdgeInsets.all(20),
-                        padding: const EdgeInsets.all(20),
+                        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
+                            colors: [Color(0xFFFF9800), Color(0xFFF57C00), Color(0xFFE65100)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF9800).withOpacity(0.5),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1,
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.stars, color: Colors.white, size: 32),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${_user!.points} điểm',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              child: const Icon(Icons.stars, color: Colors.white, size: 32),
+                            ),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${_user!.points}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Text(
+                                  'điểm',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -304,12 +381,48 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        gradient: canRedeem
+            ? LinearGradient(
+                colors: [
+                  voucherColor.withOpacity(0.15),
+                  const Color(0xFF2A2A2A),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: canRedeem ? voucherColor : Colors.grey.withOpacity(0.3),
-          width: 2,
+          color: canRedeem
+              ? voucherColor.withOpacity(0.5)
+              : Colors.grey.withOpacity(0.2),
+          width: canRedeem ? 1.5 : 1,
         ),
+        boxShadow: canRedeem
+            ? [
+                BoxShadow(
+                  color: voucherColor.withOpacity(0.3),
+                  blurRadius: 15,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -325,14 +438,35 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                   children: [
                     // Voucher icon
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: voucherColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: canRedeem
+                            ? LinearGradient(
+                                colors: [
+                                  voucherColor,
+                                  voucherColor.withOpacity(0.8),
+                                ],
+                              )
+                            : LinearGradient(
+                                colors: [
+                                  Colors.grey.withOpacity(0.5),
+                                  Colors.grey.withOpacity(0.3),
+                                ],
+                              ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: canRedeem
+                            ? [
+                                BoxShadow(
+                                  color: voucherColor.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Icon(
                         _getVoucherIcon(voucher),
-                        color: voucherColor,
+                        color: Colors.white,
                         size: 32,
                       ),
                     ),
@@ -364,15 +498,36 @@ class _AllVouchersScreenState extends State<AllVouchersScreen> {
                     ),
                     // Source badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: voucherColor.withOpacity(0.2),
+                        gradient: canRedeem
+                            ? LinearGradient(
+                                colors: [
+                                  voucherColor,
+                                  voucherColor.withOpacity(0.8),
+                                ],
+                              )
+                            : LinearGradient(
+                                colors: [
+                                  Colors.grey.withOpacity(0.3),
+                                  Colors.grey.withOpacity(0.2),
+                                ],
+                              ),
                         borderRadius: BorderRadius.circular(20),
+                        boxShadow: canRedeem
+                            ? [
+                                BoxShadow(
+                                  color: voucherColor.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Text(
                         _getVoucherTypeLabel(voucher),
                         style: TextStyle(
-                          color: voucherColor,
+                          color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),

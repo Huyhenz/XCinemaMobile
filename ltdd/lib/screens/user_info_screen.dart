@@ -149,14 +149,63 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Text('Thông Tin Cá Nhân'),
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFF0F0F0F),
         elevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF2196F3).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2196F3).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        title: const Text(
+          'Thông Tin Cá Nhân',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 0.5,
+          ),
+        ),
         actions: [
           if (!_isEditing && !_isLoading)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => setState(() => _isEditing = true),
+            Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF2196F3).withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.edit, color: Colors.white),
+                onPressed: () => setState(() => _isEditing = true),
+              ),
             ),
         ],
       ),
@@ -292,36 +341,59 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
       onTap: _isEditing ? _pickImage : null,
       child: Stack(
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE50914), Color(0xFFB20710)],
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1A1A1A),
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2196F3).withOpacity(0.5),
+                    blurRadius: 20,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              child: avatarWidget,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+                child: avatarWidget,
+              ),
             ),
-          ),
           if (_isEditing)
             Positioned(
               bottom: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE50914),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                  ),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: const Color(0xFF1A1A1A),
                     width: 3,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2196F3).withOpacity(0.5),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.camera_alt,
@@ -339,9 +411,29 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF2196F3).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2196F3).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -420,21 +512,59 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: enabled ? const Color(0xFF2A2A2A) : const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(12),
+            gradient: enabled
+                ? LinearGradient(
+                    colors: [
+                      const Color(0xFF2A2A2A).withOpacity(0.8),
+                      const Color(0xFF1A1A1A).withOpacity(0.8),
+                    ],
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+                  ),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: enabled ? const Color(0xFF3A3A3A) : const Color(0xFF2A2A2A),
+              color: enabled
+                  ? const Color(0xFF2196F3).withOpacity(0.3)
+                  : const Color(0xFF2A2A2A).withOpacity(0.5),
+              width: 1.5,
             ),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF2196F3).withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: TextField(
             controller: controller,
             enabled: enabled,
             keyboardType: keyboardType,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white, fontSize: 15),
             decoration: InputDecoration(
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              prefixIcon: Icon(icon, color: const Color(0xFFE50914)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: enabled
+                      ? const LinearGradient(
+                          colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                        )
+                      : LinearGradient(
+                          colors: [
+                            Colors.grey.withOpacity(0.3),
+                            Colors.grey.withOpacity(0.2),
+                          ],
+                        ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
             ),
           ),
         ),
@@ -457,11 +587,32 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: _isEditing ? const Color(0xFF2A2A2A) : const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(12),
+            gradient: _isEditing
+                ? LinearGradient(
+                    colors: [
+                      const Color(0xFF2A2A2A).withOpacity(0.8),
+                      const Color(0xFF1A1A1A).withOpacity(0.8),
+                    ],
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+                  ),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: _isEditing ? const Color(0xFF3A3A3A) : const Color(0xFF2A2A2A),
+              color: _isEditing
+                  ? const Color(0xFF2196F3).withOpacity(0.3)
+                  : const Color(0xFF2A2A2A).withOpacity(0.5),
+              width: 1.5,
             ),
+            boxShadow: _isEditing
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF2196F3).withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: InkWell(
             onTap: _isEditing
@@ -528,19 +679,42 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A2A2A)),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFF2196F3).withOpacity(0.2),
+              width: 1.5,
+            ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFFE50914)),
-              const SizedBox(width: 12),
-              Text(
-                value,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF2196F3).withOpacity(0.3),
+                      const Color(0xFF1976D2).withOpacity(0.2),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: const Color(0xFF2196F3), size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
@@ -553,60 +727,117 @@ class _UserInfoScreenState extends State<UserInfoScreen> {
     return Row(
       children: [
         Expanded(
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _isEditing = false;
-                _selectedImageFile = null; // Reset selected image
-                // Reset to original values
-                if (_user != null) {
-                  _nameController.text = _user!.name;
-                  _phoneController.text = _user!.phone ?? '';
-                  _avatarUrlController.text = _user!.avatarUrl ?? '';
-                  _selectedDateOfBirth = _user!.dateOfBirth != null
-                      ? DateTime.fromMillisecondsSinceEpoch(_user!.dateOfBirth!)
-                      : null;
-                }
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2A2A2A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              minimumSize: const Size(0, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1.5,
               ),
             ),
-            child: const Text(
-              'Hủy',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _isEditing = false;
+                    _selectedImageFile = null; // Reset selected image
+                    // Reset to original values
+                    if (_user != null) {
+                      _nameController.text = _user!.name;
+                      _phoneController.text = _user!.phone ?? '';
+                      _avatarUrlController.text = _user!.avatarUrl ?? '';
+                      _selectedDateOfBirth = _user!.dateOfBirth != null
+                          ? DateTime.fromMillisecondsSinceEpoch(_user!.dateOfBirth!)
+                          : null;
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  alignment: Alignment.center,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.close, color: Colors.white, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Hủy',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: ElevatedButton(
-            onPressed: _updateUserInfo,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE50914),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              minimumSize: const Size(0, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2196F3), Color(0xFF1976D2), Color(0xFF1565C0)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2196F3).withOpacity(0.5),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
               ),
             ),
-            child: const Text(
-              'Lưu',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _updateUserInfo,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  alignment: Alignment.center,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Lưu',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

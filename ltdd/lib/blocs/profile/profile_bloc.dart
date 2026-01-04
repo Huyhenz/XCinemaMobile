@@ -23,6 +23,14 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     try {
       // Lấy thông tin user
       UserModel? user = await _dbService.getUser(event.userId);
+      
+      if (user != null) {
+        print('📝 ProfileBloc loaded user: name=${user.name}, phone=${user.phone}, dateOfBirth=${user.dateOfBirth}');
+        print('📝 Phone check: ${user.phone == null ? "null" : (user.phone!.isEmpty ? "empty" : user.phone)}');
+        print('📝 DateOfBirth check: ${user.dateOfBirth == null ? "null" : user.dateOfBirth}');
+      } else {
+        print('❌ ProfileBloc: User not found for userId: ${event.userId}');
+      }
 
       // Lấy danh sách booking
       List<BookingModel> bookings = await _dbService.getBookingsByUser(event.userId);

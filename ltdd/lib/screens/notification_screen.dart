@@ -92,19 +92,66 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0F0F0F),
+        elevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Thông Báo'),
+            const Text(
+              'Thông Báo',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                letterSpacing: 0.5,
+              ),
+            ),
             if (unreadCount > 0)
-              Text(
-                '$unreadCount chưa đọc',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$unreadCount chưa đọc',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
           ],
         ),
-        backgroundColor: const Color(0xFF1A1A1A),
-        elevation: 0,
       ),
       body: _isLoading
           ? const AppLoadingIndicator(message: 'Đang tải thông báo...')
@@ -145,10 +192,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFFE50914),
-          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE50914).withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: const Icon(Icons.delete, color: Colors.white, size: 28),
       ),
       onDismissed: (direction) {
         _deleteNotification(notification.id);
@@ -156,32 +212,77 @@ class _NotificationScreenState extends State<NotificationScreen> {
       child: GestureDetector(
         onTap: () => _showNotificationDetail(notification),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: notification.isRead
-                ? const Color(0xFF1A1A1A)
-                : const Color(0xFF2A2A2A),
-            borderRadius: BorderRadius.circular(16),
+            gradient: notification.isRead
+                ? const LinearGradient(
+                    colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : LinearGradient(
+                    colors: [
+                      _getNotificationColor(notification.type).withOpacity(0.15),
+                      const Color(0xFF2A2A2A),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: notification.isRead
-                  ? const Color(0xFF2A2A2A)
-                  : const Color(0xFFE50914).withOpacity(0.3),
+                  ? const Color(0xFF2A2A2A).withOpacity(0.5)
+                  : _getNotificationColor(notification.type).withOpacity(0.4),
+              width: notification.isRead ? 1 : 1.5,
             ),
+            boxShadow: notification.isRead
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: _getNotificationColor(notification.type).withOpacity(0.3),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _getNotificationColor(notification.type).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      _getNotificationColor(notification.type),
+                      _getNotificationColor(notification.type).withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _getNotificationColor(notification.type).withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   _getNotificationIcon(notification.type),
-                  color: _getNotificationColor(notification.type),
-                  size: 24,
+                  color: Colors.white,
+                  size: 26,
                 ),
               ),
               const SizedBox(width: 16),
@@ -205,11 +306,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         ),
                         if (!notification.isRead)
                           Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE50914),
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                              ),
                               shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE50914).withOpacity(0.6),
+                                  blurRadius: 6,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
                           ),
                       ],

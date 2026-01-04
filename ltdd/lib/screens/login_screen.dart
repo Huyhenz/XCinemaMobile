@@ -123,10 +123,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             'dateOfBirth': _selectedDateOfBirth!.millisecondsSinceEpoch,
             'email': _emailController.text.trim(),
           };
-          await FirebaseDatabase.instance
-              .ref('temp_registrations')
-              .child(cred.user!.uid)
-              .set(tempData);
+          
+          print('📝 Saving to temp_registrations: name=${tempData['name']}, phone=${tempData['phone']}, dateOfBirth=${tempData['dateOfBirth']}');
+          
+          // Sử dụng DatabaseService để lưu an toàn
+          await DatabaseService().saveTempRegistration(cred.user!.uid, tempData);
+          
+          print('✅ Saved to temp_registrations successfully');
 
           // 3. Gửi email xác thực
           await cred.user!.sendEmailVerification();
@@ -149,38 +152,61 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             if (user != null && user.emailVerified) {
             // --- TRƯỜNG HỢP 1: ĐÃ XÁC THỰC EMAIL ---
             
+            final dbService = DatabaseService();
+            
             // Kiểm tra xem đã có trong DB chưa (Lần đầu verify xong sẽ chưa có)
-            UserModel? existingUser = await DatabaseService().getUser(user.uid);
+            UserModel? existingUser = await dbService.getUser(user.uid);
             
             if (existingUser == null) {
-              // ==> ĐÂY LÀ LÚC LƯU VÀO DB <==
-              // Lấy thông tin đăng ký tạm thời nếu có
+              // Tạo user mới từ temp_registrations nếu có
+              print('📝 User chưa tồn tại trong DB, tạo user mới...');
               String name = 'New User';
               String? phone;
               int? dateOfBirth;
               
-              try {
-                final tempSnapshot = await FirebaseDatabase.instance
-                    .ref('temp_registrations')
-                    .child(user.uid)
-                    .get();
+              // Lấy thông tin từ temp_registrations
+              print('📝 Đang lấy thông tin từ temp_registrations...');
+              Map<dynamic, dynamic>? tempData = await dbService.getTempRegistration(user.uid);
+              
+              if (tempData != null && tempData.isNotEmpty) {
+                print('✅ Đã lấy được temp_registrations: $tempData');
                 
-                if (tempSnapshot.exists && tempSnapshot.value != null) {
-                  final tempData = Map<dynamic, dynamic>.from(tempSnapshot.value as Map);
-                  name = tempData['name'] ?? 'New User';
-                  phone = tempData['phone'];
-                  dateOfBirth = tempData['dateOfBirth'];
-                  
-                  // Xóa dữ liệu tạm thời sau khi lấy
+                name = tempData['name']?.toString().trim() ?? 'New User';
+                
+                final phoneValue = tempData['phone'];
+                if (phoneValue != null && phoneValue.toString().trim().isNotEmpty) {
+                  phone = phoneValue.toString().trim();
+                }
+                
+                final dateOfBirthValue = tempData['dateOfBirth'];
+                if (dateOfBirthValue != null) {
+                  if (dateOfBirthValue is int) {
+                    dateOfBirth = dateOfBirthValue;
+                  } else if (dateOfBirthValue is num) {
+                    dateOfBirth = dateOfBirthValue.toInt();
+                  } else {
+                    dateOfBirth = int.tryParse(dateOfBirthValue.toString());
+                  }
+                }
+                
+                print('📝 Parsed from temp_registrations (new user): name=$name, phone=$phone, dateOfBirth=$dateOfBirth');
+                
+                // Xóa temp_registrations sau khi lấy
+                try {
                   await FirebaseDatabase.instance
                       .ref('temp_registrations')
                       .child(user.uid)
                       .remove();
+                  print('✅ Đã xóa temp_registrations sau khi lấy');
+                } catch (e) {
+                  print('⚠️ Error removing temp_registrations: $e');
                 }
-              } catch (e) {
-                print('Lỗi khi lấy thông tin đăng ký tạm thời: $e');
+              } else {
+                print('⚠️ Không có temp_registrations hoặc temp_registrations rỗng');
+                print('⚠️ User sẽ được tạo với giá trị mặc định: name=$name, phone=$phone, dateOfBirth=$dateOfBirth');
               }
               
+              // Tạo user mới
               UserModel newUser = UserModel(
                 id: user.uid,
                 name: name,
@@ -189,8 +215,33 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 phone: phone,
                 dateOfBirth: dateOfBirth,
               );
-              await DatabaseService().saveUser(newUser);
-              print('✅ Đã khởi tạo user trong DB sau khi verify');
+              
+              print('📝 Creating new UserModel: name=$name, phone=$phone, dateOfBirth=$dateOfBirth');
+              print('📝 UserModel.toMap(): ${newUser.toMap()}');
+              await dbService.saveUser(newUser);
+              print('✅ Đã khởi tạo user trong DB');
+              
+              // Verify lại sau khi save
+              UserModel? verifyUser = await dbService.getUser(user.uid);
+              if (verifyUser != null) {
+                print('✅ Verified saved user: name=${verifyUser.name}, phone=${verifyUser.phone}, dateOfBirth=${verifyUser.dateOfBirth}');
+              } else {
+                print('❌ ERROR: User not found after saving!');
+              }
+            } else {
+              // User đã tồn tại - Luôn kiểm tra và cập nhật các trường null từ temp_registrations
+              print('📝 User đã tồn tại trong DB');
+              print('📝 Current user data: name=${existingUser.name}, phone=${existingUser.phone}, dateOfBirth=${existingUser.dateOfBirth}');
+              print('📝 Kiểm tra và cập nhật các trường null từ temp_registrations...');
+              await dbService.updateUserFromTempRegistration(user.uid);
+              
+              // Verify lại sau khi update
+              UserModel? verifyUser = await dbService.getUser(user.uid);
+              if (verifyUser != null) {
+                print('✅ Verified user after update: name=${verifyUser.name}, phone=${verifyUser.phone}, dateOfBirth=${verifyUser.dateOfBirth}');
+              } else {
+                print('❌ ERROR: User not found after update!');
+              }
             }
             
             // Xử lý return path nếu có
@@ -201,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               _navigateToHome(context);
             }
           } else {
-            // --- TRƯỜNG HỢP 2: CHƯA XÁC THỰC ---
+            // --- TRƯỜNG HỢP 2: CHƯA XÁC THỰC EMAIL ---
             
             // Kiểm tra quá hạn 5 phút
             final creationTime = user!.metadata.creationTime;
@@ -213,13 +264,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                  await user.delete();
                  // SignOut để AuthChecker quay lại màn hình Login (thay vì màn Verify)
                  await FirebaseAuth.instance.signOut();
-                 _showSnackBar('Link xác thực đã hết hạn (quá 5 phút). Tài khoản đã bị hủy. Vui lòng đăng ký lại.', isError: true);
+                 if (mounted) {
+                   _showSnackBar('Link xác thực đã hết hạn (quá 5 phút). Tài khoản đã bị hủy. Vui lòng đăng ký lại.', isError: true);
+                 }
                  return;
               }
             }
             
-            // Nếu chưa quá 5 phút -> AuthChecker sẽ tự hiển thị màn hình Verify
-            // Không cần làm gì thêm
+            // Nếu chưa quá 5 phút -> Hiển thị pop-up thông báo và chuyển sang màn hình Verify
+            if (mounted) {
+              await _showEmailNotVerifiedDialog(user);
+              // SignOut để AuthChecker quay lại màn hình Login, sau đó AuthChecker sẽ tự chuyển sang màn Verify
+              await FirebaseAuth.instance.signOut();
+            }
           }
         }
       }
@@ -387,6 +444,137 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
+  Future<void> _showEmailNotVerifiedDialog(User user) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.email_outlined,
+                color: Colors.orange,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Chưa xác nhận email',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tài khoản của bạn chưa được xác nhận qua email.',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Email: ${user.email}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Vui lòng kiểm tra hộp thư đến và xác nhận email của bạn để tiếp tục sử dụng ứng dụng.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Đóng',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await user.sendEmailVerification();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  await DialogHelper.showSuccess(
+                    context,
+                    'Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư đến của bạn.',
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  await DialogHelper.showError(
+                    context,
+                    'Lỗi gửi email: $e',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE50914),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Gửi lại email'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -429,48 +617,75 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
-              colors: [Color(0xFFE50914), Color(0xFFB20710)],
+              colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFE50914).withOpacity(0.5),
-                blurRadius: 30,
-                spreadRadius: 5,
+                color: const Color(0xFFE50914).withOpacity(0.6),
+                blurRadius: 40,
+                spreadRadius: 8,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: const Icon(
             Icons.movie_filter,
-            size: 60,
+            size: 64,
             color: Colors.white,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFFE50914), Color(0xFFFF6B6B)],
+            colors: [Color(0xFFE50914), Color(0xFFFFD700), Color(0xFFFF6B6B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ).createShader(bounds),
           child: const Text(
             'CINEMA',
             style: TextStyle(
-              fontSize: 48,
+              fontSize: 52,
               fontWeight: FontWeight.bold,
               color: Colors.white,
-              letterSpacing: 6,
+              letterSpacing: 8,
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Đặt vé xem phim dễ dàng',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[400],
-            letterSpacing: 2,
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            'Đặt vé xem phim dễ dàng',
+            style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey[300],
+              letterSpacing: 2,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -479,16 +694,33 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   Widget _buildForm() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF1F1F1F),
+            Color(0xFF1A1A1A),
+            Color(0xFF151515),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFF2A2A2A).withOpacity(0.6),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: const Color(0xFFE50914).withOpacity(0.2),
+            blurRadius: 30,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 25,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -520,25 +752,41 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   Widget _buildTabSelector() {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F0F),
-        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F0F0F), Color(0xFF151515)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF2A2A2A).withOpacity(0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Expanded(
-            child: _buildTabButton('Đăng Nhập', !_isRegister),
+            child: _buildTabButton('Đăng Nhập', !_isRegister, Icons.login_rounded),
           ),
+          const SizedBox(width: 4),
           Expanded(
-            child: _buildTabButton('Đăng Ký', _isRegister),
+            child: _buildTabButton('Đăng Ký', _isRegister, Icons.person_add_rounded),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTabButton(String text, bool isSelected) {
+  Widget _buildTabButton(String text, bool isSelected, IconData icon) {
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -553,23 +801,47 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
-            colors: [Color(0xFFE50914), Color(0xFFB20710)],
-          )
+                  colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
               : null,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.5),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey,
-            fontSize: 16,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey[500],
+            ),
+            const SizedBox(width: 6),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[500],
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -578,23 +850,37 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildEmailField() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF252525)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.white, fontSize: 15),
         decoration: InputDecoration(
           labelText: 'Email',
-          labelStyle: TextStyle(color: Colors.grey[500]),
+          labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFFE50914)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            child: const Icon(Icons.email_outlined, color: Color(0xFFE50914), size: 22),
+          ),
         ),
       ),
     );
@@ -603,27 +889,49 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildPasswordField() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF252525)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextField(
         controller: _passwordController,
         obscureText: _obscurePassword,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.white, fontSize: 15),
         decoration: InputDecoration(
           labelText: 'Mật khẩu',
-          labelStyle: TextStyle(color: Colors.grey[500]),
+          labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFFE50914)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            child: const Icon(Icons.lock_outline, color: Color(0xFFE50914), size: 22),
+          ),
           suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_off : Icons.visibility,
-              color: Colors.grey[500],
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                color: Colors.grey[400],
+                size: 20,
+              ),
             ),
             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           ),
@@ -635,22 +943,36 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildNameField() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF252525)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextField(
         controller: _nameController,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.white, fontSize: 15),
         decoration: InputDecoration(
           labelText: 'Họ tên',
-          labelStyle: TextStyle(color: Colors.grey[500]),
+          labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: const Icon(Icons.person_outline, color: Color(0xFFE50914)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            child: const Icon(Icons.person_outline, color: Color(0xFFE50914), size: 22),
+          ),
         ),
       ),
     );
@@ -659,23 +981,37 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildPhoneField() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF252525)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextField(
         controller: _phoneController,
         keyboardType: TextInputType.phone,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.white, fontSize: 15),
         decoration: InputDecoration(
           labelText: 'Số điện thoại',
-          labelStyle: TextStyle(color: Colors.grey[500]),
+          labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFFE50914)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            child: const Icon(Icons.phone_outlined, color: Color(0xFFE50914), size: 22),
+          ),
         ),
       ),
     );
@@ -684,12 +1020,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildDateOfBirthField() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF252525)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: () async {
@@ -721,18 +1068,21 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         child: InputDecorator(
           decoration: InputDecoration(
             labelText: 'Ngày tháng năm sinh',
-            labelStyle: TextStyle(color: Colors.grey[500]),
+            labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
             border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            prefixIcon: const Icon(Icons.calendar_today_outlined, color: Color(0xFFE50914)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            prefixIcon: Container(
+              padding: const EdgeInsets.all(12),
+              child: const Icon(Icons.calendar_today_outlined, color: Color(0xFFE50914), size: 22),
+            ),
           ),
           child: Text(
             _selectedDateOfBirth == null
                 ? 'Chọn ngày sinh'
                 : DateFormat('dd/MM/yyyy').format(_selectedDateOfBirth!),
             style: TextStyle(
-              color: _selectedDateOfBirth == null ? Colors.grey[500] : Colors.white,
-              fontSize: 16,
+              color: _selectedDateOfBirth == null ? Colors.grey[400] : Colors.white,
+              fontSize: 15,
             ),
           ),
         ),
@@ -743,17 +1093,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildLoginButton() {
     return Container(
       width: double.infinity,
-      height: 56,
+      height: 58,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFE50914), Color(0xFFB20710)],
+          colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFE50914).withOpacity(0.5),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: const Color(0xFFE50914).withOpacity(0.6),
+            blurRadius: 25,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -762,28 +1120,41 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
         child: _isLoading
             ? const SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            color: Colors.white,
-            strokeWidth: 2,
-          ),
-        )
-            : Text(
-          _isRegister ? 'ĐĂNG KÝ' : 'ĐĂNG NHẬP',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 2,
-          ),
-        ),
+                width: 26,
+                height: 26,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isRegister ? Icons.person_add_rounded : Icons.login_rounded,
+                    size: 22,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _isRegister ? 'ĐĂNG KÝ' : 'ĐĂNG NHẬP',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -792,21 +1163,57 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     return Row(
       children: [
         Expanded(
-          child: Divider(color: Colors.grey[800], thickness: 1),
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.grey[700]!,
+                  Colors.grey[700]!,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'HOẶC',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.grey[900],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey[800]!,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              'HOẶC',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+              ),
             ),
           ),
         ),
         Expanded(
-          child: Divider(color: Colors.grey[800], thickness: 1),
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.grey[700]!,
+                  Colors.grey[700]!,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -815,33 +1222,53 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildGoogleButton() {
     return Container(
       width: double.infinity,
-      height: 56,
+      height: 58,
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF252525)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey[700]!.withOpacity(0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ElevatedButton.icon(
         onPressed: _isLoading ? null : _signInWithGoogle,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
         icon: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Image.network(
             'https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png',
-            height: 20,
+            height: 22,
             errorBuilder: (context, error, stackTrace) => const Icon(
               Icons.g_mobiledata,
               color: Colors.blue,
@@ -854,7 +1281,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           style: TextStyle(
             color: Colors.white,
             fontSize: 16,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
       ),

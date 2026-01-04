@@ -71,8 +71,10 @@ Cập nhật Firebase Realtime Database Rules trong Firebase Console:
       ".indexOn": ["userId", "isRead"]
     },
     "temp_registrations": {
-      ".read": "auth != null && (!data.exists() || data.child('userId').val() == auth.uid)",
-      ".write": "auth != null"
+      "$userId": {
+        ".read": "auth != null && $userId == auth.uid",
+        ".write": "auth != null && $userId == auth.uid"
+      }
     },
     "temp_bookings": {
       ".read": "auth != null",

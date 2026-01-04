@@ -132,15 +132,42 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFF0F0F0F),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         title: const Text(
           'Chọn Lịch Chiếu',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
       body: Column(
@@ -155,11 +182,11 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
   Widget _buildDateSelector() {
     return Container(
-      height: 100,
+      height: 110,
       margin: const EdgeInsets.symmetric(vertical: 16),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: _dates.length,
         itemBuilder: (context, index) {
           DateTime date = _dates[index];
@@ -175,72 +202,111 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              width: 70,
-              margin: const EdgeInsets.only(right: 12),
+              curve: Curves.easeInOut,
+              width: 75,
+              margin: const EdgeInsets.only(right: 14),
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? const LinearGradient(
-                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
-                )
-                    : null,
-                color: isSelected ? null : const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(16),
+                        colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: isSelected ? Colors.transparent : const Color(0xFF2A2A2A),
-                  width: 2,
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.2)
+                      : const Color(0xFFE50914).withOpacity(0.3),
+                  width: isSelected ? 1.5 : 1.5,
                 ),
                 boxShadow: isSelected
                     ? [
-                  BoxShadow(
-                    color: const Color(0xFFE50914).withOpacity(0.5),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-                    : null,
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (isToday)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isSelected ? Colors.white : const Color(0xFFE50914),
-                        borderRadius: BorderRadius.circular(10),
+                        gradient: isSelected
+                            ? const LinearGradient(
+                                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                              )
+                            : const LinearGradient(
+                                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                              ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE50914).withOpacity(0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Text(
                         'HÔM NAY',
                         style: TextStyle(
-                          color: isSelected ? const Color(0xFFE50914) : Colors.white,
-                          fontSize: 8,
+                          color: Colors.white,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
-                  const SizedBox(height: 4),
+                  if (!isToday) const SizedBox(height: 8),
+                  if (isToday) const SizedBox(height: 6),
                   Text(
                     DateFormat('EEE').format(date).toUpperCase(),
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey,
-                      fontSize: 12,
+                      color: isSelected ? Colors.white : Colors.grey[400],
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     DateFormat('dd').format(date),
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.white70,
-                      fontSize: 24,
+                      color: isSelected ? Colors.white : Colors.white,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     DateFormat('MMM').format(date),
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey,
-                      fontSize: 10,
+                      color: isSelected ? Colors.white70 : Colors.grey[500],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -253,62 +319,106 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
   }
 
   Widget _buildTheaterInfo() {
-    return GestureDetector(
-      onTap: _showCinemaSelectionDialog,
-      child: Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: Color(0xFFE50914),
-                size: 30,
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _showCinemaSelectionDialog,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _cinema?.name ?? 'Chọn rạp chiếu',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.1),
+                blurRadius: 15,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.location_on,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _cinema?.name ?? 'Chọn rạp chiếu',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
                           ),
                         ),
-                      ),
-                      const Icon(Icons.swap_horiz, color: Color(0xFFE50914), size: 20),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _cinema?.address ?? 'Bấm để đổi rạp',
-                    style: TextStyle(
-                      color: _cinema != null ? Colors.grey : Colors.grey[600],
-                      fontSize: 12,
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE50914).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.swap_horiz, color: Color(0xFFE50914), size: 20),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Text(
+                      _cinema?.address ?? 'Bấm để đổi rạp',
+                      style: TextStyle(
+                        color: _cinema != null ? Colors.grey[300] : Colors.grey[500],
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -328,41 +438,71 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(
+            top: BorderSide(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
+              width: 50,
+              height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey[700],
-                borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFFE50914).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               child: Row(
                 children: [
-                  const Icon(Icons.theaters, color: Color(0xFFE50914), size: 28),
-                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.theaters, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 16),
                   const Expanded(
                     child: Text(
                       'Chọn Rạp Chiếu',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A2A2A),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFE50914).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 22),
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ),
                 ],
               ),
@@ -376,62 +516,132 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                   final cinema = _allCinemas[index];
                   final isSelected = _cinema?.id == cinema.id;
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFE50914).withOpacity(0.2)
-                          : const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: isSelected
+                          ? const LinearGradient(
+                              colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : const LinearGradient(
+                              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: isSelected
-                            ? const Color(0xFFE50914)
-                            : const Color(0xFF2A2A2A),
-                        width: isSelected ? 2 : 1,
+                            ? Colors.white.withOpacity(0.2)
+                            : const Color(0xFFE50914).withOpacity(0.3),
+                        width: isSelected ? 1.5 : 1.5,
                       ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFE50914).withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                     ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2A2A),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Color(0xFFE50914),
-                          size: 24,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          Navigator.pop(context, cinema);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  gradient: isSelected
+                                      ? const LinearGradient(
+                                          colors: [Colors.white, Colors.white70],
+                                        )
+                                      : const LinearGradient(
+                                          colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                                        ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (isSelected
+                                              ? Colors.white
+                                              : const Color(0xFFE50914))
+                                          .withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.location_on,
+                                  color: isSelected ? const Color(0xFFE50914) : Colors.white,
+                                  size: 26,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cinema.name,
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : Colors.white,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      cinema.address,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white70
+                                            : Colors.grey[400],
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                )
+                              else
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.grey,
+                                  size: 18,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                      title: Text(
-                        cinema.name,
-                        style: TextStyle(
-                          color: isSelected ? const Color(0xFFE50914) : Colors.white,
-                          fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: Text(
-                        cinema.address,
-                        style: TextStyle(
-                          color: isSelected ? Colors.grey[300] : Colors.grey[400],
-                          fontSize: 12,
-                        ),
-                      ),
-                      trailing: isSelected
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Color(0xFFE50914),
-                              size: 24,
-                            )
-                          : const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.grey,
-                              size: 16,
-                            ),
-                      onTap: () {
-                        Navigator.pop(context, cinema);
-                      },
                     ),
                   );
                 },
@@ -455,15 +665,41 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
   Widget _buildShowtimesList() {
     if (_filteredShowtimes.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy, size: 80, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(Icons.event_busy, size: 64, color: Color(0xFFE50914)),
+            ),
+            const SizedBox(height: 24),
+            const Text(
               'Không có lịch chiếu',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vui lòng chọn ngày khác',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -471,23 +707,43 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       itemCount: _filteredShowtimes.length,
       itemBuilder: (context, index) {
         ShowtimeModel showtime = _filteredShowtimes[index];
         DateTime time = DateTime.fromMillisecondsSinceEpoch(showtime.startTime);
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 16),
+          margin: const EdgeInsets.only(bottom: 16, left: 20, right: 20),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF2A2A2A)),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.1),
+                blurRadius: 15,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               onTap: () async {
                 // Check authentication before booking, truyền return path
                 final isAuthenticated = await AuthGuard.requireAuth(
@@ -504,17 +760,30 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                 }
               },
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 child: Row(
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 90,
+                      height: 90,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                          colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE50914).withOpacity(0.5),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -523,22 +792,24 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                             DateFormat('HH:mm').format(time),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 22,
+                              fontSize: 26,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             DateFormat('dd/MM').format(time),
                             style: const TextStyle(
                               color: Colors.white70,
-                              fontSize: 12,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 18),
                     Expanded(
                       child: FutureBuilder(
                         future: DatabaseService().getTheater(showtime.theaterId),
@@ -546,39 +817,73 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                           final theater = snapshot.data;
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               if (theater != null) ...[
                                 Row(
                                   children: [
-                                    const Icon(Icons.meeting_room, color: Color(0xFFE50914), size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      theater.name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(Icons.meeting_room, color: Colors.white, size: 16),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        theater.name,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.3,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 14),
                               ],
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2A2A2A),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '${showtime.availableSeats.length} ghế trống',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      const Color(0xFF2A2A2A).withOpacity(0.8),
+                                      const Color(0xFF1A1A1A).withOpacity(0.8),
+                                    ],
                                   ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: const Color(0xFFE50914).withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.event_seat,
+                                      color: Color(0xFFE50914),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${showtime.availableSeats.length} ghế trống',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -586,10 +891,22 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                         },
                       ),
                     ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Colors.grey,
-                      size: 20,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF2A2A2A).withOpacity(0.5),
+                            const Color(0xFF1A1A1A).withOpacity(0.5),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward_ios,
+                        color: Color(0xFFE50914),
+                        size: 18,
+                      ),
                     ),
                   ],
                 ),

@@ -508,15 +508,42 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
       child: Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF1A1A1A),
+          backgroundColor: const Color(0xFF0F0F0F),
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: _isProcessing ? null : _handleCancel,
+          leading: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE50914).withOpacity(0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: _isProcessing ? null : _handleCancel,
+            ),
           ),
           title: const Text(
             'Thanh Toán',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
         body: SingleChildScrollView(
@@ -526,7 +553,6 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               _buildOrderSummary(),
               _buildVoucherSection(),
               _buildPaymentMethods(),
-              _buildTimer(),
             ],
           ),
         ),
@@ -549,23 +575,59 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     print('🎫 PaymentScreen - _selectedSeats.length: ${_selectedSeats.length}');
     
     return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Thông Tin Phim',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.movie, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Thông Tin Phim',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           _buildSummaryRow('Tên phim', _movie!.title),
@@ -584,61 +646,145 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
 
   Widget _buildOrderSummary() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Chi Tiết Thanh Toán',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Chi Tiết Thanh Toán',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           
           // Hiển thị snacks nếu có
           if (widget.selectedSnacks != null && widget.selectedSnacks!.isNotEmpty && _snackMap.isNotEmpty) ...[
-            const Text(
-              'Bắp Nước',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF2196F3).withOpacity(0.3),
+                        const Color(0xFF1976D2).withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.fastfood,
+                    color: Color(0xFF2196F3),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Bắp Nước',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             ...widget.selectedSnacks!.entries.map((entry) {
               final snack = _snackMap[entry.key];
               if (snack == null) return const SizedBox.shrink();
               final quantity = entry.value;
               final snackTotal = snack.price * quantity;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF2A2A2A).withOpacity(0.5),
+                      const Color(0xFF1A1A1A).withOpacity(0.5),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF2196F3).withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text(
                         '${snack.name} x$quantity',
-                        style: TextStyle(
-                          color: Colors.grey[300],
-                          fontSize: 14,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                    Text(
-                      '${NumberFormat('#,###', 'vi_VN').format(snackTotal)}đ',
-                      style: TextStyle(
-                        color: Colors.grey[300],
-                        fontSize: 14,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${NumberFormat('#,###', 'vi_VN').format(snackTotal)}đ',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -646,7 +792,18 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               );
             }),
             const SizedBox(height: 16),
-            const Divider(color: Color(0xFF2A2A2A), height: 1),
+            Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF2A2A2A),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
           ],
           
@@ -707,7 +864,19 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
               ),
             ),
           ],
-          const Divider(color: Color(0xFF2A2A2A), height: 32),
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -715,16 +884,34 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                 'Thành tiền',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
               ),
-              Text(
-                '${NumberFormat('#,###', 'vi_VN').format(_finalPrice)}đ',
-                style: const TextStyle(
-                  color: Color(0xFFE50914),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  '${NumberFormat('#,###', 'vi_VN').format(_finalPrice)}đ',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
@@ -736,37 +923,91 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   
   Widget _buildVoucherSection() {
     return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Voucher',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.card_giftcard, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Voucher',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           // Dropdown chọn voucher đã đổi
           if (_userVouchers.isNotEmpty) ...[
-            DropdownButtonFormField<VoucherModel>(
-              value: _selectedVoucher,
-              decoration: const InputDecoration(
-                labelText: 'Chọn voucher đã đổi',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.card_giftcard, color: Color(0xFFE50914)),
-                labelStyle: TextStyle(color: Colors.white),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF2A2A2A).withOpacity(0.8),
+                    const Color(0xFF1A1A1A).withOpacity(0.8),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFF9C27B0).withOpacity(0.3),
+                  width: 1,
+                ),
               ),
-              dropdownColor: const Color(0xFF2A2A2A),
-              style: const TextStyle(color: Colors.white),
+              child: DropdownButtonFormField<VoucherModel>(
+                value: _selectedVoucher,
+                decoration: InputDecoration(
+                  labelText: 'Chọn voucher đã đổi',
+                  labelStyle: TextStyle(color: Colors.grey[400]),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  prefixIcon: const Icon(Icons.card_giftcard, color: Color(0xFF9C27B0)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                dropdownColor: const Color(0xFF1A1A1A),
+                style: const TextStyle(color: Colors.white),
               items: _userVouchers.map((item) {
                 final voucher = item['voucher'] as VoucherModel;
                 return DropdownMenuItem<VoucherModel>(
@@ -793,6 +1034,7 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
                   }
                 });
               },
+              ),
             ),
             const SizedBox(height: 12),
             const Divider(color: Colors.grey),
@@ -963,16 +1205,35 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
 
   Widget _buildPaymentMethods() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Phương Thức Thanh Toán',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.payment, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Phương Thức Thanh Toán',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -1004,33 +1265,87 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
   ) {
     bool isSelected = _selectedPaymentMethod == value;
 
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPaymentMethod = value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? brandColor : const Color(0xFF2A2A2A),
-            width: 2,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selectedPaymentMethod = value),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? LinearGradient(
+                    colors: [
+                      brandColor.withOpacity(0.2),
+                      brandColor.withOpacity(0.1),
+                    ],
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected
+                  ? brandColor.withOpacity(0.6)
+                  : const Color(0xFFE50914).withOpacity(0.3),
+              width: isSelected ? 2 : 1.5,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: brandColor.withOpacity(0.3),
+                      blurRadius: 15,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
-        ),
-        child: Row(
+          child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? brandColor.withOpacity(0.2)
-                    : const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(12),
+                gradient: isSelected
+                    ? LinearGradient(
+                        colors: [
+                          brandColor,
+                          brandColor.withOpacity(0.8),
+                        ],
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                      ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: brandColor.withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
               ),
               child: Icon(
                 icon,
-                color: isSelected ? brandColor : Colors.grey,
+                color: isSelected ? Colors.white : Colors.grey[400],
                 size: 28,
               ),
             ),
@@ -1067,22 +1382,40 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildTimer() {
     return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFE50914).withOpacity(0.2),
-            const Color(0xFFB20710).withOpacity(0.1),
+            const Color(0xFFE50914).withOpacity(0.3),
+            const Color(0xFFB20710).withOpacity(0.2),
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE50914)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.3),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -1090,19 +1423,35 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
             animation: _pulseController,
             builder: (context, child) {
               return Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Color.lerp(
-                    const Color(0xFFE50914),
-                    const Color(0xFFB20710),
-                    _pulseController.value,
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.lerp(
+                        const Color(0xFFE50914),
+                        const Color(0xFFB20710),
+                        _pulseController.value,
+                      )!,
+                      Color.lerp(
+                        const Color(0xFFB20710),
+                        const Color(0xFF8B0000),
+                        _pulseController.value,
+                      )!,
+                    ],
                   ),
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.5),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.access_time,
                   color: Colors.white,
-                  size: 24,
+                  size: 26,
                 ),
               );
             },
@@ -1141,12 +1490,27 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(
+          top: BorderSide(
+            color: const Color(0xFFE50914).withOpacity(0.3),
+            width: 1.5,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 15,
             offset: const Offset(0, -5),
+          ),
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
           ),
         ],
       ),
@@ -1154,34 +1518,83 @@ class _PaymentScreenState extends State<PaymentScreen> with TickerProviderStateM
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            Container(
               width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isProcessing ? null : _handlePayment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE50914),
-                  disabledBackgroundColor: Colors.grey[800],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: _isProcessing
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-                    : const Text(
-                  'XÁC NHẬN THANH TOÁN',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: _isProcessing
+                    ? LinearGradient(
+                        colors: [
+                          Colors.grey.withOpacity(0.3),
+                          Colors.grey.withOpacity(0.2),
+                        ],
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: _isProcessing
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 8),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                border: _isProcessing
+                    ? null
+                    : Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isProcessing ? null : _handlePayment,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: _isProcessing
+                        ? const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.payment, color: Colors.white, size: 26),
+                              SizedBox(width: 16),
+                              Text(
+                                'XÁC NHẬN THANH TOÁN',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black26,
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ),

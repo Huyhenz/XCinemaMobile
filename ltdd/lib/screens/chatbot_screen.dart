@@ -130,15 +130,58 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        title: const Row(
+        backgroundColor: const Color(0xFF0F0F0F),
+        elevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.smart_toy, color: Color(0xFFE50914)),
-            SizedBox(width: 8),
-            Text('Chatbot Hỗ Trợ'),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Chatbot Hỗ Trợ',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                letterSpacing: 0.5,
+              ),
+            ),
           ],
         ),
-        backgroundColor: const Color(0xFF1A1A1A),
-        elevation: 0,
       ),
       body: Column(
         children: [
@@ -176,27 +219,53 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
             children: [
               if (!message.isUser) ...[
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE50914),
-                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withOpacity(0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
               ],
               Flexible(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   decoration: BoxDecoration(
-                    color: message.isUser
-                        ? const Color(0xFFE50914)
-                        : const Color(0xFF1A1A1A),
+                    gradient: message.isUser
+                        ? const LinearGradient(
+                            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                     borderRadius: BorderRadius.circular(20).copyWith(
                       bottomLeft: message.isUser ? const Radius.circular(20) : const Radius.circular(4),
                       bottomRight: message.isUser ? const Radius.circular(4) : const Radius.circular(20),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: message.isUser
+                            ? const Color(0xFFE50914).withOpacity(0.3)
+                            : Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,13 +292,26 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
                 ),
               ),
               if (message.isUser) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.grey.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: const Icon(Icons.person, color: Colors.white, size: 20),
                 ),
@@ -243,20 +325,40 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
               spacing: 8,
               runSpacing: 8,
               children: message.suggestions!.map((suggestion) {
-                return InkWell(
-                  onTap: () => _sendMessage(suggestion),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE50914).withAlpha(77)),
-                    ),
-                    child: Text(
-                      suggestion,
-                      style: const TextStyle(
-                        color: Color(0xFFE50914),
-                        fontSize: 13,
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _sendMessage(suggestion),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF2A2A2A).withOpacity(0.8),
+                            const Color(0xFF1A1A1A).withOpacity(0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFE50914).withOpacity(0.5),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE50914).withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        suggestion,
+                        style: const TextStyle(
+                          color: Color(0xFFE50914),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
@@ -290,10 +392,19 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE50914).withOpacity(0.3)),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.movie, color: Color(0xFFE50914), size: 20),
-            const SizedBox(width: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.movie, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,8 +451,17 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.location_on, color: Color(0xFFE50914), size: 20),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.location_on, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,22 +498,42 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFFE50914),
-              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(20).copyWith(
                 bottomLeft: const Radius.circular(4),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: const SizedBox(
               width: 40,
@@ -419,43 +559,88 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        border: Border(
-          top: BorderSide(color: Colors.grey[800]!, width: 1),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
+        border: Border(
+          top: BorderSide(
+            color: const Color(0xFFE50914).withOpacity(0.3),
+            width: 1.5,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: _messageController,
-                decoration: InputDecoration(
-                  hintText: 'Nhập câu hỏi của bạn...',
-                  hintStyle: TextStyle(color: Colors.grey[500]),
-                  filled: true,
-                  fillColor: const Color(0xFF2A2A2A),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: BorderSide.none,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF2A2A2A).withOpacity(0.8),
+                      const Color(0xFF1A1A1A).withOpacity(0.8),
+                    ],
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: const Color(0xFFE50914).withOpacity(0.2),
+                    width: 1,
+                  ),
                 ),
-                style: const TextStyle(color: Colors.white),
-                maxLines: null,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (text) => _sendMessage(text),
+                child: TextField(
+                  controller: _messageController,
+                  decoration: InputDecoration(
+                    hintText: 'Nhập câu hỏi của bạn...',
+                    hintStyle: TextStyle(color: Colors.grey[500]),
+                    filled: true,
+                    fillColor: Colors.transparent,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: null,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (text) => _sendMessage(text),
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFE50914),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                ),
                 borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: IconButton(
-                icon: const Icon(Icons.send, color: Colors.white),
-                onPressed: () => _sendMessage(_messageController.text),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _sendMessage(_messageController.text),
+                  borderRadius: BorderRadius.circular(25),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: const Icon(Icons.send, color: Colors.white, size: 24),
+                  ),
+                ),
               ),
             ),
           ],

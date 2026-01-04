@@ -26,29 +26,73 @@ class PaymentFailureScreen extends StatelessWidget {
               children: [
                 // Failure Icon
                 Container(
-                  width: 120,
-                  height: 120,
+                  width: 140,
+                  height: 140,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE50914).withOpacity(0.2),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withOpacity(0.4),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 3,
+                    ),
                   ),
                   child: const Icon(
                     Icons.cancel,
-                    size: 80,
-                    color: Color(0xFFE50914),
+                    size: 90,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 32),
                 
                 // Failure Title
-                Text(
-                  isCancelled ? 'Thanh toán đã bị hủy' : 'Thanh toán thất bại',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFE50914).withOpacity(0.2),
+                        const Color(0xFFB20710).withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFE50914).withOpacity(0.3),
+                      width: 1.5,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
+                  child: Text(
+                    isCancelled ? 'Thanh toán đã bị hủy' : 'Thanh toán thất bại',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 
@@ -67,31 +111,67 @@ class PaymentFailureScreen extends StatelessWidget {
                 
                 // Info Box
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey.withOpacity(0.3),
-                      width: 1,
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFFF9800).withOpacity(0.2),
+                        const Color(0xFFF57C00).withOpacity(0.1),
+                      ],
                     ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFFF9800).withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF9800).withOpacity(0.2),
+                        blurRadius: 15,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.orange,
-                        size: 24,
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF9800).withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.info_outline,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Text(
                           isCancelled
                             ? 'Vé của bạn vẫn được giữ trong giỏ hàng. Bạn có thể thử thanh toán lại.'
                             : 'Vui lòng kiểm tra lại thông tin thanh toán hoặc thử lại sau.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey,
+                            color: Colors.grey[200],
+                            fontWeight: FontWeight.w500,
+                            height: 1.5,
                           ),
                         ),
                       ),
@@ -101,26 +181,62 @@ class PaymentFailureScreen extends StatelessWidget {
                 const SizedBox(height: 32),
                 
                 // Try Again Button
-                SizedBox(
+                Container(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Go back to payment screen
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE50914),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: const Text(
-                      'Thử Lại',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.refresh, color: Colors.white, size: 26),
+                          SizedBox(width: 12),
+                          Text(
+                            'Thử Lại',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -128,26 +244,51 @@ class PaymentFailureScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 
                 // Back to Home Button
-                SizedBox(
+                Container(
                   width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // Navigate to home and clear navigation stack
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Color(0xFFE50914), width: 2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF2A2A2A).withOpacity(0.8),
+                        const Color(0xFF1A1A1A).withOpacity(0.8),
+                      ],
                     ),
-                    child: const Text(
-                      'Về Trang Chủ',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFE50914),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFFE50914).withOpacity(0.5),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.home, color: Color(0xFFE50914), size: 24),
+                          SizedBox(width: 12),
+                          Text(
+                            'Về Trang Chủ',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFE50914),
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

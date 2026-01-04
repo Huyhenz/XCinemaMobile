@@ -207,9 +207,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             child: Column(
               children: [
                 _buildMovieInfo(),
-                _buildTrailerSection(),
-                _buildUserRatingSection(),
                 _buildDescription(),
+                _buildUserRatingSection(),
                 _buildCommentSection(),
                 _buildBookButton(),
                 const SizedBox(height: 20),
@@ -229,8 +228,23 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       leading: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.5),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           shape: BoxShape.circle,
+          border: Border.all(
+            color: const Color(0xFFE50914).withOpacity(0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE50914).withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -252,10 +266,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    const Color(0xFF0F0F0F).withOpacity(0.7),
+                    Colors.transparent,
+                    const Color(0xFF0F0F0F).withOpacity(0.6),
+                    const Color(0xFF0F0F0F).withOpacity(0.95),
                     const Color(0xFF0F0F0F),
                   ],
-                  stops: const [0.3, 0.7, 1.0],
+                  stops: const [0.0, 0.4, 0.7, 0.85, 1.0],
                 ),
               ),
             ),
@@ -272,22 +288,42 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       color: Colors.white,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                       shadows: [
                         Shadow(
                           color: Colors.black,
+                          blurRadius: 15,
+                        ),
+                        Shadow(
+                          color: Colors.black54,
                           blurRadius: 10,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE50914),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE50914).withOpacity(0.5),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
                         child: Text(
                           _movie!.genre.split(',').first.trim(),
@@ -295,15 +331,27 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Icon(Icons.access_time, color: Colors.white70, size: 16),
-                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.access_time, color: Colors.white70, size: 16),
+                      ),
+                      const SizedBox(width: 8),
                       Text(
                         '${_movie!.duration} phút',
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -338,53 +386,89 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: InkWell(
-        onTap: () {
-          TrailerDialog.show(context, _movie!.trailerUrl!);
-        },
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF2A2A2A)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE50914),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_arrow, color: Colors.white, size: 28),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            TrailerDialog.show(context, _movie!.trailerUrl!);
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Xem Trailer',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Xem trailer trước khi đặt vé',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFE50914).withOpacity(0.3),
+                width: 1.5,
               ),
-              const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 20),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.2),
+                  blurRadius: 15,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withOpacity(0.5),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 20),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Xem Trailer',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Xem trailer trước khi đặt vé',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios, color: Color(0xFFE50914), size: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -394,11 +478,31 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildUserRatingSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -415,58 +519,120 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       color: Colors.amber,
                     ),
                     itemCount: 5,
-                    itemSize: 24.0,
+                    itemSize: 28.0,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
                     _averageRating > 0 ? '${_averageRating.toStringAsFixed(1)}/5.0' : 'Chưa có đánh giá',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
               Container(
-                height: 50,
+                height: 60,
                 width: 1,
-                color: const Color(0xFF2A2A2A),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF2A2A2A),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
               ),
               Column(
                 children: [
-                  const Icon(Icons.people, color: Color(0xFFE50914), size: 30),
-                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.people, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 12),
                   Text(
                     '$_ratingCount',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     'Đánh giá',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          const Divider(color: Color(0xFF2A2A2A)),
-          const SizedBox(height: 16),
-          // User rating input
-          if (_userId != null) ...[
-            Text(
-              _userRating != null ? 'Đánh giá của bạn' : 'Đánh giá phim này',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+          const SizedBox(height: 24),
+          Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 20),
+          // User rating input
+          if (_userId != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF2A2A2A).withOpacity(0.5),
+                    const Color(0xFF1A1A1A).withOpacity(0.5),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE50914).withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    _userRating != null ? 'Đánh giá của bạn' : 'Đánh giá phim này',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
             RatingBar.builder(
               initialRating: _userRating ?? 0,
               minRating: 1,
@@ -524,10 +690,33 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 }
               },
             ),
+                ],
+              ),
+            ),
           ] else
-            const Text(
-              'Đăng nhập để đánh giá phim',
-              style: TextStyle(color: Colors.grey, fontSize: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF2A2A2A).withOpacity(0.5),
+                    const Color(0xFF1A1A1A).withOpacity(0.5),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFE50914).withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: const Text(
+                'Đăng nhập để đánh giá phim',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
         ],
       ),
@@ -545,23 +734,43 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE50914).withOpacity(0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Icon(icon, color: const Color(0xFFE50914), size: 24),
+            child: Icon(icon, color: const Color(0xFFE50914), size: 28),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             label,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
+          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
               color: isTrailer ? const Color(0xFFE50914) : Colors.white,
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               decoration: isTrailer ? TextDecoration.underline : null,
             ),
@@ -574,36 +783,78 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildDescription() {
     return Container(
-      margin: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Mô Tả',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.description, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Mô Tả',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           AnimatedCrossFade(
             firstChild: Text(
               _movie!.description,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-                height: 1.5,
+              style: TextStyle(
+                color: Colors.grey[300],
+                fontSize: 15,
+                height: 1.6,
               ),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
             secondChild: Text(
               _movie!.description,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-                height: 1.5,
+              style: TextStyle(
+                color: Colors.grey[300],
+                fontSize: 15,
+                height: 1.6,
               ),
             ),
             crossFadeState: _isExpanded
@@ -611,22 +862,43 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 300),
           ),
-          TextButton(
-            onPressed: () {
-              setState(() => _isExpanded = !_isExpanded);
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _isExpanded ? 'Thu gọn' : 'Xem thêm',
-                  style: const TextStyle(color: Color(0xFFE50914)),
+          const SizedBox(height: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                setState(() => _isExpanded = !_isExpanded);
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFFE50914).withOpacity(0.3),
+                    width: 1,
+                  ),
                 ),
-                Icon(
-                  _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: const Color(0xFFE50914),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isExpanded ? 'Thu gọn' : 'Xem thêm',
+                      style: const TextStyle(
+                        color: Color(0xFFE50914),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: const Color(0xFFE50914),
+                      size: 20,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -637,11 +909,31 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildCommentSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2A2A)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 15,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -649,111 +941,178 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Bình Luận',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.comment, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Bình Luận',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
               if (_comments.isNotEmpty)
-                Text(
-                  '${_comments.length} bình luận',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_comments.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           // Comment input
           Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _commentController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Viết bình luận...',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                    filled: true,
-                    fillColor: const Color(0xFF2A2A2A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF2A2A2A).withOpacity(0.8),
+                        const Color(0xFF1A1A1A).withOpacity(0.8),
+                      ],
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFE50914).withOpacity(0.2),
+                      width: 1,
+                    ),
                   ),
-                  maxLines: 3,
-                  minLines: 1,
+                  child: TextField(
+                    controller: _commentController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Viết bình luận...',
+                      hintStyle: TextStyle(color: Colors.grey[600]),
+                      filled: false,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    maxLines: 3,
+                    minLines: 1,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: _isSubmittingComment ? null : _submitComment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE50914),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _isSubmittingComment ? null : _submitComment,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      child: _isSubmittingComment
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send, color: Colors.white, size: 24),
+                    ),
                   ),
                 ),
-                child: _isSubmittingComment
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.send, color: Colors.white),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           // View comments button - chỉ hiển thị khi có bình luận hoặc để người dùng xem
-          InkWell(
-            onTap: () => _showAllCommentsDialog(),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFE50914).withOpacity(0.3),
-                  width: 1,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showAllCommentsDialog(),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF2A2A2A).withOpacity(0.8),
+                      const Color(0xFF1A1A1A).withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFE50914).withOpacity(0.4),
+                    width: 1.5,
+                  ),
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.comment_outlined,
-                    color: Color(0xFFE50914),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _comments.isEmpty
-                        ? 'Xem bình luận'
-                        : 'Xem ${_comments.length} bình luận',
-                    style: const TextStyle(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.comment_outlined,
                       color: Color(0xFFE50914),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      size: 22,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    color: Color(0xFFE50914),
-                    size: 16,
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Text(
+                      _comments.isEmpty
+                          ? 'Xem bình luận'
+                          : 'Xem ${_comments.length} bình luận',
+                      style: const TextStyle(
+                        color: Color(0xFFE50914),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Color(0xFFE50914),
+                      size: 16,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1209,56 +1568,88 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final bool isEnabled = _hasShowtimes;
     
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       width: double.infinity,
-      height: 56,
+      height: 64,
       decoration: BoxDecoration(
         gradient: isEnabled
             ? const LinearGradient(
-                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               )
-            : null,
-        color: isEnabled ? null : Colors.grey.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16),
+            : LinearGradient(
+                colors: [
+                  Colors.grey.withOpacity(0.3),
+                  Colors.grey.withOpacity(0.2),
+                ],
+              ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: isEnabled
             ? [
                 BoxShadow(
                   color: const Color(0xFFE50914).withOpacity(0.5),
                   blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 4),
                 ),
               ]
             : null,
+        border: isEnabled
+            ? Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              )
+            : null,
       ),
-      child: ElevatedButton(
-        onPressed: isEnabled ? _handleBookButton : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          disabledBackgroundColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isEnabled ? _handleBookButton : null,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isEnabled ? Icons.event_seat : Icons.event_busy,
+                    color: isEnabled ? Colors.white : Colors.grey[400],
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  isEnabled ? 'ĐẶT VÉ NGAY' : 'CHƯA CÓ LỊCH CHIẾU',
+                  style: TextStyle(
+                    color: isEnabled ? Colors.white : Colors.grey[400],
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    shadows: isEnabled
+                        ? [
+                            const Shadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isEnabled ? Icons.event_seat : Icons.event_busy,
-              color: isEnabled ? Colors.white : Colors.grey[400],
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              isEnabled ? 'ĐẶT VÉ NGAY' : 'CHƯA CÓ LỊCH CHIẾU',
-              style: TextStyle(
-                color: isEnabled ? Colors.white : Colors.grey[400],
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
         ),
       ),
     );

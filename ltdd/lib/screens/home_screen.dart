@@ -30,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
   int _unreadNotificationCount = 0;
   Timer? _notificationRefreshTimer;
@@ -52,6 +53,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
+    _searchFocusNode.addListener(() {
+      setState(() {}); // Rebuild để update search bar styling
+    });
     _loadAllCinemas();
     if (widget.selectedCinemaId != null) {
       _loadSelectedCinema();
@@ -228,6 +232,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     _notificationRefreshTimer?.cancel();
     _movieRefreshTimer?.cancel();
@@ -644,29 +649,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildSearchBar() {
+    final bool isFocused = _searchFocusNode.hasFocus;
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                const Color(0xFF2A2A2A),
-                const Color(0xFF1A1A1A),
-              ],
+              colors: isFocused
+                  ? [
+                      const Color(0xFF3A2A2A),
+                      const Color(0xFF2A1A1A),
+                    ]
+                  : [
+                      const Color(0xFF2A2A2A),
+                      const Color(0xFF1A1A1A),
+                    ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: const Color(0xFFE50914).withOpacity(0.2),
-              width: 1.5,
+              color: isFocused
+                  ? const Color(0xFFE50914).withOpacity(0.6)
+                  : const Color(0xFFE50914).withOpacity(0.2),
+              width: isFocused ? 2 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFE50914).withOpacity(0.2),
-                blurRadius: 15,
-                spreadRadius: 1,
+                color: isFocused
+                    ? const Color(0xFFE50914).withOpacity(0.4)
+                    : const Color(0xFFE50914).withOpacity(0.2),
+                blurRadius: isFocused ? 20 : 15,
+                spreadRadius: isFocused ? 2 : 1,
                 offset: const Offset(0, 4),
               ),
               BoxShadow(
@@ -678,18 +695,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           child: TextField(
             controller: _searchController,
+            focusNode: _searchFocusNode,
             onChanged: _onSearchChanged,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white, fontSize: 15),
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Tìm kiếm theo tên phim hoặc thể loại...',
-              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+              hintStyle: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 14,
+              ),
               prefixIcon: Container(
                 padding: const EdgeInsets.all(12),
-                child: const Icon(
-                  Icons.search_rounded,
-                  color: Color(0xFFE50914),
-                  size: 24,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Icon(
+                    isFocused ? Icons.search_rounded : Icons.search_rounded,
+                    key: ValueKey<bool>(isFocused),
+                    color: isFocused
+                        ? const Color(0xFFE50914)
+                        : const Color(0xFFE50914).withOpacity(0.8),
+                    size: 24,
+                  ),
                 ),
               ),
               suffixIcon: _searchController.text.isNotEmpty
@@ -697,15 +724,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       icon: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE50914).withOpacity(0.2),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                          ),
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE50914).withOpacity(0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.close_rounded, color: Color(0xFFE50914), size: 18),
+                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
                       ),
                       tooltip: 'Xóa tìm kiếm',
                       onPressed: () {
                         setState(() {
                           _searchController.clear();
+                          _searchFocusNode.unfocus();
                         });
                         // Khi xóa từ khóa, chuyển về tab "Đang Chiếu" và reload lại phim
                         // Reload carousel movies khi xóa search
@@ -736,24 +773,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             colors: [
-              const Color(0xFF2A2A2A),
-              const Color(0xFF1A1A1A),
+              Color(0xFF2A2A2A),
+              Color(0xFF1F1F1F),
+              Color(0xFF1A1A1A),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(
-            color: const Color(0xFF2A2A2A).withOpacity(0.5),
-            width: 1,
+            color: const Color(0xFF2A2A2A).withOpacity(0.6),
+            width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 15,
+              spreadRadius: 1,
               offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: const Color(0xFFE50914).withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -765,11 +809,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(25),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFE50914).withOpacity(0.5),
-                blurRadius: 8,
+                color: const Color(0xFFE50914).withOpacity(0.6),
+                blurRadius: 12,
+                spreadRadius: 1,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -777,17 +822,33 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           indicatorSize: TabBarIndicatorSize.tab,
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelColor: Colors.grey[500],
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+            letterSpacing: 0.3,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 10,
+          ),
+          tabAlignment: TabAlignment.fill,
           tabs: const [
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.play_circle_outline, size: 16),
+                  Icon(Icons.play_circle_filled, size: 16),
                   SizedBox(width: 4),
-                  Text('Đang Chiếu', style: TextStyle(fontSize: 12)),
+                  Flexible(
+                    child: Text(
+                      'Đang Chiếu',
+                      style: TextStyle(fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -796,9 +857,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.schedule, size: 16),
+                  Icon(Icons.schedule_rounded, size: 16),
                   SizedBox(width: 4),
-                  Text('Sắp Chiếu', style: TextStyle(fontSize: 12)),
+                  Flexible(
+                    child: Text(
+                      'Sắp Chiếu',
+                      style: TextStyle(fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -807,9 +875,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.trending_up, size: 16),
+                  Icon(Icons.trending_up_rounded, size: 16),
                   SizedBox(width: 4),
-                  Text('Phổ Biến', style: TextStyle(fontSize: 12)),
+                  Flexible(
+                    child: Text(
+                      'Phổ Biến',
+                      style: TextStyle(fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -912,17 +987,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       },
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFE50914).withOpacity(0.3),
-              blurRadius: 15,
+              color: const Color(0xFFE50914).withOpacity(0.4),
+              blurRadius: 20,
+              spreadRadius: 1,
               offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -931,7 +1012,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 fit: BoxFit.cover,
                 placeholder: (context, url) => ShimmerLoadingCard(
                   height: double.infinity,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 errorWidget: (context, url, error) => Container(
                   color: Colors.grey[800],
@@ -945,8 +1026,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.9),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.7),
+                      Colors.black.withOpacity(0.95),
                     ],
+                    stops: const [0.0, 0.4, 0.7, 1.0],
                   ),
                 ),
               ),
@@ -1019,44 +1103,72 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE50914).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(0xFFE50914).withOpacity(0.3),
-                            width: 1,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE50914).withOpacity(0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          movie.genre,
-                          style: const TextStyle(
-                            color: Color(0xFFE50914),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.local_movies,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              movie.genre,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white.withOpacity(0.2),
+                                  Colors.white.withOpacity(0.1),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1,
+                              ),
                             ),
-                            child: const Icon(Icons.access_time, color: Colors.white70, size: 14),
+                            child: const Icon(Icons.access_time, color: Colors.white, size: 14),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Text(
                             '${movie.duration} phút',
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: Colors.white,
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
@@ -1167,12 +1279,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               SmoothPageIndicator(
                 controller: _carouselController!,
                 count: _carouselMovies.length,
-                effect: const WormEffect(
-                  activeDotColor: Color(0xFFE50914),
-                  dotColor: Color(0xFF2A2A2A),
+                effect: ExpandingDotsEffect(
+                  activeDotColor: const Color(0xFFE50914),
+                  dotColor: const Color(0xFF2A2A2A),
                   dotHeight: 8,
                   dotWidth: 8,
                   spacing: 8,
+                  expansionFactor: 3,
+                  radius: 12,
                 ),
               ),
               const SizedBox(height: 20),
@@ -1199,10 +1313,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              blurRadius: 25,
+              spreadRadius: 2,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.6),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -1228,8 +1348,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.9),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.6),
+                      Colors.black.withOpacity(0.95),
                     ],
+                    stops: const [0.0, 0.5, 0.75, 1.0],
                   ),
                 ),
               ),

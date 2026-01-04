@@ -718,19 +718,65 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFF0F0F0F),
+        elevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF4CAF50).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4CAF50).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
         title: const Text(
           'Nhiệm Vụ',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 0.5,
+          ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           // Chỉ admin mới có nút reset
           if (_isAdmin)
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: () => _showAdminResetDialog(),
-              tooltip: 'Reset nhiệm vụ (Admin)',
+            Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF4CAF50).withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: () => _showAdminResetDialog(),
+                tooltip: 'Reset nhiệm vụ (Admin)',
+              ),
             ),
         ],
       ),
@@ -746,25 +792,71 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
                   // Points display
                   if (_user != null)
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                          colors: [Color(0xFF4CAF50), Color(0xFF388E3C), Color(0xFF2E7D32)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4CAF50).withOpacity(0.5),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.stars, color: Colors.white, size: 32),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${_user!.points} điểm',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
                             ),
+                            child: const Icon(Icons.stars, color: Colors.white, size: 32),
+                          ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_user!.points}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black26,
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Text(
+                                'điểm',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -777,13 +869,29 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
                     const SizedBox(height: 24),
                   ],
                   
-                  const Text(
-                    'Nhiệm Vụ Có Sẵn',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.task_alt, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Nhiệm Vụ Có Sẵn',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   ..._tasks.where((task) => !_claimedTaskIds.contains(task.id)).map((task) => _buildTaskCard(task)),
@@ -820,21 +928,33 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isClaimed
-                      ? const Color(0xFF4CAF50).withOpacity(0.3)
-                      : isCompleted
-                          ? const Color(0xFF4CAF50).withOpacity(0.3)
-                          : const Color(0xFF4CAF50).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: isClaimed || isCompleted
+                      ? const LinearGradient(
+                          colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                        )
+                      : LinearGradient(
+                          colors: [
+                            const Color(0xFF4CAF50).withOpacity(0.5),
+                            const Color(0xFF4CAF50).withOpacity(0.3),
+                          ],
+                        ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: isClaimed || isCompleted
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF4CAF50).withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Icon(
                   task.icon, 
-                  color: isClaimed || isCompleted
-                      ? const Color(0xFF4CAF50)
-                      : const Color(0xFF4CAF50).withOpacity(0.7), 
-                  size: 24
+                  color: Colors.white, 
+                  size: 26
                 ),
               ),
               const SizedBox(width: 16),
@@ -1004,49 +1124,97 @@ class _VoucherTasksScreenState extends State<VoucherTasksScreen> {
           const SizedBox(height: 16),
           // Reward info
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    task.rewardType == 'points' ? Icons.stars : Icons.card_giftcard,
-                    color: const Color(0xFFE50914),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    task.rewardType == 'points'
-                        ? '${task.rewardValue} điểm'
-                        : '${task.rewardValue} voucher',
-                    style: const TextStyle(
-                      color: Color(0xFFE50914),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              Icon(
+                task.rewardType == 'points' ? Icons.stars : Icons.card_giftcard,
+                color: const Color(0xFFE50914),
+                size: 20,
               ),
-              ElevatedButton(
-                onPressed: canClaim
-                    ? () => _claimReward(task)
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.withOpacity(0.3),
-                  disabledForegroundColor: Colors.grey[600],
-                ),
-                child: Text(
-                  isClaimed 
-                      ? 'Đã Nhận' 
-                      : isCompleted 
-                          ? 'Nhận Thưởng' 
-                          : task.requirementType == 'manual'
-                              ? 'Hoàn Thành'
-                              : 'Chưa Hoàn Thành',
+              const SizedBox(width: 8),
+              Text(
+                task.rewardType == 'points'
+                    ? '${task.rewardValue} điểm'
+                    : '${task.rewardValue} voucher',
+                style: const TextStyle(
+                  color: Color(0xFFE50914),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: canClaim
+                  ? const LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                    )
+                  : isClaimed
+                      ? LinearGradient(
+                          colors: [
+                            Colors.grey.withOpacity(0.3),
+                            Colors.grey.withOpacity(0.2),
+                          ],
+                        )
+                      : LinearGradient(
+                          colors: [
+                            Colors.grey.withOpacity(0.3),
+                            Colors.grey.withOpacity(0.2),
+                          ],
+                        ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: canClaim
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF4CAF50).withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: canClaim ? () => _claimReward(task) : null,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isClaimed
+                            ? Icons.check_circle
+                            : isCompleted
+                                ? Icons.card_giftcard
+                                : Icons.hourglass_empty,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isClaimed 
+                            ? 'Đã Nhận' 
+                            : isCompleted 
+                                ? 'Nhận Thưởng'
+                                : task.requirementType == 'manual'
+                                    ? 'Hoàn Thành'
+                                    : 'Chưa Hoàn Thành',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

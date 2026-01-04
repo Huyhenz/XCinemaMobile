@@ -185,36 +185,45 @@ class ProfileScreen extends StatelessWidget {
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF3A3A3A),
-          width: 1,
+          color: Colors.white.withOpacity(0.3),
+          width: 1.5,
         ),
-      ),
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LoginScreen(isLoginMode: false),
-            ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
-        child: const Text(
-          'ĐĂNG KÝ',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 2,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoginScreen(isLoginMode: false),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            alignment: Alignment.center,
+            child: const Text(
+              'ĐĂNG KÝ',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 2,
+              ),
+            ),
           ),
         ),
       ),
@@ -322,6 +331,23 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   state.user!.phone!,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (state.user!.dateOfBirth != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.cake_outlined, color: Colors.grey[600], size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  DateFormat('dd/MM/yyyy').format(DateTime.fromMillisecondsSinceEpoch(state.user!.dateOfBirth!)),
                   style: TextStyle(
                     color: Colors.grey[400],
                     fontSize: 14,
@@ -699,9 +725,29 @@ class ProfileScreen extends StatelessWidget {
           Container(
             height: MediaQuery.of(context).size.height * 0.5, // Chiều cao động dựa trên màn hình (50% chiều cao màn hình)
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2A2A2A)),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF2196F3).withOpacity(0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2196F3).withOpacity(0.1),
+                  blurRadius: 15,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -740,9 +786,23 @@ class ProfileScreen extends StatelessWidget {
       child: Container(
         margin: EdgeInsets.only(bottom: removeBottomMargin ? 0 : 16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF2196F3).withOpacity(0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -836,30 +896,51 @@ class ProfileScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: booking.status == 'confirmed'
-                          ? const Color(0xFF4CAF50).withOpacity(0.2)
-                          : const Color(0xFFE50914).withOpacity(0.2),
+                      gradient: booking.status == 'confirmed'
+                          ? const LinearGradient(
+                              colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                            )
+                          : const LinearGradient(
+                              colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                            ),
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (booking.status == 'confirmed'
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFFE50914))
+                              .withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Text(
                       booking.status == 'confirmed' ? 'Đã Xác Nhận' : 'Đã Hủy',
-                      style: TextStyle(
-                        color: booking.status == 'confirmed'
-                            ? const Color(0xFF4CAF50)
-                            : const Color(0xFFE50914),
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  Text(
-                    '${NumberFormat('#,###', 'vi_VN').format(booking.finalPrice ?? booking.totalPrice)}đ',
-                    style: const TextStyle(
-                      color: Color(0xFFE50914),
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${NumberFormat('#,###', 'vi_VN').format(booking.finalPrice ?? booking.totalPrice)}đ',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -915,9 +996,19 @@ class ProfileScreen extends StatelessWidget {
           maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(
+                color: const Color(0xFF2196F3).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
           ),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -966,10 +1057,25 @@ class ProfileScreen extends StatelessWidget {
               builder: (context, snackSnapshot) {
                 final snackMap = snackSnapshot.data ?? {};
                 return Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF2196F3).withOpacity(0.2),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
@@ -1046,24 +1152,46 @@ class ProfileScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2A2A2A),
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1.5,
                 ),
               ),
-              child: const Text(
-                'Đóng',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.close, color: Colors.white, size: 22),
+                        SizedBox(width: 10),
+                        Text(
+                          'Đóng',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-                SizedBox(height: MediaQuery.of(context).padding.bottom),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
               ],
             ),
           ),
@@ -1129,7 +1257,7 @@ class _ProfileContent extends StatefulWidget {
 }
 
 class _ProfileContentState extends State<_ProfileContent> {
-  bool _hasCheckedDateOfBirth = false;
+  bool _hasCheckedMissingInfo = false;
 
   // Delegate các methods đến ProfileScreen static methods
   Widget _buildHeader() => ProfileScreen._buildHeaderStatic();
@@ -1143,15 +1271,33 @@ class _ProfileContentState extends State<_ProfileContent> {
     return BlocListener<ProfileBloc, ProfileState>(
       listener: (context, state) {
         // Chỉ kiểm tra một lần khi user data đã load xong
-        if (!_hasCheckedDateOfBirth && 
+        if (!_hasCheckedMissingInfo && 
             !state.isLoading && 
-            state.user != null && 
-            state.user!.dateOfBirth == null) {
-          _hasCheckedDateOfBirth = true;
-          // Hiển thị dialog yêu cầu cập nhật ngày sinh
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _showDateOfBirthDialog(context);
-          });
+            state.user != null) {
+          // Kiểm tra nếu thiếu số điện thoại hoặc ngày sinh
+          final userPhone = state.user!.phone;
+          final userDateOfBirth = state.user!.dateOfBirth;
+          
+          print('📝 ProfileScreen checking missing info:');
+          print('   - phone: ${userPhone == null ? "null" : (userPhone.isEmpty ? "empty" : userPhone)}');
+          print('   - dateOfBirth: ${userDateOfBirth == null ? "null" : userDateOfBirth}');
+          
+          final missingPhone = userPhone == null || userPhone.isEmpty;
+          final missingDateOfBirth = userDateOfBirth == null;
+          
+          print('   - missingPhone: $missingPhone');
+          print('   - missingDateOfBirth: $missingDateOfBirth');
+          
+          if (missingPhone || missingDateOfBirth) {
+            print('⚠️ Showing missing info dialog');
+            _hasCheckedMissingInfo = true;
+            // Hiển thị dialog yêu cầu cập nhật thông tin thiếu
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _showMissingInfoDialog(context, missingPhone, missingDateOfBirth);
+            });
+          } else {
+            print('✅ All info is present, no dialog needed');
+          }
         }
       },
       child: BlocBuilder<ProfileBloc, ProfileState>(
@@ -1205,20 +1351,43 @@ class _ProfileContentState extends State<_ProfileContent> {
     );
   }
 
-  void _showDateOfBirthDialog(BuildContext context) {
+  void _showMissingInfoDialog(BuildContext context, bool missingPhone, bool missingDateOfBirth) {
+    // Tạo danh sách thông tin thiếu
+    List<String> missingItems = [];
+    if (missingPhone) missingItems.add('Số điện thoại');
+    if (missingDateOfBirth) missingItems.add('Ngày tháng năm sinh');
+    
+    String missingInfoText = missingItems.join(' và ');
+    String contentText = missingItems.length == 2
+        ? 'Vui lòng cập nhật số điện thoại và ngày tháng năm sinh trong thông tin cá nhân để có thể sử dụng đầy đủ các tính năng của ứng dụng.'
+        : missingPhone
+            ? 'Vui lòng cập nhật số điện thoại trong thông tin cá nhân để có thể sử dụng đầy đủ các tính năng của ứng dụng.'
+            : 'Vui lòng cập nhật ngày tháng năm sinh trong thông tin cá nhân để có thể đặt vé phim có độ tuổi xem.';
+    
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.info_outline, color: Color(0xFFE50914), size: 28),
-            SizedBox(width: 12),
-            Expanded(
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.info_outline,
+                color: Colors.orange,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
               child: Text(
                 'Cập nhật thông tin',
                 style: TextStyle(
@@ -1230,19 +1399,58 @@ class _ProfileContentState extends State<_ProfileContent> {
             ),
           ],
         ),
-        content: const Text(
-          'Vui lòng cập nhật ngày sinh trong thông tin cá nhân để có thể đặt vé phim có độ tuổi xem.',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 16,
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              contentText,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+            ),
+            if (missingItems.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Thông tin cần cập nhật: $missingInfoText',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Để sau',
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           ElevatedButton(
@@ -1257,6 +1465,10 @@ class _ProfileContentState extends State<_ProfileContent> {
                 // Refresh profile sau khi cập nhật
                 if (context.mounted) {
                   context.read<ProfileBloc>().add(RefreshProfile(widget.userId));
+                  // Reset flag để có thể hiển thị lại dialog nếu vẫn còn thiếu thông tin
+                  setState(() {
+                    _hasCheckedMissingInfo = false;
+                  });
                 }
               });
             },

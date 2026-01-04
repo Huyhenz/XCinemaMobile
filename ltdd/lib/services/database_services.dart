@@ -1,6 +1,7 @@
 // File: lib/services/database_services.dart
 // FINAL FIX - Xử lý hoàn toàn mọi trường hợp data lỗi
 
+import 'dart:convert';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/booking.dart';
@@ -1751,6 +1752,219 @@ class DatabaseService {
     } catch (e) {
       print('Error updating user: $e');
       rethrow;
+    }
+  }
+
+  // ✅ Helper method để lưu temp_registrations an toàn
+  Future<void> saveTempRegistration(String userId, Map<String, dynamic> data) async {
+    try {
+      print('📝 Saving temp_registrations for user: $userId');
+      print('📝 Data: $data');
+      
+      // Đảm bảo tất cả giá trị đều là primitive types (String, int, double, bool, null)
+      Map<String, dynamic> cleanData = {};
+      data.forEach((key, value) {
+        if (value is String || value is int || value is double || value is bool || value == null) {
+          cleanData[key] = value;
+        } else {
+          // Convert các kiểu khác thành String
+          cleanData[key] = value.toString();
+          print('⚠️ Converted $key from ${value.runtimeType} to String: ${value.toString()}');
+        }
+      });
+      
+      await _db.child('temp_registrations').child(userId).set(cleanData);
+      print('✅ Saved temp_registrations successfully');
+    } catch (e) {
+      print('❌ Error saving temp_registrations: $e');
+      rethrow;
+    }
+  }
+
+  // ✅ Helper method để đọc temp_registrations an toàn
+  // Sử dụng onValue listener để đọc raw data và xử lý cả String và Map
+  Future<Map<dynamic, dynamic>?> getTempRegistration(String userId) async {
+    print('📝 Attempting to get temp_registrations for user: $userId');
+    
+    try {
+      // Sử dụng once() để đọc data một lần (trả về Stream)
+      final event = await _db.child('temp_registrations').child(userId).once();
+      
+      if (!event.snapshot.exists) {
+        print('ℹ️ temp_registrations does not exist for user: $userId');
+        return null;
+      }
+      
+      final value = event.snapshot.value;
+      
+      if (value == null) {
+        print('ℹ️ temp_registrations value is null for user: $userId');
+        return null;
+      }
+
+      print('📝 Raw value type: ${value.runtimeType}');
+      
+      // Xử lý trường hợp value là String (JSON string)
+      if (value is String) {
+        print('⚠️ temp_registrations is stored as String, attempting to parse JSON...');
+        try {
+          // Thử parse JSON
+          final decoded = jsonDecode(value);
+          if (decoded is Map) {
+            final mapData = Map<dynamic, dynamic>.from(decoded);
+            print('✅ Successfully parsed JSON string: $mapData');
+            
+            // Fix data: Lưu lại dưới dạng Map để lần sau không cần parse
+            try {
+              await _db.child('temp_registrations').child(userId).set(mapData);
+              print('✅ Fixed and saved temp_registrations as Map');
+            } catch (e) {
+              print('⚠️ Error fixing temp_registrations: $e');
+            }
+            
+            return mapData;
+          } else {
+            print('⚠️ Parsed JSON is not a Map: ${decoded.runtimeType}');
+            // Xóa corrupt data
+            try {
+              await _db.child('temp_registrations').child(userId).remove();
+              print('✅ Removed corrupt temp_registrations data');
+            } catch (e) {
+              print('⚠️ Error removing corrupt data: $e');
+            }
+            return null;
+          }
+        } catch (e) {
+          print('⚠️ Error parsing JSON string: $e');
+          print('⚠️ Raw string value: $value');
+          // Nếu không parse được JSON, xóa corrupt data
+          try {
+            await _db.child('temp_registrations').child(userId).remove();
+            print('✅ Removed corrupt temp_registrations data');
+          } catch (removeError) {
+            print('⚠️ Error removing corrupt data: $removeError');
+          }
+          return null;
+        }
+      }
+      
+      // Xử lý trường hợp value là Map
+      if (value is Map) {
+        try {
+          final mapData = Map<dynamic, dynamic>.from(value);
+          print('✅ Successfully parsed temp_registrations (Map): $mapData');
+          return mapData;
+        } catch (e) {
+          print('⚠️ Error converting Map: $e');
+          return null;
+        }
+      }
+      
+      // Nếu không phải Map hoặc String
+      print('⚠️ temp_registrations has unexpected type: ${value.runtimeType}');
+      return null;
+      
+    } on FirebaseException catch (e, stackTrace) {
+      print('⚠️ FirebaseException getting temp_registrations: ${e.code} - ${e.message}');
+      print('⚠️ Stack trace: $stackTrace');
+      return null;
+    } catch (e, stackTrace) {
+      // Xử lý các exception khác (bao gồm TypeError)
+      print('❌ Unexpected error getting temp_registrations: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      
+      // Nếu là TypeError về String/Map, thử xóa và return null
+      if (e.toString().contains('String') && e.toString().contains('Map')) {
+        print('⚠️ Detected String/Map type error, attempting to remove corrupt data...');
+        try {
+          await _db.child('temp_registrations').child(userId).remove();
+          print('✅ Removed potentially corrupt temp_registrations');
+        } catch (removeError) {
+          print('⚠️ Error removing corrupt data: $removeError');
+        }
+      }
+      
+      return null;
+    }
+  }
+
+  // ✅ Helper method để cập nhật user từ temp_registrations nếu các trường null
+  Future<void> updateUserFromTempRegistration(String userId) async {
+    try {
+      UserModel? existingUser = await getUser(userId);
+      if (existingUser == null) {
+        print('⚠️ User not found, cannot update from temp_registrations');
+        return;
+      }
+
+      // Kiểm tra xem có cần cập nhật không
+      if (existingUser.phone != null && existingUser.dateOfBirth != null) {
+        print('ℹ️ User already has phone and dateOfBirth, no need to update');
+        return;
+      }
+
+      // Lấy temp_registrations
+      Map<dynamic, dynamic>? tempData = await getTempRegistration(userId);
+      if (tempData == null) {
+        print('ℹ️ No temp_registrations found for user');
+        return;
+      }
+
+      // Chuẩn bị updates
+      Map<String, dynamic> updates = {};
+      
+      // Parse phone
+      if (existingUser.phone == null) {
+        final phoneValue = tempData['phone'];
+        if (phoneValue != null && phoneValue.toString().trim().isNotEmpty) {
+          updates['phone'] = phoneValue.toString().trim();
+        }
+      }
+      
+      // Parse dateOfBirth
+      if (existingUser.dateOfBirth == null) {
+        final dateOfBirthValue = tempData['dateOfBirth'];
+        if (dateOfBirthValue != null) {
+          if (dateOfBirthValue is int) {
+            updates['dateOfBirth'] = dateOfBirthValue;
+          } else if (dateOfBirthValue is num) {
+            updates['dateOfBirth'] = dateOfBirthValue.toInt();
+          } else {
+            final parsed = int.tryParse(dateOfBirthValue.toString());
+            if (parsed != null) {
+              updates['dateOfBirth'] = parsed;
+            }
+          }
+        }
+      }
+      
+      // Parse name (nếu là "New User")
+      if (existingUser.name == 'New User' || existingUser.name.isEmpty) {
+        final nameValue = tempData['name'];
+        if (nameValue != null && nameValue.toString().trim().isNotEmpty) {
+          updates['name'] = nameValue.toString().trim();
+        }
+      }
+
+      // Cập nhật nếu có thay đổi
+      if (updates.isNotEmpty) {
+        print('📝 Updating user from temp_registrations: $updates');
+        await updateUser(userId, updates);
+        print('✅ Updated user from temp_registrations');
+        
+        // Xóa temp_registrations sau khi cập nhật thành công
+        try {
+          await _db.child('temp_registrations').child(userId).remove();
+          print('✅ Removed temp_registrations after update');
+        } catch (e) {
+          print('⚠️ Error removing temp_registrations: $e');
+        }
+      } else {
+        print('ℹ️ No updates needed from temp_registrations');
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error updating user from temp_registrations: $e');
+      print('❌ Stack trace: $stackTrace');
     }
   }
 

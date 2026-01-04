@@ -174,16 +174,64 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 60),
-              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFE50914).withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: const Icon(Icons.error_outline, color: Color(0xFFE50914), size: 64),
+              ),
+              const SizedBox(height: 24),
               const Text(
                 'Không tìm thấy thông tin suất chiếu',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Quay lại'),
+              const SizedBox(height: 24),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      child: const Text(
+                        'Quay lại',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -194,21 +242,63 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: const Color(0xFF0F0F0F),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFE50914).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFE50914).withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         title: const Text(
           'Chọn Ghế',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 0.5,
+          ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadData,
-            tooltip: 'Làm mới',
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE50914).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: _loadData,
+              tooltip: 'Làm mới',
+            ),
           ),
         ],
       ),
@@ -233,19 +323,46 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
-        height: 60,
+        height: 70,
         decoration: BoxDecoration(
-          color: const Color(0xFFE50914),
-          borderRadius: BorderRadius.circular(8),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE50914).withOpacity(0.4),
+              blurRadius: 15,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.white.withOpacity(0.2),
+            width: 1,
+          ),
         ),
         child: const Center(
           child: Text(
             'MÀN HÌNH',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
-              letterSpacing: 3,
+              letterSpacing: 4,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                ),
+              ],
             ),
           ),
         ),
@@ -260,11 +377,39 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
     final theaterType = _theater!.theaterType;
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFFE50914).withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 12,
+            spreadRadius: 1,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
             children: [
               _buildLegendItem('Trống', const Color(0xFF2A2A2A), theaterType),
               _buildLegendItem('Đã chọn', const Color(0xFFE50914), theaterType),
@@ -272,9 +417,24 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
             ],
           ),
           if (theaterType == 'normal') ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            const SizedBox(height: 12),
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF2A2A2A),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 20,
               children: [
                 _buildLegendItem('Ghế đơn', const Color(0xFF2A2A2A), 'normal', seatType: 'single'),
                 _buildLegendItem('Ghế đôi', const Color(0xFF2A2A2A), 'normal', seatType: 'couple'),
@@ -288,25 +448,66 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
 
   Widget _buildLegendItem(String label, Color color, String theaterType, {String? seatType}) {
     final seatConfig = _getSeatConfig(theaterType, seatType ?? 'single');
+    final isSelected = color == const Color(0xFFE50914);
+    
+    // Giảm kích thước icon trong legend để tránh overflow
+    final iconWidth = (theaterType == 'vip' || theaterType == 'couple') 
+        ? (seatConfig['width'] as double) * 0.7
+        : (seatConfig['width'] as double);
+    final iconHeight = (theaterType == 'vip' || theaterType == 'couple')
+        ? (seatConfig['height'] as double) * 0.7
+        : (seatConfig['height'] as double);
+    final iconSize = (theaterType == 'vip' || theaterType == 'couple')
+        ? (seatConfig['iconSize'] as double) * 0.7
+        : (seatConfig['iconSize'] as double);
+    
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: seatConfig['width'] as double,
-          height: seatConfig['height'] as double,
+          width: iconWidth,
+          height: iconHeight,
           decoration: BoxDecoration(
-            color: color,
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: isSelected ? null : color,
             borderRadius: BorderRadius.circular(seatConfig['borderRadius'] as double),
+            border: isSelected
+                ? Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  )
+                : null,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Icon(
             seatConfig['icon'] as IconData,
             color: Colors.white70,
-            size: seatConfig['iconSize'] as double,
+            size: iconSize,
           ),
         ),
         const SizedBox(width: 8),
         Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -557,16 +758,41 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
       onTap: isAvailable ? () => _toggleSeat(seat) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: seatColor,
-          borderRadius: BorderRadius.circular(borderRadius),
-          border: isBooked
-              ? Border.all(
-                  color: Colors.grey[700]!,
-                  width: 1,
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 )
+              : null,
+          color: isSelected ? null : seatColor,
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: isSelected
+              ? Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1.5,
+                )
+              : isBooked
+                  ? Border.all(
+                      color: Colors.grey[700]!,
+                      width: 1,
+                    )
+                  : Border.all(
+                      color: const Color(0xFF2A2A2A).withOpacity(0.5),
+                      width: 1,
+                    ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
               : null,
         ),
         child: Center(
@@ -596,15 +822,31 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
 
 
   Widget _buildBottomBar() {
+    final isEnabled = _selectedSeats.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(
+          top: BorderSide(
+            color: const Color(0xFFE50914).withOpacity(0.3),
+            width: 1.5,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 15,
             offset: const Offset(0, -5),
+          ),
+          BoxShadow(
+            color: const Color(0xFFE50914).withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
           ),
         ],
       ),
@@ -615,53 +857,140 @@ class _BookingScreenState extends State<BookingScreen> with TickerProviderStateM
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${_selectedSeats.length} ghế đã chọn',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFE50914).withOpacity(0.2),
+                            const Color(0xFFB20710).withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.event_seat,
+                        color: Color(0xFFE50914),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${_selectedSeats.length} ghế đã chọn',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '${NumberFormat('#,###', 'vi_VN').format(_totalPrice)}₫',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE50914).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '${NumberFormat('#,###', 'vi_VN').format(_totalPrice)}₫',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            SizedBox(
+            const SizedBox(height: 18),
+            Container(
               width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _selectedSeats.isNotEmpty ? _proceedToPayment : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _selectedSeats.isNotEmpty
-                      ? const Color(0xFF2A2A2A)
-                      : Colors.grey[800],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.payment, color: Colors.white, size: 20),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'TIẾP TỤC THANH TOÁN',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: isEnabled
+                    ? const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : LinearGradient(
+                        colors: [
+                          Colors.grey.withOpacity(0.3),
+                          Colors.grey.withOpacity(0.2),
+                        ],
                       ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: isEnabled
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 8),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+                border: isEnabled
+                    ? Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      )
+                    : null,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isEnabled ? _proceedToPayment : null,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.payment, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 16),
+                        const Text(
+                          'TIẾP TỤC THANH TOÁN',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
