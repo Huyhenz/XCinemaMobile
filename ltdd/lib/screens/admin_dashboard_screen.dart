@@ -20,6 +20,8 @@ import '../services/database_services.dart';
 import '../utils/dialog_helper.dart';
 import '../widgets/hamburger_menu_button.dart';
 import 'admin_cleanup_screen.dart';
+import 'admin_intro_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -30,6 +32,40 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _currentIndex = 0;
+  bool _isCheckingIntro = true;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIntroStatus();
+  }
+
+  Future<void> _checkIntroStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final introCompleted = prefs.getBool('admin_intro_completed') ?? false;
+      
+      if (!introCompleted && mounted) {
+        // Hiển thị intro screen lần đầu
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const AdminIntroScreen(isFirstTime: true),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      print('Error checking intro status: $e');
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isCheckingIntro = false;
+      });
+    }
+  }
+
 
   void _navigateToTab(int index) {
     setState(() {
@@ -106,24 +142,89 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingIntro) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F0F0F),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFE50914)),
+        ),
+      );
+    }
+
     return BlocProvider(
       create: (context) => AdminBloc()..add(LoadAdminData()),
       child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: const Color(0xFF0F0F0F),
         drawer: _buildDrawer(),
         appBar: AppBar(
-          title: Text(_getCurrentTitle()),
+          backgroundColor: const Color(0xFF0F0F0F),
+          elevation: 0,
+          title: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              _getCurrentTitle(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.cleaning_services),
-              tooltip: 'Database Cleanup',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminCleanupScreen(),
+            Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2A2A2A), Color(0xFF1A1A1A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                );
-              },
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.cleaning_services, color: Colors.white),
+                tooltip: 'Database Cleanup',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminCleanupScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
             const Padding(
               padding: EdgeInsets.only(right: 8.0),
@@ -138,68 +239,238 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildDrawer() {
     return Drawer(
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: const Color(0xFF0F0F0F),
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              color: Color(0xFFE50914),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const Icon(
-                  Icons.admin_panel_settings,
-                  color: Colors.white,
-                  size: 48,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Admin Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
                 ),
               ],
+            ),
+            child: DrawerHeader(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.admin_panel_settings,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Admin Dashboard',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           _buildDrawerItem(Icons.theaters, 'Tạo Rạp Chiếu', 0),
           _buildDrawerItem(Icons.business, 'Quản Lý Rạp Chiếu', 1),
-          const Divider(color: Color(0xFF2A2A2A)),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           _buildDrawerItem(Icons.movie, 'Tạo Phim', 2),
           _buildDrawerItem(Icons.edit, 'Quản Lý Phim', 3),
           _buildDrawerItem(Icons.schedule, 'Tạo Lịch Chiếu', 4),
           _buildDrawerItem(Icons.event_available, 'Quản Lý Lịch Chiếu', 5),
           _buildDrawerItem(Icons.meeting_room, 'Tạo Phòng Chiếu', 6),
           _buildDrawerItem(Icons.room, 'Quản Lý Phòng Chiếu', 7),
-          const Divider(color: Color(0xFF2A2A2A)),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           _buildDrawerItem(Icons.local_offer, 'Tạo Voucher', 8),
           _buildDrawerItem(Icons.card_giftcard, 'Quản Lý Voucher', 9),
-          const Divider(color: Color(0xFF2A2A2A)),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           _buildDrawerItem(Icons.games, 'Quản Lý Minigame', 10),
-          const Divider(color: Color(0xFF2A2A2A)),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           _buildDrawerItem(Icons.fastfood, 'Tạo Bắp Nước', 11),
           _buildDrawerItem(Icons.restaurant_menu, 'Quản Lý Bắp Nước', 12),
-          const Divider(color: Color(0xFF2A2A2A)),
-          ListTile(
-            leading: const Icon(Icons.cleaning_services, color: Colors.grey),
-            title: const Text(
-              'Database Cleanup',
-              style: TextStyle(color: Colors.white),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF2A2A2A),
+                  Colors.transparent,
+                ],
+              ),
             ),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AdminCleanupScreen(),
+          ),
+          Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF2196F3).withOpacity(0.3),
+                  const Color(0xFF1976D2).withOpacity(0.2),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF2196F3).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF2196F3).withOpacity(0.3),
+                      const Color(0xFF1976D2).withOpacity(0.2),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              );
-            },
+                child: const Icon(Icons.help_outline, color: Color(0xFF2196F3), size: 20),
+              ),
+              title: const Text(
+                'Xem lại hướng dẫn',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminIntroScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF2A2A2A).withOpacity(0.5),
+                  const Color(0xFF1A1A1A).withOpacity(0.5),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.grey.withOpacity(0.3),
+                      Colors.grey.withOpacity(0.2),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.cleaning_services, color: Colors.white70, size: 20),
+              ),
+              title: const Text(
+                'Database Cleanup',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminCleanupScreen(),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -207,15 +478,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildDrawerItem(IconData icon, String title, int tabIndex) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(
-        title,
-        style: const TextStyle(color: Colors.white),
+    final isSelected = _currentIndex == tabIndex;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isSelected ? null : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected
+              ? Colors.white.withOpacity(0.2)
+              : Colors.transparent,
+          width: 1,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
-      onTap: () => _navigateToTab(tabIndex),
-      selected: _currentIndex == tabIndex,
-      selectedTileColor: const Color(0xFF2A2A2A),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Colors.white.withOpacity(0.2)
+                : const Color(0xFF2A2A2A).withOpacity(0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: isSelected ? Colors.white : Colors.white70,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14,
+          ),
+        ),
+        onTap: () => _navigateToTab(tabIndex),
+      ),
     );
   }
 }
@@ -288,110 +604,310 @@ class _CreateCinemaTabState extends State<_CreateCinemaTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Name
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Tên Rạp Chiếu *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.theaters),
-              ),
-              validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên rạp' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Address
-            TextFormField(
-              controller: _addressController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Địa Chỉ *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.location_on),
-              ),
-              validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập địa chỉ' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Phone
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Số Điện Thoại',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Image URL
-            TextFormField(
-              controller: _imageUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Link Ảnh Rạp (URL)',
-                hintText: 'https://example.com/cinema.jpg',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.image),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Latitude
-            TextFormField(
-              controller: _latitudeController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Vĩ Độ (Latitude)',
-                hintText: '10.762622',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.map),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Longitude
-            TextFormField(
-              controller: _longitudeController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Kinh Độ (Longitude)',
-                hintText: '106.660172',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.map),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Create Button
-            ElevatedButton(
-              onPressed: _isCreating ? null : _createCinema,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE50914),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isCreating
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'TẠO RẠP CHIẾU',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Card
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.4),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 8),
                     ),
+                  ],
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.theaters, color: Colors.white, size: 32),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tạo Rạp Chiếu Mới',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Điền thông tin để tạo rạp chiếu mới',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Form Fields Container
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF2A2A2A),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Name
+                    _buildStyledTextField(
+                      controller: _nameController,
+                      label: 'Tên Rạp Chiếu *',
+                      icon: Icons.theaters,
+                      validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập tên rạp' : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Address
+                    _buildStyledTextField(
+                      controller: _addressController,
+                      label: 'Địa Chỉ *',
+                      icon: Icons.location_on,
+                      maxLines: 2,
+                      validator: (value) => value?.isEmpty ?? true ? 'Vui lòng nhập địa chỉ' : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Phone
+                    _buildStyledTextField(
+                      controller: _phoneController,
+                      label: 'Số Điện Thoại',
+                      icon: Icons.phone,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Image URL
+                    _buildStyledTextField(
+                      controller: _imageUrlController,
+                      label: 'Link Ảnh Rạp (URL)',
+                      icon: Icons.image,
+                      hintText: 'https://example.com/cinema.jpg',
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Location Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStyledTextField(
+                            controller: _latitudeController,
+                            label: 'Vĩ Độ (Latitude)',
+                            icon: Icons.map,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            hintText: '10.762622',
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildStyledTextField(
+                            controller: _longitudeController,
+                            label: 'Kinh Độ (Longitude)',
+                            icon: Icons.map,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            hintText: '106.660172',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Create Button
+              Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: _isCreating
+                      ? null
+                      : const LinearGradient(
+                          colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                  color: _isCreating ? Colors.grey[800] : null,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: _isCreating
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: const Color(0xFFE50914).withOpacity(0.4),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _isCreating ? null : _createCinema,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      alignment: Alignment.center,
+                      child: _isCreating
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.add_circle_outline, color: Colors.white, size: 24),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'TẠO RẠP CHIẾU',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 1,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStyledTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? hintText,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A).withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF3A3A3A),
+          width: 1,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        validator: validator,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey[600]),
+          labelStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFE50914).withOpacity(0.3),
+                  const Color(0xFFB20710).withOpacity(0.2),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
+            child: Icon(icon, color: const Color(0xFFE50914), size: 20),
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
     );
@@ -404,108 +920,246 @@ class _ManageCinemasTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AdminBloc, AdminState>(
-      builder: (context, state) {
-        if (state.isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFE50914)),
-          );
-        }
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: BlocBuilder<AdminBloc, AdminState>(
+        builder: (context, state) {
+          if (state.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFFE50914)),
+            );
+          }
 
-        if (state.cinemas.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.theaters_outlined, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Chưa có rạp chiếu nào',
-                    style: TextStyle(color: Colors.grey, fontSize: 18),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Hãy tạo rạp chiếu mới ở tab "Tạo Rạp Chiếu"',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: state.cinemas.length,
-          itemBuilder: (context, index) {
-            final cinema = state.cinemas[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              color: const Color(0xFF1A1A1A),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: Container(
-                  padding: const EdgeInsets.all(12),
+          if (state.cinemas.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Container(
+                  padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE50914).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.theaters, color: Color(0xFFE50914), size: 28),
-                ),
-                title: Text(
-                  cinema.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    Text(
-                      cinema.address,
-                      style: TextStyle(color: Colors.grey[400]),
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF2A2A2A),
+                      width: 1.5,
                     ),
-                    if (cinema.phone != null && cinema.phone!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'ĐT: ${cinema.phone}',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
                       ),
                     ],
-                    if (cinema.latitude != null && cinema.longitude != null) ...[
-                      const SizedBox(height: 4),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.grey.withOpacity(0.3),
+                              Colors.grey.withOpacity(0.2),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.theaters_outlined, size: 64, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Chưa có rạp chiếu nào',
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
                       Text(
-                        'Vị trí: ${cinema.latitude!.toStringAsFixed(6)}, ${cinema.longitude!.toStringAsFixed(6)}',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        'Hãy tạo rạp chiếu mới ở tab "Tạo Rạp Chiếu"',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                        textAlign: TextAlign.center,
                       ),
                     ],
-                  ],
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Color(0xFF4CAF50)),
-                      onPressed: () => _showEditCinemaDialog(context, cinema),
-                      tooltip: 'Sửa rạp chiếu',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Color(0xFFE50914)),
-                      onPressed: () => _showDeleteCinemaConfirmDialog(context, cinema),
-                      tooltip: 'Xóa rạp chiếu',
-                    ),
-                  ],
+                  ),
                 ),
               ),
             );
-          },
-        );
-      },
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20.0),
+            itemCount: state.cinemas.length,
+            itemBuilder: (context, index) {
+              final cinema = state.cinemas[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF1A1A1A),
+                      const Color(0xFF2A2A2A).withOpacity(0.5),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF3A3A3A),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE50914).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.theaters, color: Colors.white, size: 32),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cinema.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.location_on, color: Colors.grey[400], size: 16),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    cinema.address,
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (cinema.phone != null && cinema.phone!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.phone, color: Colors.grey[400], size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    cinema.phone!,
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (cinema.latitude != null && cinema.longitude != null) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.map, color: Colors.grey[400], size: 16),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      '${cinema.latitude!.toStringAsFixed(6)}, ${cinema.longitude!.toStringAsFixed(6)}',
+                                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF4CAF50).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.white),
+                              onPressed: () => _showEditCinemaDialog(context, cinema),
+                              tooltip: 'Sửa rạp chiếu',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE50914).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.white),
+                              onPressed: () => _showDeleteCinemaConfirmDialog(context, cinema),
+                              tooltip: 'Xóa rạp chiếu',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -529,29 +1183,71 @@ class _ManageCinemasTab extends StatelessWidget {
           value: adminBloc,
           child: AlertDialog(
             backgroundColor: const Color(0xFF1A1A1A),
-            title: const Text(
-              'Xác nhận xóa',
-              style: TextStyle(color: Colors.white),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: const Color(0xFFE50914).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            title: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+                  SizedBox(width: 12),
+                  Text(
+                    'Xác nhận xóa',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
             content: Text(
               'Bạn có chắc chắn muốn xóa rạp chiếu "${cinema.name}"?\n\nHành động này không thể hoàn tác.',
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: Colors.white70, fontSize: 15),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  adminBloc.add(DeleteCinema(cinema.id));
-                  Navigator.pop(dialogContext);
-                  await DialogHelper.showSuccess(context, '✅ Đã xóa rạp chiếu');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE50914),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 ),
-                child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey, fontSize: 15)),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE50914), Color(0xFFB20710)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE50914).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () async {
+                    adminBloc.add(DeleteCinema(cinema.id));
+                    Navigator.pop(dialogContext);
+                    await DialogHelper.showSuccess(context, '✅ Đã xóa rạp chiếu');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: const Text('Xóa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
               ),
             ],
           ),
@@ -890,65 +1586,213 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
   Widget build(BuildContext context) {
     return BlocBuilder<AdminBloc, AdminState>(
       builder: (context, state) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Cinema Selection
-                if (_isLoadingCinemas)
-                  const Center(child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: CircularProgressIndicator(color: Color(0xFFE50914)),
-                  ))
-                else ...[
-                  // Checkbox for "Create for all cinemas"
-                  CheckboxListTile(
-                    title: const Text(
-                      'Tạo cho tất cả rạp',
-                      style: TextStyle(fontSize: 16),
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header Card
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE50914).withOpacity(0.4),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      ),
                     ),
-                    subtitle: const Text(
-                      'Tạo phim này cho tất cả rạp cùng lúc',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.movie, color: Colors.white, size: 32),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tạo Phim Mới',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black26,
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Điền thông tin để tạo phim mới',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    value: _createForAllCinemas,
-                    onChanged: (value) {
-                      setState(() {
-                        _createForAllCinemas = value ?? false;
-                        if (_createForAllCinemas) {
-                          _selectedCinemaId = null;
-                        }
-                      });
-                    },
-                    activeColor: const Color(0xFFE50914),
                   ),
-                  const SizedBox(height: 8),
-                  // Cinema dropdown (disabled when "create for all" is selected)
-                  DropdownButtonFormField<String>(
-                    value: _selectedCinemaId,
-                    decoration: const InputDecoration(
-                      labelText: 'Chọn Rạp Chiếu *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.theaters),
+                  const SizedBox(height: 24),
+
+                  // Form Fields Container
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF2A2A2A),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    items: _cinemas.map((cinema) {
-                      return DropdownMenuItem<String>(
-                        value: cinema.id,
-                        child: Text(cinema.name),
-                      );
-                    }).toList(),
-                    onChanged: _createForAllCinemas ? null : (value) {
-                      setState(() {
-                        _selectedCinemaId = value;
-                      });
-                    },
-                    validator: _createForAllCinemas ? null : (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
-                  ),
-                ],
-                const SizedBox(height: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Cinema Selection
+                        if (_isLoadingCinemas)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(color: Color(0xFFE50914)),
+                            ),
+                          )
+                        else ...[
+                          // Checkbox for "Create for all cinemas"
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2A2A2A).withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF3A3A3A),
+                                width: 1,
+                              ),
+                            ),
+                            child: CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                'Tạo cho tất cả rạp',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                              ),
+                              subtitle: const Text(
+                                'Tạo phim này cho tất cả rạp cùng lúc',
+                                style: TextStyle(color: Colors.grey, fontSize: 12),
+                              ),
+                              value: _createForAllCinemas,
+                              onChanged: (value) {
+                                setState(() {
+                                  _createForAllCinemas = value ?? false;
+                                  if (_createForAllCinemas) {
+                                    _selectedCinemaId = null;
+                                  }
+                                });
+                              },
+                              activeColor: const Color(0xFFE50914),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Cinema dropdown (disabled when "create for all" is selected)
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2A2A2A).withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF3A3A3A),
+                                width: 1,
+                              ),
+                            ),
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedCinemaId,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Chọn Rạp Chiếu *',
+                                labelStyle: TextStyle(color: Colors.grey[400]),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                prefixIcon: Container(
+                                  margin: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFFE50914).withOpacity(0.3),
+                                        const Color(0xFFB20710).withOpacity(0.2),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.theaters, color: Color(0xFFE50914), size: 20),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              ),
+                              dropdownColor: const Color(0xFF1A1A1A),
+                              items: _cinemas.map((cinema) {
+                                return DropdownMenuItem<String>(
+                                  value: cinema.id,
+                                  child: Text(cinema.name, style: const TextStyle(color: Colors.white)),
+                                );
+                              }).toList(),
+                              onChanged: _createForAllCinemas ? null : (value) {
+                                setState(() {
+                                  _selectedCinemaId = value;
+                                });
+                              },
+                              validator: _createForAllCinemas ? null : (value) => value == null ? 'Vui lòng chọn rạp chiếu' : null,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
 
                 // Title
                 TextFormField(
@@ -1139,30 +1983,83 @@ class _CreateMovieTabState extends State<_CreateMovieTab> {
                     ),
                   ),
 
-                const SizedBox(height: 24),
-
-                // Create Button
-                ElevatedButton(
-                  onPressed: _isCreating ? null : _createMovie,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE50914),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                      ],
+                    ),
                   ),
-                  child: _isCreating
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'TẠO PHIM',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  const SizedBox(height: 24),
+
+                  // Create Button
+                  Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: _isCreating
+                          ? null
+                          : const LinearGradient(
+                              colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                      color: _isCreating ? Colors.grey[800] : null,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: _isCreating
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: const Color(0xFFE50914).withOpacity(0.4),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isCreating ? null : _createMovie,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          alignment: Alignment.center,
+                          child: _isCreating
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.add_circle_outline, color: Colors.white, size: 24),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'TẠO PHIM',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        letterSpacing: 1,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black26,
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
-                ),
-              ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -2053,13 +2950,36 @@ class _ManageShowtimesTab extends StatelessWidget {
             // Nút xóa tất cả lịch chiếu
             Container(
               margin: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: ElevatedButton.icon(
                 onPressed: () => _showDeleteAllShowtimesDialog(context, state.showtimes.length),
                 icon: const Icon(Icons.delete_sweep, color: Colors.white),
-                label: Text('Xóa Tất Cả Lịch Chiếu (${state.showtimes.length})'),
+                label: Text(
+                  'Xóa Tất Cả Lịch Chiếu (${state.showtimes.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[700],
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 ),
               ),
             ),
@@ -2566,13 +3486,36 @@ class _ManageTheatersTab extends StatelessWidget {
             // Nút xóa tất cả phòng chiếu
             Container(
               margin: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: ElevatedButton.icon(
                 onPressed: () => _showDeleteAllTheatersDialog(context, state.theaters.length),
                 icon: const Icon(Icons.delete_sweep, color: Colors.white),
-                label: Text('Xóa Tất Cả Phòng Chiếu (${state.theaters.length})'),
+                label: Text(
+                  'Xóa Tất Cả Phòng Chiếu (${state.theaters.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[700],
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 ),
               ),
             ),
@@ -3741,13 +4684,36 @@ class _ManageMoviesTab extends StatelessWidget {
             // Nút xóa tất cả phim
             Container(
               margin: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE50914), Color(0xFFB20710), Color(0xFF8B0000)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE50914).withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: ElevatedButton.icon(
                 onPressed: () => _showDeleteAllMoviesDialog(context, state.movies.length),
                 icon: const Icon(Icons.delete_sweep, color: Colors.white),
-                label: Text('Xóa Tất Cả Phim (${state.movies.length})'),
+                label: Text(
+                  'Xóa Tất Cả Phim (${state.movies.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[700],
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 ),
               ),
             ),

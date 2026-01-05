@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ltdd/widgets/navigation_provider.dart';
 import 'package:ltdd/screens/get_voucher_screen.dart';
+import 'package:ltdd/screens/admin_intro_screen.dart';
 
 class HamburgerMenuButton extends StatelessWidget {
   const HamburgerMenuButton({super.key});
@@ -101,8 +102,20 @@ class HamburgerMenuButton extends StatelessWidget {
         index: 1,
         currentIndex: currentIndex,
         onTap: () {
-          provider.navigateTo(1);
           Navigator.pop(context);
+          // Chuyển sang dashboard trước
+          provider.navigateTo(1);
+          // Sau đó hiển thị intro admin dashboard
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminIntroScreen(isFirstTime: false),
+                ),
+              );
+            }
+          });
         },
       ),
       _buildMenuItem(
